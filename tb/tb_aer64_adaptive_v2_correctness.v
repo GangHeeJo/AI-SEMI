@@ -17,9 +17,7 @@ module tb_aer64_adaptive_v2_correctness;
 
   always #5 clk = ~clk;
 
-  integer queue [0:63][0:QDEPTH-1];
-  integer qhead [0:63];
-  integer qcount [0:63];
+  event_scoreboard #(.N(64), .QDEPTH(QDEPTH)) score();
   reg [63:0] seen;
   integer errors, errors_before;
   integer i, idx;
@@ -28,7 +26,7 @@ module tb_aer64_adaptive_v2_correctness;
     integer c;
     begin
       errors_before = errors;
-      for (i=0;i<64;i=i+1) begin qhead[i]=0; qcount[i]=0; end
+      score.init;
       req = 64'd0; new_event = 64'd0;
       repeat (20) begin @(posedge clk); #1; end
 
@@ -36,12 +34,12 @@ module tb_aer64_adaptive_v2_correctness;
       for (c = 0; c < cycles; c = c + 1) begin
         new_event = 64'd0;
         for (i = 0; i < 64; i = i + 1) begin
-          if (pattern[i] && qcount[i] == 0) begin
-            qcount[i] = 1;
+          if (pattern[i] && score.qcount[i] == 0) begin
+            score.record_arrival(i, c);
             new_event[i] = 1'b1;
           end
         end
-        for (i = 0; i < 64; i = i + 1) req[i] = (qcount[i] > 0);
+        for (i = 0; i < 64; i = i + 1) req[i] = (score.qcount[i] > 0);
 
         @(posedge clk); #1;
 
@@ -51,7 +49,10 @@ module tb_aer64_adaptive_v2_correctness;
             $display("FAIL[%0s]: req에 없는 이벤트(row=%0d,col=%0d)가 복원됨", label, event_row, event_col);
             errors = errors + 1;
           end
-          if (qcount[idx] > 0) qcount[idx] = qcount[idx] - 1;
+          if (score.record_departure(idx, c) < 0) begin
+            $display("FAIL[%0s]: phantom 이벤트(row=%0d,col=%0d, 밀린 게 없었음)", label, event_row, event_col);
+            errors = errors + 1;
+          end
           seen[idx] = 1'b1;
         end
       end

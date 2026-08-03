@@ -16,9 +16,7 @@ module tb_debug_hotarb;
   always #5 clk = ~clk;
 
   integer rng_seed = 1;
-  integer queue [0:15][0:QDEPTH-1];
-  integer qhead [0:15];
-  integer qcount [0:15];
+  event_scoreboard #(.N(16), .QDEPTH(QDEPTH)) score();
   integer cyc, i;
 
   integer row_pick_count [0:3]; // ROW 패킷으로 실제 선택된 행 카운트(누적)
@@ -29,20 +27,17 @@ module tb_debug_hotarb;
 
   initial begin
     rst = 1; req = 16'd0;
-    for (i=0;i<16;i=i+1) begin qhead[i]=0; qcount[i]=0; end
+    score.init;
     for (i=0;i<4;i=i+1) row_pick_count[i]=0;
     @(posedge clk); #1; rst = 0;
 
     for (cyc = 0; cyc < CYCLES; cyc = cyc + 1) begin
       for (i = 0; i < 16; i = i + 1) begin
         if ((($random(rng_seed) % 100 + 100) % 100) < (is_hotspot(i) ? HOT_PCT : BG_PCT)) begin
-          if (qcount[i] < QDEPTH) begin
-            queue[i][(qhead[i]+qcount[i])%QDEPTH] = cyc;
-            qcount[i] = qcount[i] + 1;
-          end
+          score.record_arrival(i, cyc);
         end
       end
-      for (i = 0; i < 16; i = i + 1) req[i] = (qcount[i] > 0);
+      for (i = 0; i < 16; i = i + 1) req[i] = (score.qcount[i] > 0);
 
       @(posedge clk); #1;
 

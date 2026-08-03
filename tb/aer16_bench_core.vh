@@ -1,4 +1,5 @@
 // aer_tx16 계열(기본판/fovea판 등) 공용 성능 측정 코어. `TX / `TX_NAME 매크로로 송신기 지정.
+// 큐/지연시간/공정성 추적은 event_scoreboard(공용 채점기)로 통일함.
 module tb_aer16_bench;
   `ifndef SEED_VAL
   `define SEED_VAL 1
@@ -28,18 +29,11 @@ module tb_aer16_bench;
   aer_rx16 rx(.clk(clk), .rst(rst), .valid(valid), .addr_type(addr_type), .addr(addr),
               .event_valid(event_valid), .event_row(event_row), .event_col(event_col));
 
+  event_scoreboard #(.N(N), .QDEPTH(QDEPTH)) score();
+
   always #5 clk = ~clk;
 
-  integer queue [0:N-1][0:QDEPTH-1];
-  integer qhead [0:N-1];
-  integer qcount [0:N-1];
-
   integer cyc, i, latency, idx;
-  integer total_latency [0:N-1];
-  integer max_latency   [0:N-1];
-  integer grant_count   [0:N-1];
-  integer total_grants;
-  integer overflow_warns;
   integer phantom_errors;
 
   function integer group_of(input integer idx_);
@@ -51,42 +45,27 @@ module tb_aer16_bench;
   endfunction
 
   initial begin
-    rst = 1; req = 16'd0; total_grants = 0; overflow_warns = 0; phantom_errors = 0;
-    for (i = 0; i < N; i = i + 1) begin
-      qhead[i] = 0; qcount[i] = 0;
-      total_latency[i] = 0; max_latency[i] = 0; grant_count[i] = 0;
-    end
+    rst = 1; req = 16'd0; phantom_errors = 0;
+    score.init;
     @(posedge clk); #1;
     rst = 0;
 
     for (cyc = 0; cyc < CYCLES; cyc = cyc + 1) begin
       for (i = 0; i < N; i = i + 1) begin
         if ((($random(rng_seed) % 100 + 100) % 100) < ARRIVAL_PCT) begin
-          if (qcount[i] < QDEPTH) begin
-            queue[i][(qhead[i] + qcount[i]) % QDEPTH] = cyc;
-            qcount[i] = qcount[i] + 1;
-          end else begin
-            overflow_warns = overflow_warns + 1;
-          end
+          score.record_arrival(i, cyc);
         end
       end
-      for (i = 0; i < N; i = i + 1) req[i] = (qcount[i] > 0);
+      for (i = 0; i < N; i = i + 1) req[i] = (score.qcount[i] > 0);
 
       @(posedge clk); #1;
 
       if (event_valid) begin
         idx = event_row * 4 + event_col;
-        if (qcount[idx] == 0) begin
+        latency = score.record_departure(idx, cyc);
+        if (latency < 0) begin
           $display("PHANTOM ERROR: cycle=%0d row=%0d col=%0d 인데 대기 이벤트가 없었음", cyc, event_row, event_col);
           phantom_errors = phantom_errors + 1;
-        end else begin
-          latency = cyc - queue[idx][qhead[idx]];
-          total_latency[idx] = total_latency[idx] + latency;
-          if (latency > max_latency[idx]) max_latency[idx] = latency;
-          grant_count[idx] = grant_count[idx] + 1;
-          total_grants = total_grants + 1;
-          qhead[idx] = (qhead[idx] + 1) % QDEPTH;
-          qcount[idx] = qcount[idx] - 1;
         end
       end
     end
@@ -100,30 +79,28 @@ module tb_aer16_bench;
   end
 
   task print_report;
-    integer sum_lat, max_lat_all, min_gc, max_gc;
     integer g_sum_lat [0:1], g_sum_grants [0:1];
+    integer min_gc, max_gc;
     begin
-      sum_lat = 0; max_lat_all = 0; min_gc = grant_count[0]; max_gc = grant_count[0];
       g_sum_lat[0] = 0; g_sum_lat[1] = 0; g_sum_grants[0] = 0; g_sum_grants[1] = 0;
+      min_gc = score.visits[0]; max_gc = score.visits[0];
       for (i = 0; i < N; i = i + 1) begin
-        sum_lat = sum_lat + total_latency[i];
-        if (max_latency[i] > max_lat_all) max_lat_all = max_latency[i];
-        if (grant_count[i] < min_gc) min_gc = grant_count[i];
-        if (grant_count[i] > max_gc) max_gc = grant_count[i];
-        g_sum_lat[group_of(i)]    = g_sum_lat[group_of(i)] + total_latency[i];
-        g_sum_grants[group_of(i)] = g_sum_grants[group_of(i)] + grant_count[i];
+        g_sum_lat[group_of(i)]    = g_sum_lat[group_of(i)] + score.lat_sum_by_idx[i];
+        g_sum_grants[group_of(i)] = g_sum_grants[group_of(i)] + score.visits[i];
+        if (score.visits[i] < min_gc) min_gc = score.visits[i];
+        if (score.visits[i] > max_gc) max_gc = score.visits[i];
       end
 
       $display("=== AER16[%s] BENCH REPORT (CYCLES=%0d, ARRIVAL_PCT=%0d%%) ===", `TX_NAME, CYCLES, ARRIVAL_PCT);
-      $display("[1] 평균 지연시간: %0d cycles (total_grants=%0d)", (total_grants>0)?sum_lat/total_grants:0, total_grants);
-      $display("[2] 최악 지연시간: %0d cycles", max_lat_all);
-      $display("[3] 공정성: max-min grant 차이 = %0d (min=%0d, max=%0d)", max_gc - min_gc, min_gc, max_gc);
-      $display("[4] 처리량: %0d grants / %0d cycles = %0d.%0d grants per 100cycles", total_grants, CYCLES, (total_grants*100)/CYCLES, ((total_grants*10000)/CYCLES)%100);
+      $display("[1] 평균 지연시간: %0d cycles (total_grants=%0d)", score.avg_latency(0), score.count);
+      $display("[2] 최악 지연시간: %0d cycles", score.max_lat);
+      $display("[3] 공정성: max-min grant 차이 = %0d (min=%0d, max=%0d), Jain fairness index = %0d/1000", max_gc - min_gc, min_gc, max_gc, score.jain_fairness_x1000(0));
+      $display("[4] 처리량: %0d grants / %0d cycles = %0d.%0d grants per 100cycles", score.count, CYCLES, (score.count*100)/CYCLES, ((score.count*10000)/CYCLES)%100);
       $display("[5] 그룹간 평균 지연시간: center(2x2)=%0d cycles, periphery(나머지12개)=%0d cycles",
         (g_sum_grants[0] > 0) ? g_sum_lat[0]/g_sum_grants[0] : 0,
         (g_sum_grants[1] > 0) ? g_sum_lat[1]/g_sum_grants[1] : 0);
-      if (overflow_warns > 0)
-        $display("WARNING: 큐 오버플로우 %0d회", overflow_warns);
+      if (score.overflow_count > 0)
+        $display("WARNING: 큐 오버플로우 %0d회", score.overflow_count);
     end
   endtask
 endmodule

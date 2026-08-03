@@ -30,9 +30,7 @@ module tb_moving_hotspot;
   always #5 clk = ~clk;
 
   integer rng_seed = 1;
-  integer queue [0:15][0:QDEPTH-1];
-  integer qhead [0:15];
-  integer qcount [0:15];
+  event_scoreboard #(.N(16), .QDEPTH(QDEPTH)) score();
   integer cyc, i, idx, latency, phase;
 
   // phase 0,2 = 중심(5,6,9,10) hot / phase 1 = 모서리(0,3,12,15) hot
@@ -62,7 +60,7 @@ module tb_moving_hotspot;
 
   initial begin
     rst = 1; req = 16'd0;
-    for (i=0;i<16;i=i+1) begin qhead[i]=0; qcount[i]=0; end
+    score.init;
     transition_cycle[0]=0; transition_cycle[1]=PHASE_LEN; transition_cycle[2]=PHASE_LEN*2;
     settle_cycle[0]=-1; settle_cycle[1]=-1; settle_cycle[2]=-1;
     match_streak[0]=0; match_streak[1]=0; match_streak[2]=0;
@@ -75,13 +73,10 @@ module tb_moving_hotspot;
       phase = current_hotspot_idx(cyc);
       for (i = 0; i < 16; i = i + 1) begin
         if ((($random(rng_seed) % 100 + 100) % 100) < (is_hotspot(i,phase) ? HOT_PCT : BG_PCT)) begin
-          if (qcount[i] < QDEPTH) begin
-            queue[i][(qhead[i]+qcount[i])%QDEPTH] = cyc;
-            qcount[i] = qcount[i] + 1;
-          end
+          score.record_arrival(i, cyc);
         end
       end
-      for (i = 0; i < 16; i = i + 1) req[i] = (qcount[i] > 0);
+      for (i = 0; i < 16; i = i + 1) req[i] = (score.qcount[i] > 0);
 
       @(posedge clk); #1;
 
@@ -108,11 +103,7 @@ module tb_moving_hotspot;
 
       if (event_valid) begin
         idx = event_row*4+event_col;
-        if (qcount[idx] > 0) begin
-          latency = cyc - queue[idx][qhead[idx]];
-          qhead[idx] = (qhead[idx]+1)%QDEPTH;
-          qcount[idx] = qcount[idx]-1;
-        end
+        latency = score.record_departure(idx, cyc);
       end
     end
 

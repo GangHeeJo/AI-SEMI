@@ -21,9 +21,7 @@ module tb_hotspot_v2_center;
   always #5 clk = ~clk;
 
   integer rng_seed = 1;
-  integer queue [0:15][0:QDEPTH-1];
-  integer qhead [0:15];
-  integer qcount [0:15];
+  event_scoreboard #(.N(16), .QDEPTH(QDEPTH)) score();
   integer cyc, i, idx, latency;
   integer hot_sum_lat, hot_count, hot_max_lat;
 
@@ -34,7 +32,7 @@ module tb_hotspot_v2_center;
   initial begin
     rst = 1; req = 16'd0; new_event = 16'd0;
     hot_sum_lat=0; hot_count=0; hot_max_lat=0;
-    for (i=0;i<16;i=i+1) begin qhead[i]=0; qcount[i]=0; end
+    score.init;
     @(posedge clk); #1; rst = 0;
 
     for (cyc = 0; cyc < CYCLES; cyc = cyc + 1) begin
@@ -42,22 +40,17 @@ module tb_hotspot_v2_center;
       for (i = 0; i < 16; i = i + 1) begin
         if ((($random(rng_seed) % 100 + 100) % 100) < (is_hotspot(i) ? HOT_PCT : BG_PCT)) begin
           new_event[i] = 1'b1;
-          if (qcount[i] < QDEPTH) begin
-            queue[i][(qhead[i]+qcount[i])%QDEPTH] = cyc;
-            qcount[i] = qcount[i] + 1;
-          end
+          score.record_arrival(i, cyc);
         end
       end
-      for (i = 0; i < 16; i = i + 1) req[i] = (qcount[i] > 0);
+      for (i = 0; i < 16; i = i + 1) req[i] = (score.qcount[i] > 0);
 
       @(posedge clk); #1;
 
       if (event_valid) begin
         idx = event_row*4+event_col;
-        if (qcount[idx] > 0) begin
-          latency = cyc - queue[idx][qhead[idx]];
-          qhead[idx] = (qhead[idx]+1)%QDEPTH;
-          qcount[idx] = qcount[idx]-1;
+        latency = score.record_departure(idx, cyc);
+        if (latency >= 0) begin
           if (is_hotspot(idx)) begin
             hot_sum_lat = hot_sum_lat + latency;
             hot_count = hot_count + 1;

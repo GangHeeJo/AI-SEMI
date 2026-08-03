@@ -285,6 +285,15 @@ DECAY_SHIFT를 크게 잡으면 어떻게 되는지 계산해보니, **감쇠가
 
 **의미**: 지금까지 시뮬레이션으로 확인한 adaptive FAER의 기능적 이득(추적정확도 81~95%, hot/배경 지연개선)은 실재하지만, **PPA만 놓고 보면 팀원의 개선안과 마찬가지로 "기각 후보"에 가까움**. 아직 결론 낸 건 아니고, 다음에 결정할 부분: (1) 그래도 adaptive를 메인 제출안으로 밀지, (2) base를 메인으로 하고 adaptive는 "탐색한 개선 방향" 분석으로만 리포트에 담을지, (3) 더 가벼운 버전(활동량 카운터 비트폭 축소, 순위비교 단순화 등)으로 비용을 낮출 수 있는지 탐색할지.
 
+### 5-19. 테스트벤치 통일 — 공용 채점기(event_scoreboard) 도입
+
+친구 팀원의 `aer_scoreboard.sv`(모듈 기반 자체 채점기, Jain fairness index 사용)를 참고해서, 그동안 테스트벤치마다 복사-붙여넣기 해온 "큐 추적 + 지연시간/공정성 통계" 로직을 `tb/event_scoreboard.v` 하나로 통일함.
+
+- **`tb/event_scoreboard.v`**: 셀별 큐(record_arrival/record_departure), 지연시간(평균/최악), overflow 카운트, **Jain's fairness index**(0~1000 정수로 반환)를 제공하는 재사용 가능한 모듈. 모듈로 만들어서 한 테스트벤치 안에서 DUT 두 개(v2 vs v3 비교 등)를 각각 독립된 스코어보드 인스턴스로 다룰 수 있음(친구의 module-scoreboard 패턴과 동일한 이유).
+- **공용 코어 5개**(`aer16_bench_core.vh`, `aer64_bench_core.vh`, `bench_core.vh`, `hotspot_bench_core.vh`, `gap_measure_core.vh`) + **개별 테스트벤치 약 15개**(`tb_*_correctness.v`, `tb_debug_*.v`, `tb_hotspot*_v2*.v`, `tb_moving_hotspot*.v`, `tb_v2_vs_v3_*.v`)를 전부 이 모듈을 쓰도록 리팩터링.
+- **회귀 검증**: 리팩터링 후 15개 이상의 테스트를 재실행해서 기존에 기록해둔 수치와 전부 정확히 일치함을 확인(예: base16 평균535/최악639, FAER 510/1279 max-min152, base64 2689/4605, v2 중심574/699·모서리568/680, base_corner row0=244/row3=243, debug_v2_balance row0=226/row3=226, moving_hotspot64_v2 95%/95% 등) — 동작 변화 없이 구조만 정리됐음을 실증적으로 확인.
+- **덤으로 얻은 것**: 기존 max-min 공정성 지표에 더해 **Jain fairness index**(표준 지표)를 모든 벤치 리포트에 추가함.
+
 ## 7. 다음 액션 (우선순위 순)
 1. **(중요, 미결) base vs adaptive 제출 전략 결정** — 위 PPA 결과를 놓고 adaptive를 계속 밀지, base를 메인으로 하고 adaptive는 분석으로만 담을지, 경량화를 시도할지 결정 필요.
 2. **DS(IOR) 재설계** — v3처럼 "cold로 강등"하는 대신, hot 그룹에 남긴 채로 그 행의 서비스 배분 비중만 일시적으로 줄이는 방식으로 다시 시도(5-16 원인분석: 강등해도 도착률 자체는 안 줄어서 배경 쪽 순번을 뺏는 게 문제였음). STD(습관화)는 v2의 기존 decay로 이미 충분한지 별도 검토.
