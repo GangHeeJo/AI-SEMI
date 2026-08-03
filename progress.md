@@ -268,10 +268,25 @@ DECAY_SHIFT를 크게 잡으면 어떻게 되는지 계산해보니, **감쇠가
 - 타이밍: 5ns 클럭에서 WNS(slack) 3805ps — 여유 많음
 - 전력: 총 3.64uW (vectorless 추정치)
 
-합성 플로우 자체가 정상 동작함을 확인. 다음은 진짜 비교 대상 — `syn/run_genus_base.tcl`(전통적 AER, `aer_tx16`)과 `syn/run_genus_adaptive_v2.tcl`(우리 최종 후보, `aer_tx16_adaptive_v2`)을 합성해서, 팀원 사례([[project_teammate_ai_semi_summary]], round-robin+FIFO가 PPA에서 대폭 손해로 기각된 사례)처럼 우리 adaptive 설계도 PPA 손해가 있는지 실측 확인 예정.
+합성 플로우 자체가 정상 동작함을 확인.
+
+### 5-18. base vs adaptive v2 합성 비교 — 팀원 사례와 같은 방향의 PPA 손해 실측 확인
+
+`syn/run_genus_base.tcl`(`aer_tx16`)과 `syn/run_genus_adaptive_v2.tcl`(`aer_tx16_adaptive_v2`)을 실제 합성해서 비교(5ns 클럭, GPDK045 `slow_vdd1v0_basicCells.lib`, 둘 다 Normal exit, 에러 0건):
+
+| 지표 | base(aer_tx16) | adaptive v2 | 변화 |
+|---|---|---|---|
+| 면적 | 204.858 um² (103셀) | 1613.556 um² (838셀) | **+688%** |
+| WNS @ 5ns | 2883 ps | 608 ps | 크리티컬패스 약 2.1배 |
+| 환산 Fmax (1000/(5-WNS)) | 약 472 MHz | 약 228 MHz | **-52%** |
+| 총 전력(vectorless) | 18.115 uW | 90.126 uW | **+397%** |
+
+**팀원 사례([[project_teammate_ai_semi_summary]])와의 비교**: 팀원의 round-robin+FIFO(기각됨)는 area +549%, Fmax -52%, power +228%였음 — **Fmax 하락폭(-52%)이 우리 결과와 거의 정확히 일치**함. 서로 다른 두 "공정성/적응형 개선" 설계가 독립적으로 비슷한 비율의 Fmax 손해를 보였다는 건, 우연이 아니라 **이런 종류의 로직(활동량 추적, 순위비교, 이중 중재기, FIFO 등)이 이 PDK/셀 라이브러리에서 대략 이 정도의 구조적 비용을 문다**는 걸 시사함.
+
+**의미**: 지금까지 시뮬레이션으로 확인한 adaptive FAER의 기능적 이득(추적정확도 81~95%, hot/배경 지연개선)은 실재하지만, **PPA만 놓고 보면 팀원의 개선안과 마찬가지로 "기각 후보"에 가까움**. 아직 결론 낸 건 아니고, 다음에 결정할 부분: (1) 그래도 adaptive를 메인 제출안으로 밀지, (2) base를 메인으로 하고 adaptive는 "탐색한 개선 방향" 분석으로만 리포트에 담을지, (3) 더 가벼운 버전(활동량 카운터 비트폭 축소, 순위비교 단순화 등)으로 비용을 낮출 수 있는지 탐색할지.
 
 ## 7. 다음 액션 (우선순위 순)
-1. **base vs adaptive v2 합성 비교** — `syn/run_genus_base.tcl`, `syn/run_genus_adaptive_v2.tcl` 실행해서 실제 area/timing/power 차이 확인 (팀원 사례처럼 PPA 손해 가능성 검증).
+1. **(중요, 미결) base vs adaptive 제출 전략 결정** — 위 PPA 결과를 놓고 adaptive를 계속 밀지, base를 메인으로 하고 adaptive는 분석으로만 담을지, 경량화를 시도할지 결정 필요.
 2. **DS(IOR) 재설계** — v3처럼 "cold로 강등"하는 대신, hot 그룹에 남긴 채로 그 행의 서비스 배분 비중만 일시적으로 줄이는 방식으로 다시 시도(5-16 원인분석: 강등해도 도착률 자체는 안 줄어서 배경 쪽 순번을 뺏는 게 문제였음). STD(습관화)는 v2의 기존 decay로 이미 충분한지 별도 검토.
 3. (검토 중) 셀당 FIFO/다중 이벤트 버퍼링을 실제 RTL에 추가할지 결정
 4. Digital 2차 스펙 정의 (좌표/각도 비트폭) 착수
