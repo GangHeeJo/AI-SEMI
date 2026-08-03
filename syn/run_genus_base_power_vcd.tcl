@@ -24,9 +24,10 @@ syn_generic
 syn_map
 syn_opt
 
-# VCD 최상위(tb_aer16_base_vcd) 안에서 실제 DUT는 "tx" 인스턴스이므로 그 하위 스코프를
-# 지정해서 신호를 매칭한다. vectorless 대신 진짜 스위칭 활동으로 전력을 계산.
-read_stimulus -file $VCD_FILE -format vcd -dut_instance tx
+# VCD 최상위(tb_aer16_base_vcd) 안에서 실제 DUT는 "tx" 인스턴스이므로 그 전체 경로를
+# 지정해서 신호를 매칭한다(help read_stimulus로 확인: -dut_instance는 전체 경로 필요,
+# 예 "/cpu_10bit_tb/CPU"). vectorless 대신 진짜 스위칭 활동으로 전력을 계산.
+read_stimulus -file $VCD_FILE -format vcd -dut_instance /tb_aer16_base_vcd/tx
 
 report_power > $OUT_DIR/${DESIGN}_vcd_power.rpt
 

@@ -321,6 +321,11 @@ DECAY_SHIFT를 크게 잡으면 어떻게 되는지 계산해보니, **감쇠가
 
 `syn/run_genus_base_power_vcd.tcl` 작성 완료(첫 시도, `read_stimulus -file ... -format vcd -dut_instance tx`로 VCD를 합성 후 넷리스트에 매칭 시도) — 서버가 비면(현재 다른 세션이 naive 스윕 + 경량화 합성 진행 중) VCD 파일을 scp로 옮기고 실행해서 실제 문법 오류를 보고 다듬을 예정.
 
+**진행 중 겪은 문제와 수정(실제 서버 실행으로 확인)**:
+1. `-dut_instance tx`는 틀린 문법 — `help read_stimulus`로 확인해보니 인스턴스 이름만이 아니라 **VCD 안에서의 전체 경로**가 필요함(예시: `/cpu_10bit_tb/CPU`). 우리 VCD의 최상위가 `tb_aer16_base_vcd`고 그 안의 DUT 인스턴스명이 `tx`이므로 `-dut_instance /tb_aer16_base_vcd/tx`로 수정.
+2. `read_stimulus`가 VCD를 못 읽고 **"Invalid time format around line num 8"** 에러 — Icarus가 `` `timescale`` 지시자를 코드에 안 넣으면 기본값(1초 단위)으로 VCD를 찍는데, Genus의 VCD 파서가 이 비표준 타임스케일을 거부함. `tb/tb_aer16_base_vcd.v` 맨 위에 `` `timescale 1ns/1ps``를 추가해서 해결(로컬 재생성 후 VCD의 `$timescale`이 `1ps`로 정상 출력되는 것 확인, 5ns 클럭 SDC와도 맞아떨어짐 — 논리적 타이밍 관계는 원래도 같았고 물리 단위 해석만 5초→5ns로 바뀐 것).
+3. 수정한 VCD를 서버로 다시 옮겨서 재시도하려던 차에 **다른 세션이 사용량 한도(서버 디스크가 아니라 Claude 세션 자체의 용량/한도)에 도달**해서 중단됨 — 서버 자체엔 문제 없음. 다음 세션에서 이어서 하면 됨: (1) `tb/tb_aer16_base_vcd.v`(timescale 수정본, 아직 로컬 미커밋 상태였을 수 있으니 git 상태 확인) 재실행해서 VCD 재생성 → (2) scp로 서버 전송 → (3) `genus -files syn/run_genus_base_power_vcd.tcl` 재실행 → (4) `report_power`가 vectorless 아니라 VCD 활동도를 실제로 쓰는지 확인(전에는 `-mode : vectorless`로 나와서 로드된 stim이 실제로 안 쓰였을 가능성 있음 — `report_power -stims` 옵션으로 명시적으로 지정해야 할 수도 있음, 다음에 확인 필요).
+
 ### 5-22. "전통적 AER" 기준점(naive) 신설 — base가 실제로 이긴다는 걸 실측으로 증명
 
 지금까지 PPA 비교는 base vs adaptive뿐이었는데, 정작 과제가 요구하는 "전통적 AER 대비 개선"의 **"전통적" 쪽을 합성한 적이 없었음**. 행-열 계층 분해도 버스트 전송도 없는 flat 16:1 라운드로빈 설계(`rtl/arbiter16.v` + `rtl/aer_tx16_naive.v`, 매 사이클 4bit 주소를 통으로 전송)를 새로 만들어 이 공백을 채움. 정확성 검증(단일/16개 동시 라운드로빈/3000cycle 무작위 스트레스, phantom 0건) `tb/tb_aer_tx16_naive.v`로 PASS 확인.
@@ -361,8 +366,9 @@ adaptive v2의 activity(16비트)/round(16비트) 레지스터가 실사용 범�
 **결론**: 비트폭 낭비가 실재했고(면적 기준 원래 손해의 약 40%p 가량을 비트폭 트림만으로 회수) 그만큼은 "그냥 안 다듬어서" 생긴 손해가 맞음. 하지만 base 대비 손해의 대부분(면적 기준 여전히 +427%)은 **hot/cold 이중 arbiter + 4행 순위비교(12번의 크기비교기) 구조 자체의 근본 비용**임이 더 명확해짐 — 경량화만으로는 채택 가능한 수준까지 못 내려감.
 
 ## 7. 다음 액션 (우선순위 순)
-1. **(중요, 미결) base vs adaptive 제출 전략 결정** — 5-22/5-23으로 경량화(비트폭 트림)를 시도해봤지만 여전히 base 대비 +427% area 손해라 채택 가능한 수준까지는 못 내려옴. base는 반대로 naive(전통) 대비 실측 우위(5-22)까지 확인됨 — base를 메인 제출안으로, adaptive는 "탐색·기각 근거를 정직하게 분석한" 리포트 파트로 담는 쪽에 무게가 실리는 중.
-2. **DS(IOR) 재설계** — v3처럼 "cold로 강등"하는 대신, hot 그룹에 남긴 채로 그 행의 서비스 배분 비중만 일시적으로 줄이는 방식으로 다시 시도(5-16 원인분석: 강등해도 도착률 자체는 안 줄어서 배경 쪽 순번을 뺏는 게 문제였음). STD(습관화)는 v2의 기존 decay로 이미 충분한지 별도 검토.
-3. (검토 중) 셀당 FIFO/다중 이벤트 버퍼링을 실제 RTL에 추가할지 결정
-4. Digital 2차 스펙 정의 (좌표/각도 비트폭) 착수
-5. (탐색 후보, 미착수) base/고정FAER 쪽 극단 트래픽(한 셀만 100% 요청) 기아 검증, 8x8 고정FAER의 weight 1~20 전체 테이블(4x4에서만 해봄)
+1. **활동도(VCD) 기반 전력 측정 이어서 하기** — 5-21 참고. 다음 단계: VCD 재생성(timescale 수정 반영) → scp로 서버 전송 → `genus -files syn/run_genus_base_power_vcd.tcl` → `report_power`가 실제 VCD 활동도를 쓰는지(`-stims` 명시 필요할 수 있음) 확인.
+2. **(중요, 미결) base vs adaptive 제출 전략 결정** — 5-22/5-23으로 경량화(비트폭 트림)를 시도해봤지만 여전히 base 대비 +427% area 손해라 채택 가능한 수준까지는 못 내려옴. base는 반대로 naive(전통) 대비 실측 우위(5-22)까지 확인됨 — base를 메인 제출안으로, adaptive는 "탐색·기각 근거를 정직하게 분석한" 리포트 파트로 담는 쪽에 무게가 실리는 중.
+3. **DS(IOR) 재설계** — v3처럼 "cold로 강등"하는 대신, hot 그룹에 남긴 채로 그 행의 서비스 배분 비중만 일시적으로 줄이는 방식으로 다시 시도(5-16 원인분석: 강등해도 도착률 자체는 안 줄어서 배경 쪽 순번을 뺏는 게 문제였음). STD(습관화)는 v2의 기존 decay로 이미 충분한지 별도 검토.
+4. (검토 중) 셀당 FIFO/다중 이벤트 버퍼링을 실제 RTL에 추가할지 결정
+5. Digital 2차 스펙 정의 (좌표/각도 비트폭) 착수
+6. (탐색 후보, 미착수) base/고정FAER 쪽 극단 트래픽(한 셀만 100% 요청) 기아 검증, 8x8 고정FAER의 weight 1~20 전체 테이블(4x4에서만 해봄)
