@@ -1,10 +1,11 @@
-# Genus synthesis smoke test (verified working 2026-08-03: area 54.036 um^2,
-# 33 cells, WNS 3805ps @ 5ns clock, total power 3.64uW). Run from the repo
-# root on the contest server:
-#   genus -files syn/run_genus.tcl
+# Synthesize our best candidate — the adaptive FAER (v2). This is the real
+# PPA risk-check: does the extra activity-tracking/rank/dual-arbiter logic
+# cost too much area/power/frequency, the way the teammate's round-robin+FIFO
+# design did (see teammate_handoff_summary.txt)? Run from the repo root:
+#   genus -files syn/run_genus_adaptive_v2.tcl
 
-set DESIGN   arbiter4
-set RTL_LIST {rtl/arbiter4.v}
+set DESIGN   aer_tx16_adaptive_v2
+set RTL_LIST {rtl/arbiter4.v rtl/aer_tx16_adaptive_v2.v}
 set SDC_FILE syn/constraints_5ns.sdc
 set LIB_FILE /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib
 set OUT_DIR  syn/reports

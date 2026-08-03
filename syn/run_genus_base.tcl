@@ -1,10 +1,9 @@
-# Genus synthesis smoke test (verified working 2026-08-03: area 54.036 um^2,
-# 33 cells, WNS 3805ps @ 5ns clock, total power 3.64uW). Run from the repo
-# root on the contest server:
-#   genus -files syn/run_genus.tcl
+# Synthesize the plain (non-adaptive) AER pipeline — the "traditional" side
+# of the PPA comparison. Run from the repo root on the contest server:
+#   genus -files syn/run_genus_base.tcl
 
-set DESIGN   arbiter4
-set RTL_LIST {rtl/arbiter4.v}
+set DESIGN   aer_tx16
+set RTL_LIST {rtl/arbiter4.v rtl/aer_tx16.v}
 set SDC_FILE syn/constraints_5ns.sdc
 set LIB_FILE /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib
 set OUT_DIR  syn/reports
