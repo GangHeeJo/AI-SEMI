@@ -14,7 +14,8 @@ echo "period_ns | Path1_line"
 echo "----------+----------------------------------------------------------"
 for P in "$@"; do
   AER_DESIGN="$DESIGN" AER_RTL_LIST="$RTL_LIST" AER_CLK_PERIOD="$P" \
-    genus -files syn/run_genus_sweep.tcl > "$OUT/${DESIGN}_${P}.log" 2>&1
-  LINE=$(grep -m1 "^Path 1:" "$OUT/${DESIGN}_${P}.log")
+    genus -files syn/run_genus_sweep.tcl > "$OUT/${DESIGN}_${P}.log" 2>&1 || true
+  # "Path 1: ..." 줄은 로그가 아니라 report_timing이 만든 _timing.rpt 파일 안에 있음.
+  LINE=$(grep -m1 "^Path 1:" "$OUT/${DESIGN}_${P}_timing.rpt" 2>/dev/null || echo "NO MATCH (합성 실패 - 로그 확인: $OUT/${DESIGN}_${P}.log)")
   printf "%-9s | %s\n" "$P" "$LINE"
 done
