@@ -298,16 +298,19 @@ DECAY_SHIFT를 크게 잡으면 어떻게 되는지 계산해보니, **감쇠가
 
 기존 5ns 기준 WNS=2883ps는 임의로 느슨하게 잡은 값이라 진짜 한계가 아니었음. `syn/run_genus_sweep.tcl` + `syn/sweep_fmax.sh`로 클럭 주기를 좁혀가며 base(`aer_tx16`)를 반복 재합성:
 
-| 주기 | 결과 |
-|---|---|
-| 5.0ns | MET, +2883ps |
-| 2.0ns | MET, +13ps |
-| 1.5ns | MET, 0ps |
-| **1.2ns** | **MET, 0ps** |
-| 1.15ns | VIOLATED, -17ps |
-| 1.1ns | VIOLATED, -69ps |
-| 1.05ns | VIOLATED, -116ps |
-| 1.0ns | VIOLATED, -152ps |
+| 주기 | 환산 주파수 | 결과 |
+|---|---:|---|
+| 5.0ns | 200 MHz | MET, +2883ps |
+| 2.0ns | 500 MHz | MET, +13ps |
+| 1.5ns | 667 MHz | MET, 0ps |
+| **1.2ns** | **833 MHz** | **MET, 0ps** |
+| 1.15ns | 870 MHz | VIOLATED, -17ps |
+| 1.1ns | 909 MHz | VIOLATED, -69ps |
+| 1.05ns | 952 MHz | VIOLATED, -116ps |
+| 1.0ns | 1000 MHz | VIOLATED, -152ps |
+| 0.8ns | 1250 MHz | VIOLATED, -345ps |
+
+(전체 원본 로그: `syn/sweep/aer_tx16_<주기>.log`, `syn/sweep/aer_tx16_<주기>_timing.rpt`)
 
 **진짜 Fmax = 1.2ns 주기 = 833.3MHz** (1.2ns에서 정확히 0ps로 딱 맞고 1.15ns부터 확실히 깨짐 — 경계가 아주 좁게 확정됨). 기존 5ns 기준 추정치(472MHz)보다 훨씬 빠르게 동작 가능하다는 게 실측으로 확인됨. 같은 방법으로 naive(전통) 설계도 스윕해서 "각자의 진짜 한계"끼리 비교 예정(다른 세션에서 진행 중).
 
