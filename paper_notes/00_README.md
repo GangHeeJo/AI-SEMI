@@ -20,6 +20,7 @@
 | [D1_02_Boahen2004.md](D1_02_Boahen2004.md) | Boahen (2004) | 행 단위 병렬 판독 + 순차 주소 전송으로 핀 수 절반화 |
 | [D1_03_Park2017_HiAER.md](D1_03_Park2017_HiAER.md) | Park et al. (2017) | 계층적 라우팅(HiAER)으로 단일 버스의 한계 돌파 ⚠️원문 미확보, 후속 공개논문 기반 |
 | [D1_04_Wei2019_RotationArbiter.md](D1_04_Wei2019_RotationArbiter.md) | Wei et al. (2019) | 회전 우선순위 중재기로 "고정 잡음" 공정성 문제 해결 ⚠️초록 기반 |
+| [D1_05_Orchard2021_Loihi2.md](D1_05_Orchard2021_Loihi2.md) | Orchard et al. (2021) | 최신 뉴로모픽(Loihi 2) — 32bit graded spike로 "주소=이벤트" 원칙을 의도적으로 깸, mesh 네트워크 |
 
 ## 지도교수(류현석) 관련 논문·특허
 

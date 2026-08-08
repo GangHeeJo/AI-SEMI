@@ -74,6 +74,8 @@ module tb_gap_measure;
           (gap_sumsq[i]/gap_count[i]) - (gap_sum[i]/gap_count[i])*(gap_sum[i]/gap_count[i]));
       end
     end
+    if (score.overflow_count > 0)
+      $display("WARNING: 큐 오버플로우 %0d회 — row visit 사이 한 셀에 64개 넘게 밀림, gap 측정 전제(방문마다 리셋)가 깨졌을 수 있음", score.overflow_count);
     $finish;
   end
 endmodule

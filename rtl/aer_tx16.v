@@ -7,7 +7,15 @@ module aer_tx16(
   input  [15:0] req,
   output reg    valid,
   output reg    addr_type,   // 0=ROW, 1=COL
-  output reg [1:0] addr
+  output reg [1:0] addr,
+  output reg [1:0] captured_row,  // 행이 그랜트된 바로 그 사이클에(=ROW 패킷과 동일 사이클)
+  output reg [3:0] captured_cols  // 이번 burst에 실린 열들을 알려줌(1사이클 펄스).
+                                   // captured_cols==0이면 이번 사이클엔 캡처 없음(별도 valid 불필요).
+                                   // 16bit 원핫 대신 (행2bit+열비트맵4bit)=6bit로 최소화 —
+                                   // 폭/인코딩은 우리가 검증용으로 넣은 신호라 자유롭게 정함.
+                                   // ack 신호 부재로 인한 재캡처(같은 req가 안 내려간 채
+                                   // 다음 라운드에 또 잡히는 것)를 막으려면, 요청측(TB 등)이
+                                   // 이 신호를 보고 "그 즉시" req를 내려야 함.
 );
   wire [3:0] row_req;
   assign row_req[0] = |req[3:0];
@@ -49,6 +57,7 @@ module aer_tx16(
   always @(posedge clk) begin
     if (rst) begin
       state <= 1'b0; valid <= 1'b0; addr_type <= 1'b0; addr <= 2'd0; col_bitmap <= 4'd0;
+      captured_row <= 2'b0; captured_cols <= 4'b0;
     end else begin
       case (state)
         1'b0: begin // IDLE: 행 중재
@@ -58,8 +67,11 @@ module aer_tx16(
             addr_type <= 1'b0; // ROW
             addr <= idx4(row_gnt);
             state <= 1'b1;
+            captured_row  <= idx4(row_gnt);   // ROW 패킷과 동일 사이클에 확정
+            captured_cols <= sel_row_cols;
           end else begin
             valid <= 1'b0;
+            captured_cols <= 4'b0;
           end
         end
         1'b1: begin // BURST: 열 순차 전송
@@ -73,6 +85,7 @@ module aer_tx16(
             valid <= 1'b0;
             state <= 1'b0;
           end
+          captured_cols <= 4'b0; // burst 도중엔 새 캡처 없음
         end
       endcase
     end

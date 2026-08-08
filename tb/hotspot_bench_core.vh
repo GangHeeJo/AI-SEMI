@@ -88,6 +88,8 @@ module tb_hotspot_bench;
       `TX_NAME, `HOTSPOT_NAME,
       (hot_count>0)?hot_sum_lat/hot_count:0, hot_max_lat, hot_count,
       (bg_count>0)?bg_sum_lat/bg_count:0, bg_count, score.jain_fairness_x1000(0));
+    if (score.overflow_count > 0)
+      $display("WARNING: 큐 오버플로우 %0d회 발생 — 위 지연시간 통계는 QDEPTH=%0d 캡에 의한 편향값임(ARRIVAL_PCT를 낮추거나 QDEPTH를 늘리세요)", score.overflow_count, QDEPTH);
     $finish;
   end
 endmodule
