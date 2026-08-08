@@ -75,7 +75,9 @@ set init_pwr_net VDD
 set init_mmmc_file $MMMC
 init_design
 setDesignMode -process 45
+set_dont_use [get_lib_cells */BUFX2] true
 floorPlan -r 1.0 0.5 10 10 10 10
+assignIoPins -pin [dbGet top.terms.name]
 globalNetConnect VDD -type pgpin -pin VDD -inst * -verbose
 globalNetConnect VSS -type pgpin -pin VSS -inst * -verbose
 addRing -nets {VDD VSS} -type core_rings -layer {top Metal6 bottom Metal6 left Metal7 right Metal7} -width 2 -spacing 2 -offset 2

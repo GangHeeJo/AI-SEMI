@@ -1259,3 +1259,298 @@ shadow 카운터로 overrun 보고와 배출을 독립 검증. 첫 실행에서 
 **1-deep은 절충점이 아니라 그냥 나쁜 선택**: cluster 대비 면적·전력을 두 자릿수 퍼센트로 더 쓰면서도, 애초에 버퍼를 넣은 목적(재발화 손실 제거)을 하나도 달성 못 함 — "카운터를 넣었다"는 것 자체가 비용이 아니라 "2까지 셀 수 있어야 한다"는 게 비용의 실질. 2-deep과 1-deep의 면적/전력 차이(약 2.1배/1.75배)가 딱 "1비트냐 2비트냐"보다 크게 벌어지는 것도 케이스문(동시 도착+서비스 처리)의 복잡도가 폭에 따라 늘어나기 때문으로 보임. 채택한다면 2-deep이 맞고, 비용을 더 줄이고 싶다면 "버퍼 자체를 줄이기"가 아니라 다른 축(예: 카운터 대신 더 단순한 인코딩)을 찾아야 함.
 
 **결론**: "전선을 아끼자"는 rate coding의 장점이, 받는 쪽 디코더 비용까지 합치면 사라짐 — 세 축 전부에서 payload가 이김. 생물학이 이 방식을 쓰는 건 "공학적으로 최선이라서"가 아니라 "축삭이 payload를 못 만들게 생겨서 어쩔 수 없었다"는 제약 때문이었다는 걸 실측으로 재확인함 — 실리콘은 그 제약이 없어서 우리한텐 오히려 payload 쪽이 더 유리할 수 있음.
+
+## 45. cluster2 qualified P&R 시도 — CG버그 이론 반증, 진짜 원인은 미해결 (2026-08-08)
+
+§40에서 "P&R부터 정상화"를 최우선으로 정했던 것에 따라 cluster2를 qualified P&R(per_target_resynthesis)에 돌림. 그런데 §40에서 현수가 진단한 "더블하이트 전력도메인 CG셀 때문에 legalize 실패"라는 원인을 직접 로그로 추적해보니 **우리 쪽에는 안 맞았음** — 순서대로 반증/시도한 것:
+
+1. **CG셀 이론 반증**: cluster의 실제 합성 로그를 보면 쓰인 CG셀은 `TLATNTSCAX2`(정상 단일높이 latch, liberty에 `clock_gating_integrated_cell` 속성 정상)이고, 우리가 쓰는 `.lib`엔애초에 isolation/retention/level-shift/power-switch류 전력도메인 셀 자체가 정의돼 있지도 않음. **cluster2를 `lp_insert_clock_gating false`로 CG 자체를 꺼도 `IMPCCOPT-2215`(clk net not fully connected)가 똑같이 발생** — CG는 원인이 아님을 직접 실험으로 확인.
+2. **별개로 진짜 버그 하나 발견·수정**: `resynth_pnr_sweep.sh`에 **I/O 핀 배치 명령이 아예 없었음** — `floorPlan` 뒤에 `assignIoPins`를 부른 적이 없어서 top-level 포트(clk/rst/req[]/valid/col_mask 등)가 "21 core components: 21 unplaced"로 floorplan에 물리적 위치가 없는 채로 남아있었음. `assignIoPins -pin [dbGet top.terms.name]`로 고쳐서 32개 핀 전부 배치 확인함(스크립트에 반영, §33 이후 전체 이력에 적용되던 결함이라 앞으로의 모든 P&R에 영향).
+3. **그런데 핀을 다 배치해도 `IMPCCOPT-2215`는 그대로 발생, extractRC도 여전히 `preRoute` 폴백** — 즉 pin 배치 버그는 실재했고 고쳤지만, 원래 찾던 "not fully connected" 증상의 원인은 아니었음.
+
+**현재 상태**: CG 셀 이론과 핀 미배치 둘 다 배제됐고, 진짜 원인은 미확인 상태로 남음. 에러가 발생하는 지점은 항상 동일(`clock_opt_design`의 CCOpt 단계, "Preprocessing clock nets" 중 "Nets initialized ... Unsuccessful: 1") — 우리 설계가 너무 작아서(cluster2 기준 인스턴스 53~90개) CCOpt의 클록트리 합성 로직이 상정하는 "일반적 규모"에 안 맞는 edge case일 가능성이 높다고 보지만, 확인은 아직 못 함. 이 시점에서 더 파는 대신 시간 대비 가치를 재판단해 중단 — **qualified Fmax 확보는 여전히 미해결 과제로 남김**(cluster2뿐 아니라 fovea/cluster 전부 동일). 다음에 재개한다면 `clock_opt_design`을 완전히 건너뛰거나 더 단순한 clock connect 방식으로 대체하는 것부터 시도해볼 것.
+
+**[정정, 같은 날 후속]** 위 결론은 틀렸음 — 원인을 찾았고 §40의 "preRoute 폴백=무효" 판단 자체도 잘못이었음. §49 참고.
+
+## 46. Lane count 스윕(1/2/4) — lane4는 중재기가 아예 없는 극단값
+
+cluster(1레인)/cluster2(2레인)에 이어 lane=4(행마다 전용 출력, 중재 자체가 없음)를 만들어 lane count에 따른 PPA 곡선을 확인. `rtl/aer_tx16_lane4.v` — 행 4개 각각 `validN`+`col_maskN`을 매 사이클 무조건 내보냄, row/col 중재기가 하나도 없음(경쟁할 대상 자체가 없으므로 fovea의 중심가중치도 무의미해서 WEIGHT 파라미터도 없앰).
+
+**정확성**(`tb/tb_lane4_correctness.v`, 무작위 30% 부하 5000cycle): req가 1사이클 뒤 그대로 등록되는지 확인, 0 errors — `LANE4_CORRECTNESS_PASS`. row/col 레벨 경쟁이 아예 없으므로 이 레벨 손실은 이론상 완전히 0%(같은 소스 재발화 문제는 여전히 남음, req가 레벨 신호라서 cluster/cluster2와 동일한 한계).
+
+**Genus PPA**(5ns 기준, `syn/run_genus_lane4.tcl`):
+
+| lane count | 설계 | 면적 | 전력 | slack@5ns | 핀 수 |
+|---|---|---:|---:|---:|---:|
+| 1 | cluster | 146.034um² | 10.6735uW | 3365ps | 6 |
+| 2 | cluster2 | **138.852um²**(최소) | 11.8744uW | 3790ps | 14 |
+| 4 | lane4 | 142.272um² | **13.9530uW**(최대) | **4325ps**(최단 critical path) | **20** |
+
+**면적은 단조가 아님** — cluster2(2레인)가 오히려 lane4(4레인)보다 작음. lane4는 중재 로직을 완전히 없앴는데도 면적이 더 큰데, 이유는 출력 레지스터 개수 자체가 늘어서(cluster 6비트 → cluster2 14비트 → lane4 20비트, 전부 매 사이클 토글 가능) — **중재기 제거로 아끼는 양보다 늘어난 출력 플립플롭이 더 비쌈**. 전력도 lane 수와 함께 단조 증가(더 많은 FF가 매 사이클 토글). 반면 critical path(=slack)는 lane 수와 함께 꾸준히 짧아짐(중재 로직이 적을수록 조합 지연이 줄어듦) — throughput/지연 관점에선 유리하지만 면적/전력/핀 수 관점에선 2레인이 최적점이라는 게 실측으로 드러남. **"병렬성을 늘릴수록 무조건 좋다"가 아니라 cluster2(2레인)가 이미 이 설계 공간의 sweet spot에 가깝다는 근거.**
+
+## 47. Lane stealing(work-conserving cluster2) — 팀 내부 경쟁까지 없애는 다음 단계
+
+cluster2는 중심(행1,2) vs 주변(행0,3) **팀 간** 경쟁은 없앴지만, 각 팀 **안**에서는 여전히 행 2개가 자기 레인 하나를 놓고 매 사이클 경쟁함(arbiter4_tree로 한쪽만 고름). 그런데 PERIPH_MASK/CENTER_MASK가 정확히 "팀당 행 2개"라서, 상대 팀이 완전히 idle이면 그 팀의 레인을 빌려와 내 행 2개를 경쟁 없이 동시에 내보낼 수 있음 — `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal.v`.
+
+**로직**: `steal_to_periph`(중심 idle & 주변 두 행 다 대기) → lane0=행0, lane1=행3(경쟁 없이 동시). `steal_to_center`(주변 idle & 중심 두 행 다 대기) → lane0=행1, lane1=행2. 두 조건은 동시에 참일 수 없음(구조적으로 배타적). 그 외 상황은 cluster2와 완전히 동일(각 팀 안에서 경쟁 있으면 arbiter4_tree로 공정하게).
+
+**정확성**(`tb/tb_cluster2_steal_correctness.v`, event_scoreboard 재사용): generated=delivered=47735, phantom 0, jain fairness 1.000, lane 충돌(같은 사이클 두 레인이 같은 행을 가리키는 모순) 0건 — `CLUSTER2_STEAL_CORRECTNESS_PASS`.
+
+**효과 실측**(`tb/tb_cluster2_steal_benefit.v`, 중심 완전 idle + 주변 완전포화 2000cycle): plain cluster2는 주변 두 행이 번갈아 나가서 평균 2.0개/cycle, cluster2_steal은 두 행이 매 사이클 동시에 나가서 평균 4.0개/cycle — **정확히 2배**(이론값과 일치).
+
+**Genus PPA**(5ns 기준, `syn/run_genus_cluster2_steal.tcl`):
+
+| | cluster2 | **cluster2_steal** |
+|---|---:|---:|
+| 면적 | 138.852um² | 161.082um²(+16.0%) |
+| 전력 | 11.8744uW | 13.0080uW(+9.6%) |
+| slack@5ns | 3790ps | 3579ps |
+
+핀 수는 cluster2와 동일(14핀, 인터페이스 안 바뀜) — steal 로직이 순수 내부 mux 추가라 면적/전력 비용이 lane4로 가는 것보다 훨씬 저렴하게 "비대칭 부하 상황의 처리량 2배"를 삼. 한쪽 팀이 놀 때만 이득이라 균등부하 상황에선 cluster2와 동일하게 동작(손해 없음, 대칭 트래픽에서 매 사이클 두 조건 다 거짓이 되어 정확히 cluster2로 폴백).
+
+## 48. Refractory AER(불응기 모방) — cluster2에 억제 게이트 추가, buffer와 정면 비교
+
+같은 소스 재발화 문제(§44)를 "저장"(2-deep counter)이 아니라 "억제"로 접근하는 실험. 생물 뉴런이 발화 직후 R cycle 동안 다시 발화 못 하는 것처럼, 소스가 grant된 직후 R cycle 동안 그 소스의 새 도착을 pending으로 아예 안 받아준다 — `rtl/aer_tx16_trad_rowcol_fovea_cluster2_refractory.v`. 저장이 아니라 발생률 자체를 낮추는 것이라 buffer와 달리 **손실 없는 방식이 아님**(의도적/비가역적 손실).
+
+**구현 중 진짜 버그 하나 잡음**: 처음엔 cluster2를 블랙박스 서브모듈로 인스턴스화하고, 별도의 `always @(posedge clk)` 블록에서 cluster2의 등록된 출력(valid0/row0/col_mask0)을 읽어 "grant됐으면 pending 해제"를 판단하게 짰음 — 그런데 두 블록이 같은 clk 엣지에 걸리면서, 넌블로킹 대입 특성상 이 블록이 valid0의 "방금 갱신된 새 값"이 아니라 "한 사이클 전 값"을 읽는 레이스가 생겨서, pending 해제가 실제보다 한 사이클 늦어지고 같은 소스가 두 번 grant되는 대량의 phantom이 발생함(§44에서 겪은 것과 정확히 같은 종류의 버그). cluster_buf가 cluster를 블랙박스로 안 쓰고 통째로 인라인했던 것과 같은 이유로, cluster2의 중재 로직(center_arb/periph_arb+열 선택)을 이 모듈 안에 통째로 인라인해서 pending 갱신과 같은 always 블록, 같은 콤비네이셔널 신호로 동기화해서 해결.
+
+**정확성**(`tb/tb_refractory_correctness.v`, 무작위 15% 도착 20000cycle, R=2): `generated=48045 delivered=32307 suppressed=9831 retrigger_drop=5907 phantom=0` → 보존식(delivered+suppressed+retrigger_drop=generated) 성립, `REFRACTORY_CORRECTNESS_PASS`.
+
+**R별 손실 스윕**(같은 테스트, R=0/1/2/4 — R=0은 refractory 효과 없음 = 순수 pending-1비트 모델의 sanity check):
+
+| R | delivered | suppressed | retrigger_drop | 총 손실률 |
+|---:|---:|---:|---:|---:|
+| 0 | 40416 | 0 | 7629 | 15.9% |
+| 1 | 35750 | 5585 | 6710 | 25.6% |
+| 2 | 32307 | 9831 | 5907 | 32.8% |
+| 4 | 27063 | 16219 | 4763 | 43.7% |
+
+R이 커질수록 손실이 단조 증가 — refractory가 길수록 재발화를 더 많이 억제하지만(retrigger_drop은 오히려 줄어듦, 애초에 재도전 기회 자체가 줄어서), 그만큼 진짜로 버려지는 이벤트(suppressed)가 훨씬 많이 늘어남. R=4에서 거의 절반이 손실.
+
+**Genus PPA**(5ns 기준):
+
+| | cluster2 | refractory R=1 | refractory R=2 | cluster_buf(2-deep, §44) |
+|---|---:|---:|---:|---:|
+| 면적 | 138.852um² | 506.502um²(+264.8%) | 729.144um²(+425.1%) | 650.826um²(cluster 대비 +345.7%) |
+| 전력 | 11.8744uW | 41.2345uW(+247.3%) | 54.3799uW(+357.9%) | 43.9977uW |
+| slack@5ns | 3790ps | 3408ps | 3521ps | 3300ps |
+
+**결론**: refractory는 buffer보다 비용이 더 크면서(R=1만으로도 cluster_buf의 2-deep급을 이미 넘어섬) 손실은 buffer(0%, §44)와 달리 **의도적으로 발생**시킴 — "buffer vs refractory" 질문에 대한 답은 이번 구현으로는 buffer 완승. 원인은 cluster2 자체를 통째로 인라인해야 했던 구조(중재기 2벌+16소스 grant-비교 로직)가 base 비용을 이미 많이 올려놨기 때문 — 순수 "억제 로직만의 비용"이 아니라 "cluster2+억제"를 다 합친 비용이라 cluster_buf(순정 cluster+카운터)와 완전히 공평한 비교는 아님(cluster2가 cluster보다 태생적으로 더 비쌈, §46 참고)에 유의. 그래도 손실을 만드는 방식 자체(억제 vs 저장)의 트레이드오프는 명확히 드러남 — 저장이 가능하면(우리처럼 payload가 없어 카운터만으로 충분한 경우) 굳이 손실을 감수하는 억제 방식을 쓸 이유가 없음. 생물학적 그럴듯함이 공학적 우위로 안 이어진다는 점에서 §43의 rate-coding 결론과 같은 종류의 negative result.
+## 49. P&R 진짜 원인 확정 — BUFX2(더블하이트 셀) 제외로 해결, §40의 "preRoute=무효" 판단도 정정
+
+현수의 실제로 통과한 coord_partial 스크립트(`~/semi-ai/synth/resynth_pnr_sweep_coord_partial.sh`)를 직접 diff해서 찾음 — 우리 스크립트엔 없던 딱 한 줄:
+
+```tcl
+set_dont_use [get_lib_cells */BUFX2] true
+```
+
+**BUFX2가 정확히 `CoreSiteDouble`(더블하이트 사이트) 셀이었음**(LEF 확인) — 현수의 원래 진단("더블하이트 전력도메인 셀")이 완전히 틀린 게 아니라, 내가 §45에서 "우리 `.lib`엔 그런 셀이 정의돼있지도 않다"고 반증했던 건 **합성용 timing `.lib`(cell 속성만 있음)만 보고 물리 배치용 macro `.lef`(SITE 정보)는 확인 안 해서 생긴 오판**이었음. `.lef`를 열어보니 BUFX2뿐 아니라 isolation/level-shift/power-switch/retention 계열 셀 전부(`ISO*`, `LS*`, `FSW*/HSW*`, `R*FF*`, `SRDFF*`) `CoreSiteDouble`을 씀 — 현수가 맞았음. 다만 문제를 일으킨 건 그 중에서도 **CG나 전력도메인과 무관한 평범한 클록 버퍼 BUFX2**였음 — `clock_opt_design`(CCOpt)이 클록트리 균형을 맞추려고 버퍼를 자동 삽입하는 과정에서 이 더블하이트 셀을 가끔 골랐고, 공용 floorplan에 그 site용 row가 없어서 legalize/클록 라우팅 그래프가 깨진 것. `lp_insert_clock_gating`(Genus 단계)과는 무관해서, §45에서 CG를 꺼도 안 없어졌던 게 설명됨.
+
+**추가로 §40의 "preRoute 폴백=P&R 결과 신뢰 불가"라는 판단 자체도 틀렸음**을 확인함 — 현수의 실제로 팀에 qualified로 등록된 결과(1.6ns/625MHz, `~/semi-ai/synth/pnr/resynth_coord_partial/innovus_1.6.log`)를 직접 열어보니 **거기도 `extraction engine 'preRoute'`로 똑같이 찍혀있음**. 즉 preRoute는 이 팀 전체 플로우가 cap table을 아무도 안 만들어서 쓰는 **기본 추출 모드**였을 뿐, 클록 넷이 실제로 안 끊겼다는 전제 하에는 결과 신뢰도와 무관함. 진짜 무효 신호는 `IMPCCOPT-2215` 에러 하나뿐이었음 — preRoute 라벨과 이 에러가 우연히 같이 나타난 사례들만 보고 둘을 하나로 묶어서 판단한 게 §40의 오류.
+
+**수정**: `syn/resynth_pnr_sweep.sh`에 `set_dont_use [get_lib_cells */BUFX2] true`를 `init_design` 직후(`assignIoPins`보다도 먼저)에 추가.
+
+**검증**(cluster2, 1.2ns 단일 지점): `IMPCCOPT-2215` 0건, DRC 0건, antenna 0건, **setup MET(slack +3ps, 경계에 아슬아슬)**, hold MET(slack +173ps). P&R 면적 178.866um²(Genus 사전추정 138.852um² 대비 +28.8%, 배치/배선 현실 반영), 전력 48.68uW.
+
+**전체 스윕 완료**(`syn/resynth_pnr_sweep.sh`, `syn/pnr/resynth_cluster2_final/`, 0.9~1.5ns 8개 지점, 전부 `IMPCCOPT-2215` 0건):
+
+| 주기(ns) | setup slack | hold slack |
+|---|---:|---|
+| 0.9 | **FAIL(-0.034)** | MET(+0.163) |
+| 0.95 | MET(+0.028) | MET(+0.166) |
+| 1.0 | MET(+0.032) | MET(+0.166) |
+| 1.05 | MET(+0.045) | MET(+0.163) |
+| 1.1 | MET(+0.039) | MET(+0.163) |
+| 1.15 | MET(+0.028) | MET(+0.172) |
+| 1.2 | MET(+0.003) | MET(+0.173) |
+| 1.25 | MET(+0.059) | MET(+0.172) |
+| 1.3 | MET(+0.045) | MET(+0.163) |
+| 1.5 | MET(+0.107) | (미확인) |
+
+**cluster2의 진짜 qualified Fmax bracket: [1052.6, 1111.1)MHz**(마지막 PASS 0.95ns, 첫 FAIL 0.9ns) — Genus 사전추정(5ns 기준 slack 3790ps → critical path 1.21ns → 826MHz 추정)보다 실제로 **더 빠름**(반대 방향 오차, fovea 때(§34, Genus가 40% 부풀림)와는 다른 케이스 — per_target_resynthesis가 주기별로 새로 최적화하다 보니 빡빡한 주기에서 더 공격적으로 합성된 결과로 보임). hold는 전 구간 여유(+0.16ns 이상), DRC/antenna 0건(모든 지점 확인).
+
+**0.95ns(최고속 PASS 지점) P&R 실측 PPA**: 면적 288.990um²(Genus 138.852um² 대비 +108%, 빡빡한 타이밍 맞추려고 버퍼/큰 셀 늘어난 영향), 전력 77.28uW.
+
+**다음 단계**: fovea/cluster도 같은 BUFX2 수정으로 재검증 필요(§35의 fovea [666.7,769.2)MHz와 §36의 cluster 결과도 전부 이 버그로 오염된 채였음).
+
+### fovea 재검증 완료
+
+| 주기(ns) | setup slack | hold slack |
+|---|---:|---|
+| 1.2 | FAIL(-0.138) | MET(+0.107) |
+| 1.3 | FAIL(-0.015) | MET(+0.127) |
+| 1.4 | MET(+0.030) | MET(+0.120) |
+| 1.5 | MET(+0.030) | MET(+0.116) |
+
+**fovea의 진짜 qualified Fmax bracket: [714.3, 769.2)MHz**(마지막 FAIL 1.3ns, 첫 PASS 1.4ns) — 전부 `IMPCCOPT-2215` 0건. 우연히 상한(769.2MHz=1.3ns가 첫 FAIL)이 §35의 옛 bracket과 숫자가 겹치는데, 하한은 666.7(1.5ns)에서 714.3(1.4ns)으로 올라감 — CG버그가 "가끔"(현수 표현) 걸리는 문제라 옛 스윕도 일부 지점은 우연히 안 걸려서 비슷한 값이 나왔을 뿐, 신뢰도 자체가 달라짐(이번엔 전 지점 클록넷 정상 확인됨).
+
+**1.4ns(최고속 PASS) P&R 실측 PPA**: 면적 385.434um²(Genus 169.632um² 대비 +127%), 전력 73.01uW.
+
+cluster2(1052.6MHz)가 fovea(769.2MHz)보다 훨씬 빠름 — col_arb를 없앤 효과가 P&R 레벨에서도 그대로 유지됨(Genus 사전추정 단계의 우위가 물리설계에서도 안 사라짐).
+
+### cluster 재검증 완료
+
+| 주기(ns) | setup slack |
+|---|---:|
+| 1.2 | FAIL(-0.002) |
+| 1.25 | MET(+0.025) |
+| 1.3 | MET(+0.037) |
+| 1.35 | MET(+0.030) |
+| 1.4 | MET(+0.011) |
+| 1.5 | MET(+0.052) |
+| 1.6 | FAIL(-0.005, 비단조 anomaly로 판단 — 1.5/1.7 둘 다 통과인데 1.6만 실패) |
+| 1.7 | MET(+0.051) |
+
+**cluster의 진짜 qualified Fmax bracket: [800.0, 833.3)MHz**(마지막 FAIL 1.2ns, 첫 PASS 1.25ns) — 전 구간 `IMPCCOPT-2215` 0건, hold 전부 여유(+0.12ns 이상). 1.6ns의 단독 FAIL은 현수가 자기 스윕에서도 겪은 것과 같은 종류의 per_target_resynthesis 스토캐스틱 편차(그 지점만 다시 합성된 넷리스트가 우연히 더 나쁘게 나온 것)로 판단 — 앞뒤(1.5/1.7)가 다 통과라 경계 판정에는 영향 없음.
+
+**1.25ns(최고속 PASS) P&R 실측 PPA**: 면적 272.232um²(Genus 146.034um² 대비 +86.4%), 전력 58.59uW.
+
+### 세 설계 qualified P&R 최종 비교
+
+| | fovea | cluster | cluster2 |
+|---|---:|---:|---:|
+| qualified Fmax | [714.3, 769.2)MHz | [800.0, 833.3)MHz | **[1052.6, 1111.1)MHz** |
+| 최고속 지점 면적(P&R) | 385.434um² | 272.232um² | 288.990um² |
+| 최고속 지점 전력(P&R) | 73.01uW | 58.59uW | 77.28uW |
+
+col_arb를 없앤 cluster/cluster2가 fovea보다 확실히 빠르고(P&R 레벨에서 Genus 사전추정 순위 그대로 유지), cluster2는 2레인 대가로 fovea보다도 전력이 살짝 높지만 Fmax는 압도적으로 앞섬. 세 설계 다 이제 진짜 물리검증된 숫자로 비교 가능 — §35/§36/§40의 옛 수치는 전부 이 값들로 교체.
+
+## 50. Dendritic coincidence filter(공간 상관 노이즈 억제) 실측
+
+지도교수 논문 정리 때 접한 "여러 뉴런의 국소 계산"(dendrite가 point neuron 하나로 뭉뚱그려지지 않고 자체 연산을 한다는 최근 뉴로모픽 연구 방향)에서 착안 — cluster류가 "이미 발생한 이벤트를 어떻게 더 효율적으로 나를까"를 풀었다면, 이건 "애초에 이벤트를 만들지 말지"를 계산하는 완전히 다른 축. lateral inhibition(주변이 발화하면 억제)과 반대로, **주변이 같이 발화해야 통과시키는** 필터 — `rtl/aer_coincidence_filter.v`. 4x4를 2x2 블록 4개(TL/TR/BL/BR)로 나눠서, 같은 사이클에 한 블록 안에서 2개 이상 동시발화해야만 진짜 이벤트로 통과, 혼자만 발화하면 고립 노이즈로 간주해 억제. 이번 구현은 같은 사이클 상관만 봄(T=1, 순수 조합논리) — 여러 사이클에 걸친 상관까지 보려면 "먼저 온 이벤트를 들고 이웃을 기다리는" 상태기계가 필요해져서(§44 buffer급 복잡도) 범위를 좁힘.
+
+**검증**(`tb/tb_coincidence_filter.v`): 순수 고립 노이즈(항상 소스 1개만 무작위 발화) 2000회 → **100% 억제**(0개 통과). 블록 상관 버스트(한 블록에서 3개 동시발화) 2000회(6000개 이벤트) → **100% 통과**(0개 손실). 보존식(filtered+rejected=arrival, 겹침 없음) 전 시행 성립 — `COINCIDENCE_FILTER_PASS`.
+
+**Genus PPA**(5ns 기준, `syn/run_genus_coincidence_filter.tcl`): **97.128um², 3.055uW** — 조합논리만(레지스터 없음) 있어서 cluster2(138.852um²)보다도 쌈. 실제 시스템에 넣으려면 이 필터 뒤에 AER TX(cluster/cluster2 등)를 그대로 붙이면 되므로 총 비용은 필터+TX 합.
+
+**해석 시 주의**: 이건 "손실을 줄이는" 실험(cluster류)이 아니라 **"무엇을 이벤트로 인정할지"의 기준 자체를 바꾸는** 실험 — 노이즈 억제율/통과율 100%는 이 특정 인공 시나리오(순수고립 vs 순수상관)에서만 그렇고, 실제 센서 데이터에서 "약한 진짜 이벤트가 우연히 고립돼서 억제되는" 위양성(false suppression) 비용은 아직 측정 안 함(실제 트레이스로 검증 필요, `common_traces/`의 hotspot/moving류 재활용 가능). T=1(같은 사이클)만 보는 것도 실제 센서 타이밍 지터를 못 담아서, 실전에서는 이 100%가 그대로 안 나올 가능성이 큼 — 지금은 "메커니즘 자체가 동작한다"는 걸 확인한 1차 검증.
+
+## 51. Temporal Fidelity 실험 — "레인을 늘리면 원래 spike timing도 더 잘 보존하는가?"
+
+ISI(inter-spike interval, 스파이크 사이 시간차)/rank-order/phase-coding처럼 "시간 자체에 정보를 싣는" 방식들을 새로 만들기 전에, 그게 애초에 우리 시스템에서 성립할 조건인지부터 확인하는 게 순서라고 판단해서 먼저 함(rate coding이 §43에서 경합 시 왜곡되는 걸 실측으로 확인했던 것과 같은 종류의 사전 검증). 이미 만든 cluster/cluster2/cluster2_steal에 새 RTL 없이 테스트벤치만 추가(`tb/tb_temporal_fidelity.v`) — `event_scoreboard`의 `record_departure`가 이벤트별 latency를 바로 리턴하는 걸 이용해, 같은 소스의 연속 이벤트 latency 차이 = ISI 왜곡과 수학적으로 같다는 점을 씀(r2-r1 = (t2-t1)+(lat2-lat1)이므로 ISI_error=|lat2-lat1|).
+
+**결과**(무작위 도착, 20000cycle, N=16):
+
+| ARRIVAL_PCT | 설계 | avg_latency | max_latency | ISI_MAE | ISI_MAX |
+|---|---|---:|---:|---:|---:|
+| 15%(cluster 포화) | cluster | 702 | 3421 | 2 | 78 |
+| 15% | cluster2 | 2 | 94 | 1 | 65 |
+| 15% | cluster2_steal | 2 | 94 | 1 | 65 |
+| 10%(cluster 한계 근처) | cluster | 2 | 38 | 1 | 27 |
+| 10% | cluster2 | 1 | 114 | 1 | 90 |
+| 10% | cluster2_steal | 1 | 114 | 1 | 90 |
+| 5%(전부 여유) | cluster | 0 | 11 | 0 | 9 |
+| 5% | cluster2 | 0 | 127 | 1 | 125 |
+| 5% | cluster2_steal | 0 | 101 | 0 | 100 |
+
+**cluster2/cluster2_steal이 균등부하에서 완전히 동일**한 건 버그가 아니라 정상 — steal은 "한쪽 팀이 완전 idle일 때"만 발동하는데, 균등 무작위 부하에서는 두 팀이 거의 항상 동시에 뭔가 대기중이라 steal 조건이 사실상 안 걸림(§47에서 확인한 조건 그대로).
+
+**핵심 결론(예상과 다름)**: "레인이 많을수록 timing도 더 잘 보존된다"는 직관이 이 데이터로는 **확인 안 됨** — 15% 포화 상황(cluster가 구조적으로 못 버티는 부하)에서만 cluster2가 확실히 나은 것이고, cluster가 감당 가능한 부하(5~10%)에서는 오히려 cluster2/steal의 max_latency/ISI_MAX가 cluster보다 더 큼(예: 10%에서 cluster 27 vs cluster2 90). 레인을 둘로 쪼개면 각 레인 안에서 행 2개가 arbiter2 기반 공정 중재를 하는데, 이 지역적 공정성이 "짧고 일정한 지연"을 보장하진 않아서(공정하다=언젠가는 서비스된다일 뿐, 매번 빠르다는 아님) 오히려 산발적으로 더 긴 대기가 나올 수 있음.
+
+**그래서 ISI/rank-order/phase-coding류(§ 사용자 제안 #1,2,9,10,11) 계열은 우선순위를 낮춤**: "레인을 늘리면 시간 코드가 자동으로 더 잘 보존된다"는 전제 자체가 이 실험으로는 지지 안 되고, ISI_MAX가 사실 quite 크게(65~125cycle) 나오는 걸 보면 조금이라도 정밀한 시간 코드는 최악의 경우 심하게 틀어질 수 있음 — rate coding 때와 결이 같은 결론("생체모방적 아이디어가 우리처럼 공유·중재되는 채널에선 그대로 안 통함")이 더 강화된 셈. 이 계열을 파려면 "왜 cluster2가 max_latency가 더 큰가"부터 규명해야 하는데, 그 답을 찾아도 결국 "특정 레인 배정 방식에서만 개선"이라는 좁은 결론이 나올 가능성이 높아 보여 지금은 보류.
+
+## 52. Coincidence filter T=2(2사이클 창) 확장 — 실측 비용이 T=1의 4~8배
+
+§50 T=1(같은 사이클만 보는) 필터의 명시된 한계("여러 사이클에 걸친 상관까진 못 봄")를 실제로 넘어서 봄 — `rtl/aer_coincidence_filter_t2.v`. 먼저 온 이벤트를 1사이클 붙잡아뒀다가(`prev_arrival`), 그 다음 사이클에 같은 블록의 다른 소스가 오면 확인해서 **둘 다** 통과시키고, 안 오면 버림.
+
+**구현 중 실제 버그 하나 발견·수정**: 처음엔 "직전 사이클 이벤트만 판정"하는 단순한 형태로 짰다가, 비대칭 문제를 실측으로 발견함 — source0이 먼저 오고 source1이 다음 사이클에 오면, source0은 (그 다음 사이클에 source1을 보고) 정상적으로 확인되는데, **source1 자신은 그 다음다음 사이클에 "이제 자기 혼자"인 상태로 다시 판정당해서 억울하게 반려**됨(cross-cycle 테스트에서 1000/1000 = 절반만 통과로 드러남). 원인은 "확인된 이벤트가 다음 판정에서 또 검사당하는" 이중판정 — 확인된 사이클에 있던 정보(자기를 확인해준 짝)가 다음 사이클로 안 넘어가서 생김. `carry_forward = arrival & ~pass_mask`(이미 확인된 건 다음 판정 대상에서 빼기)로 수정 후 재검증 완료.
+
+**검증**(`tb/tb_coincidence_filter_t2.v`): 고립 노이즈(1사이클 간격) 1000회 → **100% 억제**. 같은 사이클 상관(T=1과 동일 케이스) 1000회 → **100% 통과**(T=1 능력 유지 확인). **걸친 사이클 상관(T=1은 원래 못 잡는 케이스) 1000회(2000개 이벤트) → 100% 통과**(수정 후) — T=2 확장이 실제로 의도한 새 능력을 발휘함.
+
+**Genus PPA**(5ns 기준): **404.928um², 24.7165uW** — T=1(97.128um², 3.055uW) 대비 **면적 +317%, 전력 +709%**. `prev_arrival` 16비트 레지스터 + 이중판정 방지용 추가 로직이 원인 — 조합논리만 있던 T=1과 달리 레지스터/제어로직이 붙으면서 비용이 급격히 커짐.
+
+**결론**: 1사이클 창을 2사이클로 늘리는 것만으로 비용이 4~8배 뛰는 걸 보면, 이 방향(창을 더 늘려 T=3,4...로 확장)은 급격히 안 좋아질 가능성이 높음 — payload 폭을 늘릴 때(§43, 1bit→16bit가 11배 이상 뛰던 것)와 비슷한 종류의 비선형 비용 증가 패턴. T=1(§50)이 이미 "메커니즘이 동작한다"를 싸게 보여줬으니, 실제 채택 후보로는 T=1이 훨씬 합리적이고 T=2는 "창을 넓히면 정확도가 늘지만 비용도 급격히 는다"는 트레이드오프를 보여주는 참고 데이터로 남겨둠.
+
+## 53. Quarantine buffer 실현성 사전측정 + K-패킷 생존확률 실측
+
+문헌조사(dual-timescale contextual AER 신규성 검증) 결과 "여러 패킷에 걸쳐 분산된 의미가 공유·중재 채널에서 손실될 때의 신뢰성"을 정량적으로 다룬 선행연구가 없다는 게 확인됨 — 이걸 직접 실측함(`tb/tb_quarantine_and_kpacket.v`, cluster2, ARRIVAL_PCT=15%, 50000cycle).
+
+### (A) Quarantine(공용 오버플로 버퍼) 실현성 — 동시충돌 히스토그램
+
+소스별 전용 카운터(cluster_buf, §44) 대신, 재발화 충돌이 난 소스의 주소만 작은 공용 버퍼에 넣는 방식(§"Blood-Clotting AER" 아이디어)이 실제로 싸게 될지 사전 검증 — 관건은 "한 사이클에 몇 개 소스가 동시에 충돌하는가"(=버퍼가 몇 개의 쓰기 포트를 가져야 하는가):
+
+| 동시충돌 소스 수 | 사이클 비율 |
+|---|---:|
+| 0개 | 89.4% |
+| 1개 | 9.8% |
+| 2개 | 0.6% |
+| 3개 | 0.03%(14/50000) |
+| 4개 이상 | 0건 |
+
+**우려했던 멀티라이트포트 문제는 기우였음** — 2~3포트 공유 버퍼면 관측된 충돌의 사실상 전부를 커버함(4포트 이상 필요한 사이클이 5만 사이클 동안 한 번도 없었음). cluster_buf(16개 전용 카운터, 650.826um²) 대비 2~3엔트리 공유 버퍼가 실제로 더 쌀 가능성이 높아짐 — 다음 단계로 실제 RTL 구현 검토 가치 있음.
+
+### (B) K-패킷 생존확률 — "여러 패킷에 의미를 분산시키면 얼마나 위험한가"
+
+같은 소스의 연속 K개 시도(성공/실패 무관, 슬라이딩 윈도우)가 전부 무사히 배달될 확률:
+
+| K | 생존확률 |
+|---|---:|
+| 2 | 90.6% |
+| 3 | 86.2% |
+| 4 | 81.9% |
+
+15%라는 극단적이지 않은 부하에서도, K=2짜리 코드조차 이미 9.4%가 깨지고 K=4는 18.1%가 깨짐 — rate coding(§43), ISI(§51)처럼 "여러 이벤트에 걸쳐 의미를 분산시키는" 방식 전부가 이 손실 메커니즘에 공통으로 취약하다는 걸 하나의 숫자로 정량화함. 문헌조사가 찾은 gap(이런 신뢰성 분석을 다룬 선행연구 없음)을 직접 메꾸는 실측 근거 — "생체모방 다중패킷 코드가 우리 시스템에 안 맞는 이유"를 개별 실험이 아니라 원리로 일반화하는 데 씀.
+
+## 54. Quarantine buffer(공용 오버플로 큐) 실제 구현 — 정확성은 완성, PPA는 역효과(기각)
+
+§53에서 동시충돌이 거의 항상 0~1개(99.2%)라 포트 요구량이 낮다는 걸 확인하고 실제 RTL로 만들어봄(`rtl/aer_tx16_trad_rowcol_fovea_cluster2_quarantine.v`) — cluster_buf(§44, 16개 전용 카운터)와 달리 재발화 충돌이 난 소스의 주소만 작은 공용 큐(Q=4)에 넣는 방식. 한 사이클에 최대 Q개까지 동시 enqueue하는 버전을 먼저 짰다가 정확성 검증에서 못 잡는 미묘한 버그가 있어서, 한 사이클에 1개만 받는(나머지는 진짜 overrun) 단순한 버전으로 낮춰 구현.
+
+### 디버깅 — 실측으로 진짜 버그 3개를 순서대로 발견·수정
+
+1. **이중계산**: grant되는 소스에 같은 사이클 재발화가 겹치면 pending과 큐 양쪽에 동시에 잡힘.
+2. **조기소거**: pending(1개)+큐(1개)=2개가 밀린 소스가 grant 1번 받으면, 큐만 비우고 pending까지 같이 꺼버려서 실제보다 하나 더 사라짐.
+3. **grant+3번째충돌 오분류**(가장 찾기 어려웠음): 소스에 이미 2개(pending+큐)가 밀려있는 상태에서 grant와 동시에 "또" 새 도착이 오면(3번째), 원래는 "grant되는 소스는 충돌이 아니다"라는 §54 도입 초기 규칙 때문에 이 3번째 도착이 충돌로도 overrun으로도 안 잡히고 그냥 증발함 — `collide` 판정에 "grant되는 소스라도 이미 큐 엔트리가 있었다면(즉 밀린 게 2개 이상이었다면) 여전히 충돌"이라는 예외를 추가해서 해결(`queued_addr_bitmap` 신설).
+
+각 버그는 "전체 무작위 시뮬레이션에서 소스별 잔류 backlog 총합"으로 먼저 감지하고(§44부터 써온 shadow-count 대조 방법론), 그 다음 특정 소스 하나를 골라 사이클 단위로 손으로 추적해서 정확한 원인을 짚는 방식으로 찾음 — 세 버그 다 "같은 사이클에 두 가지 이상의 사건(grant, 신규충돌, 큐배출)이 겹치는" 동시성 케이스였다는 공통점이 있음(§44/§48에서 겪었던 것과 같은 종류).
+
+**최종 검증**(`tb/tb_quarantine_correctness.v`, 15% 부하 50000cycle + `tb/tb_quarantine_leak_find2.v`, 소스별 개별 대조 20000cycle): `generated=119988 delivered=119431 dropped_overrun=557 phantom=0` → 보존식 정확히 성립, `QUARANTINE_CORRECTNESS_PASS`. 소스별 leak 0건.
+
+### Genus PPA — 예상과 반대로 cluster_buf보다 더 비쌈
+
+| | cluster_buf(16개 전용 카운터, §44) | **quarantine(공용 큐 Q=4)** |
+|---|---:|---:|
+| 면적 | 650.826um² | **1047.888um²(+61.0%)** |
+| 전력 | 43.9977uW | **54.17uW(+23.1%)** |
+| slack@5ns | 3300ps | **1332ps**(critical path 훨씬 김) |
+
+**세 축 전부 cluster_buf가 이김** — §53의 사전측정(포트 1~2개면 충분)이 틀린 게 아니라, **포트 개수보다 "주소를 값으로 저장하고 비교해야 하는" 구조(CAM류) 자체의 비용이 더 크다는 걸 놓쳤음**. cluster_buf는 소스 인덱스가 곧 저장 위치라 비교 로직이 아예 필요 없는데(위치=신원), quarantine은 큐에 "이 엔트리가 어느 주소냐"를 저장해두고 매번 비교해야 함 — `queued_addr_bitmap`(16주소×4슬롯 비교기), `q_pop_mask`(4슬롯×16-to-1 먹스), `has_queue_entry`(16번 호출되는 비교 루프) 등 연관기억 특유의 조합논리가 "포트 1개"라는 작은 큐 크기로는 못 만회할 만큼 비쌈. Critical path가 눈에 띄게 길어진 것(1332ps vs 3300ps)도 이 비교/먹스 체인이 직렬로 길게 이어지기 때문으로 보임.
+
+**결론**: "동시충돌이 드무니까 공용 버퍼가 싸겠다"는 직관은 틀렸음 — 저장 자체의 비용이 아니라 **주소 기반 매칭(내용 주소화)의 비용**이 지배적이었음. cluster_buf(포화 카운터, 위치=신원)가 여전히 맞는 선택으로 확정. quarantine은 채택 안 함(negative result로 기록).
+
+## 55. cluster2_steal + cluster_buf 결합판 — 잠정 최종 후보로 확정(2026-08-09)
+
+cluster2 하나만 qualified P&R로 증명된 상태였고, cluster2_steal(inter-source)/cluster_buf(intra-source)는 각자 다른 손실 원인을 따로 풀어놓고 결합은 안 한 상태였음 — 실제로 결합판을 만들어서 "진짜 최종 구조"가 있는지 확인함.
+
+### 설계 — `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf.v`
+
+quarantine(§54)이 CAM류 구조 때문에 PPA에서 완패한 교훈을 반영해서, **새로운 종류의 상태(연관기억, 공용 큐)를 도입하지 않고** cluster_buf의 검증된 "위치=신원" 카운터 패턴(`pending_cnt[16]`, 2비트 포화) 위에 cluster2_steal의 2레인 steal 중재 로직만 얹음. lane0/lane1은 구조상 항상 서로 다른 행을 가리켜서(중심={1,2} vs 주변={0,3}) 두 레인의 grant 비트맵을 단순 OR해도 충돌 없음. 각 always 블록마다 전용 loop 변수 사용(§54의 공유변수 버그 교훈 반영).
+
+### 검증
+
+- **정확성**: 첫 버전의 `tb_steal_buf_correctness.v`(shadow_cnt 배열 방식)가 소스 2/12/13에서 실패로 나왔는데, `dut.pending_gt0`를 직접 찍어보니 drain 즉시 0으로 전부 비어있었음 — **RTL이 아니라 테스트벤치의 shadow 모델 버그**였음(§44부터 써온 방식인데 이번 결합판에서 처음 어긋남, 정확한 원인은 못 찾음). 독립적인 방식(`tb_steal_buf_raw_count.v`, 원시 이벤트 카운트만으로 `generated=dropped_overrun+delivered_raw` 대조 + 최종 `pending_gt0==0` 확인)으로 재검증: `generated=47773 dropped_overrun=299 delivered_raw=47474 sum=47773` 정확히 일치, `RAW_COUNT_PASS`.
+- **원래 두 기능이 결합 후에도 살아있는지**(`tb_steal_buf_capabilities.v`): 재발화(소스0 매 사이클 재도착) `overrun=0/256`(cluster_buf 원래 결과와 동일), 비대칭부하(중심 idle+주변 포화) 처리량 `~4.0개/cycle`(cluster2_steal 원래 결과와 동일한 2배 효과). 둘 다 보존됨.
+
+### PPA — Genus + qualified P&R
+
+| | cluster2(기준) | cluster2_steal | cluster_buf | **결합판** |
+|---|---:|---:|---:|---:|
+| 면적(Genus) | 138.852um² | 161.082um² | 650.826um² | **695.286um²(+5.0배)** |
+| 전력(Genus) | 11.8744uW | 13.0080uW | 43.9977uW | **19.9182uW(+68%)** |
+| qualified Fmax | **[1052.6, 1111.1)MHz** | 미측정 | 미측정 | **확실한 건 3.0ns(333.3MHz)까지, 진짜 상한은 1.8~2.6ns(385~555MHz) 구간 어딘가** |
+
+**P&R 스윕이 이례적으로 시끄럽게 나옴**(1.8 PASS/1.9 FAIL/2.0 PASS/2.2 FAIL/2.4 PASS/2.6 FAIL, 전부 ±40ps 이내 — per_target_resynthesis 스토캐스틱 편차가 실제 타이밍 여유와 비슷한 크기라 정확한 경계를 못 좁힘). 3.0ns는 확실히 여유 있게 통과(+107ps)라 이걸 보수적 하한으로 씀 — cluster2 단독 대비 **최소 2배, 실제로는 2.5~3배 정도 느릴 것으로 추정**.
+
+느려진 원인은 구조적: cluster2는 "중재 결정→출력 레지스터"로 끝나는데, 결합판은 같은 사이클 안에서 그 중재 결정이 카운터 갱신(도착+grant 동시처리 case문)까지 먹여야 해서 조합논리 체인이 더 길어짐 — grant 결정을 1사이클 지연시켜 카운터에 넘기는 재설계를 하면 더 빨라질 수 있으나 이번엔 안 함(다음에 재개할 지점으로 남김).
+
+### 트레이드오프 정리
+
+| | 얻는 것 | 잃는 것 |
+|---|---|---|
+| cluster2→결합판 | 재발화 손실 6.02%→0%, 비대칭부하 처리량 2배 | Fmax 최소 2배↓, 면적 5배↑, 전력 +68% |
+
+면적(695um²)과 전력(19.9uW)은 절대량으로 보면 45nm 공정에서 무시할 수준(작은 SRAM 매크로 하나보다도 작음) — 이 두 축은 "5배/68% 늘었다"는 상대수치가 절대적으로는 문제 안 됨. **다만 Fmax는 절대량 논리가 안 통함** — 처리율 자체가 줄어드는 것이라 회로가 작다고 희석되는 비용이 아님. 이 프로젝트에서는 "손실 0%"라는 스토리를 "속도"보다 우선하기로 하고 결합판을 채택.
+
+### 결정: 잠정(reversible) — cluster2 단독으로 되돌릴 수 있음
+
+**이번 결정은 확정이 아니라 잠정**임을 명시적으로 남김. 대회 심사 기준에서 속도(Fmax/처리율)가 손실률보다 더 중요하다고 판단되면, cluster2 단독([1052.6, 1111.1)MHz, qualified P&R 완료)으로 되돌릴 것 — 그 경우 재발화 손실 6.02%(§43, 준영 4자비교 기준)를 "구조적 한계로 알려져 있으나 감수함"으로 명시하고 제출하면 됨. 두 후보(cluster2 단독 / 결합판) 모두 이미 qualified 검증이 끝난 상태라, 전환 비용은 "어느 RTL을 최종 제출본으로 고르느냐"뿐 — 추가 설계/디버깅 없이 즉시 전환 가능.
+
