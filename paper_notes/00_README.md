@@ -29,6 +29,8 @@
 | ★★★ | [P1_Patent9934557_CoordTransform.md](P1_Patent9934557_CoordTransform.md) | US Patent 9,934,557 (2018) | 변환행렬 T로 이벤트 정합 — Digital 2차 좌표변환과 문제 설정이 거의 동일 |
 | ★★☆ | [P2_Lee2014_GestureInterface.md](P2_Lee2014_GestureInterface.md) | Lee et al. (2014) | 스테레오 DVS 기반 실시간 제스처 인식 — AER의 실전 응용 사례 ⚠️초록 기반 |
 | ★★☆ | [P3_Son2017_DVS_AER.md](P3_Son2017_DVS_AER.md) | Son et al. (2017, ISSCC) | 640×480, 9μm 픽셀, 300Meps AER — 공유픽셀+TDM으로 대역폭 절감 ⚠️초록도 미확보, 관련 특허 기반 |
+| ★★★ | [P4_Ryu2019_TraditionalAER_ProblemTimeline.md](P4_Ryu2019_TraditionalAER_ProblemTimeline.md) | Ryu (2019, CVPR Workshop) | 류현석 교수 본인 발표자료(원문 전체 확보·정독) — Gen1~Gen3 4세대에 걸쳐 "전통적 AER의 문제"가 처리량→불공정 지연→timestamp 왜곡(motion artifact)→다시 대역폭으로 재정의되는 시간적 흐름을 원문 인용 기반으로 재구성 |
+| ★★★ | [P5_Suh2020_ISCAS_MotionArtifactMinimization.md](P5_Suh2020_ISCAS_MotionArtifactMinimization.md) | Suh et al. (2020, ISCAS) | P4의 Gen3 해법(순차스캔+global hold)을 1280×960/1.3Geps 양산칩으로 실증(원문 전체 확보) — 핵심 발견: 류 교수의 실제 최종 해법은 "비트 최적화"가 아니라 "압도적 대역폭으로 비효율을 무의미하게 만들기"였음(12쪽 전체에 주소오버헤드 언급 전무) |
 
 ---
 

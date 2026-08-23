@@ -58,7 +58,7 @@
 | 4-1 | Boahen 2000 | (=1-1) | 대규모 어레이 AER 통신의 이론적 기반 |
 | 4-2 | Boahen 2004 | (=1-2) | 패드 수 절반화 — 256×256급 실질 참고 |
 | 4-3 | Son et al. 2017 (Ryu 공저) | 640×480 9μm 300Meps DVS | 삼성 VGA급 DVS, 대규모 AER 판독 핵심 |
-| 4-4 | Suh et al. 2020 (Ryu 공저) | 1280×960 4.95μm DVS | 삼성 1.3MP급 후속 DVS |
+| 4-4 | Suh et al. 2020 (Ryu 공저) | 1280×960 4.95μm DVS | 삼성 1.3MP급 후속 DVS — **원문(12쪽 발표슬라이드) 확보·정독 완료(2026-08-19), paper_notes/P5 참고** |
 | 4-5 | Finateu et al. 2020 | Sony/Prophesee IMX636 | 산업계 SOTA 스택형 이벤트 센서 |
 | 4-6 | Aung et al. 2011 | Adaptive Priority Toggle Arbiter | 공정한 트리 중재기 설계 |
 | 4-7 | Richter et al. 2023 | Speck (SynSense) | 2차원 비동기 판독 + 온칩 SNN |
@@ -285,10 +285,10 @@
 4-2. **Boahen, K. A. — "A Burst-Mode Word-Serial Address-Event Link" I/II/III.** (1-2 참조) — 행/열 순차 전송으로 패드 수 절반화. 256×256급 어레이에서 패드 제약 해결에 실질적 참고.
 
 4-3. **Son, B., Suh, Y., Kim, S., 외 (**Ryu, H.** 포함) — "A 640×480 Dynamic Vision Sensor with a 9μm Pixel and 300Meps Address-Event Representation."** ISSCC 2017, Session 4.1.
-   삼성전자 VGA급 DVS. BSI 공정 9μm 픽셀, 초당 3억 이벤트(300Meps) AER 출력. **지도교수 공저 — 대규모 어레이 AER 판독 구조의 핵심 참고 논문.**
+   삼성 Gen2 VGA DVS. 기존 pixel-by-pixel AER의 interface-bandwidth-induced latency를 줄이기 위해 digitally synthesized Group-AER(G-AER)를 적용하여 300 Meps 처리율을 달성. 단순 throughput 개선뿐 아니라 이후 arbitration-induced latency 및 timestamp distortion 문제를 분석하는 출발점이 된 설계. **지도교수 공저 — 대규모 어레이 AER 판독 구조의 핵심 참고 논문.** (5-A 참고)
 
-4-4. **Suh, Y., Choi, S., 외 (**Ryu, H.** 포함) — "A 1280×960 Dynamic Vision Sensor with a 4.95-μm Pixel Pitch and Motion Artifact Minimization."** IEEE ISCAS 2020.
-   1.3MP급 후속 DVS. Cu-Cu 픽셀 접합, 순차 컬럼 선택 및 글로벌 이벤트 홀딩으로 모션 아티팩트 최소화. **지도교수 공저 — 대형 어레이 스캔 방식에 직접 참고.**
+4-4. **Suh, Y., Choi, S., 외 (**Ryu, H.** 포함) — "A 1280×960 Dynamic Vision Sensor with a 4.95-μm Pixel Pitch and Motion Artifact Minimization."** IEEE ISCAS 2020. **원문(12쪽 발표슬라이드) 확보·정독 완료(2026-08-19) — paper_notes/P5 참고.**
+   1.3MP급 후속 DVS. Cu-Cu 픽셀 접합, 순차 컬럼 선택 및 글로벌 이벤트 홀딩으로 모션 아티팩트 최소화. 특히 이전 Gen2의 arbiter 기반 word-serial AER에서 나타난 event generation time–readout time mismatch 문제를 해결하기 위해 arbitrary arbitration 대신 sequential column scan을 채택한 후속 구조라는 점에서 중요. **지도교수 공저 — 대형 어레이 스캔 방식에 직접 참고.** 성능비교표 실측: 이 세대(1.3 Geps)가 arbitration 방식(Gen2, 300Meps)보다 오히려 빠른데, 그 이유는 인코딩 최적화가 아니라 **2.5Gbps 4-lane MIPI라는 압도적 인터페이스 대역폭으로 순차 스캔의 비효율 자체를 무의미하게 만들었기 때문** — 논문 전체에서 주소 오버헤드/비트 효율은 단 한 번도 언급되지 않음. (5-A 참고)
 
 4-5. **Finateu, T., Niwa, A., Matolin, D., 외 — "A 1280×720 Back-Illuminated Stacked Temporal Contrast Event-Based Vision Sensor with 4.86μm Pixels, 1.066GEPS Readout, Programmable Event-Rate Controller and Compressive Data-Formatting Pipeline."** ISSCC 2020, Session 5.10. (Sony/Prophesee, IMX636)
    산업계 최고 성능급 스택형 이벤트 센서. 1.06 Geps 판독 속도, 프로그래머블 이벤트율 제어기. **효율적 AER 판독 아키텍처의 최신 SOTA 참고.**
@@ -321,7 +321,40 @@
 
 5-6. *(미검증)* **Kim, J.-S., Ryu, H., Park, P. K. J., Kim, J., Park, Y. — "A High Dynamic Range CMOS Image Sensor Using Programmable Linear-Logarithmic Counter for Low Light Imaging Applications."** venue/연도 미확정(ISCAS 계열로 추정) — 인용 전 원문 확인 필요.
 
-5-7. *(정식 논문 아님, 참고자료)* **Ryu, H. E. — "Industrial DVS Design: Key Features and Applications."** CVPR 2019 Workshop on Event-based Vision 발표자료 (rpg.ifi.uzh.ch 게시). 산업용 DVS 설계 원칙을 실전 관점에서 정리한 슬라이드 — 인용 시 정식 논문이 아님을 명시.
+5-7. *(정식 논문 아님, 참고자료)* **Ryu, H. E. — "Industrial DVS Design: Key Features and Applications."** CVPR 2019 Workshop on Event-based Vision 발표자료 (rpg.ifi.uzh.ch 게시). 산업용 DVS 설계 원칙을 실전 관점에서 정리한 슬라이드 — 인용 시 정식 논문이 아님을 명시. **원문 전체 확보·정독 완료, 심층분석은 `paper_notes/P4_Ryu2019_TraditionalAER_ProblemTimeline.md` 참고** — Gen1~Gen3에 걸쳐 "전통적 AER의 문제"가 **throughput bottleneck → bandwidth-induced latency → unfair arbitration → timestamp/motion artifact → deterministic scan readout**으로 재정의되는 시간적 흐름을 원문 인용 기반으로 재구성함.
+
+### 5-A. 류현석 교수의 AER 설계 발전 과정 — Throughput에서 Temporal Fidelity로
+
+류현석의 DVS/AER 연구는 단순히 AER 전송 속도를 높이는 방향으로만 발전한 것이 아니라, 실제 산업용 고해상도 DVS에서 발생하는 대역폭 병목, arbitration 지연, timestamp 오차, motion artifact를 순차적으로 해결하는 방향으로 변화했다. 특히 삼성전자 System LSI 재직 당시 발표한 5-7의 *Industrial DVS Design* 자료는 2014년 Gen1부터 2018년 Gen3, 2020년 Gen4까지의 설계 변화를 직접 설명하고 있어 그의 문제 인식을 추적하기에 가장 좋은 1차 자료다(원문 전체 확보·정독 완료 — 아래 인용은 전부 슬라이드 원문 그대로).
+
+**① Gen1, 2014 — 전통적인 row/column arbitration.** 640×480 VGA 어레이에서 Column Arbiter + Address Decoder / Row Arbiter + Address Decoder를 사용한 전통적인 AER 구조. 최대 이벤트 처리율 6.5 Meps, 20-bit parallel interface. 픽셀 이벤트가 개별적으로 arbitration을 거쳐 주소화되므로, 픽셀 수와 동시 발생 이벤트 수가 늘수록 arbiter와 인터페이스가 병목이 된다 — *High Event Rate → Arbitration/Interface Bottleneck → Long Readout Latency*.
+
+**② Gen2, 2016 / ISSCC 2017 — G-AER로 throughput 문제 해결.** Group Address Event Representation(G-AER) 도입, 300 Meps 달성(Gen1 대비 약 46배). 원문: *"Original AER handles the individual pixel data with address, polarity, and event generation time."* / *"Group addressing reduces the latency by the interface bandwidth limitation."* 즉 문제 정의는 **개별 이벤트 단위 AER → address overhead 증가 → interface bandwidth 제한 → latency 증가**이며, G-AER는 "빠른 AER"라기보다 이벤트마다 주소를 독립 전송하는 전통 AER의 구조적 오버헤드를 줄이기 위한 group-based readout으로 이해하는 것이 정확하다.
+
+**③ G-AER 이후 발견된 문제 — throughput만으로 해결되지 않는 arbitration fairness.** 슬라이드 제목 그대로 *"Artifacts and delay by unfair arbitration"* — column arbiter가 동시 활성 column 중 하나를 고르는 과정에서 특정 column이 항상 먼저 서비스되고 다른 column은 밀리는 편향이 생길 수 있다. 즉 arbitration은 이벤트를 잃지 않아도 이벤트 간 **상대적 시간 정보**를 왜곡할 수 있다 — "처리량이 낮다"보다 "공유 자원을 arbitration으로 배분하기 때문에 event traffic이 높아질수록 queueing delay와 service-order-dependent latency가 발생한다"고 정의하는 것이 정확하다.
+
+**④ 핵심 문제의 재정의 — event generation time과 readout time의 불일치.** 슬라이드 제목 *"AER induced motion artifact"*, 원문: *"Image artifact could be induced by the mismatch between event generation time and readout time under high event rate condition."* 실제 이벤트 발생시각 대비 AER 판독시각의 편차(Δt_AER)가 이벤트율·arbiter 상태·column 위치·트래픽에 따라 일정하지 않다 — 즉 높은 이벤트율에서는 AER가 센서 자체의 시간 해상도보다 더 큰 timing uncertainty를 만들 수 있다. 이 관점에서 전통적 AER의 가장 본질적인 문제는 "속도" 자체보다 **temporal fidelity의 손상**이라고 볼 수 있다.
+
+**⑤ Gen3, 2018 — arbiter를 더 빠르게 만드는 대신 sequential scanning으로 전환.** 핵심 기능은 *"Global hold, Global reset, Column scan readout"*, 원문: *"Timestamp error minimized by applying sequential column scan readout."* 구조가 *event → arbiter → arbitrary column selection*에서 *event → pixel event storage → sequential column selection*으로 이동 — "더 빠른 arbiter"가 아니라 arbiter의 **비결정적 선택 자체를 제거**하는 방향. 슬라이드의 비교 그래프도 "Word-serial AER using Arbiter" vs "Sequential Column Selection"의 timestamp error를 event rate에 따라 직접 비교해 이를 뒷받침한다.
+
+**⑥ 표현상 주의 — "synchronous로 바꿨다"는 부정확.** Gen3의 sequential scan을 "AER를 asynchronous에서 synchronous로 바꿨다"고 쓰면 부정확하다. DVS pixel의 event generation 자체는 여전히 비동기(event-driven) — 빛 변화가 threshold를 넘으면 즉시 event 상태가 된다. 바뀐 건 **event readout scheduling**뿐이다. 정확한 표현: "asynchronous event generation은 유지하면서, arbitration-based asynchronous readout을 event storage + deterministic sequential scan readout으로 변경" — *asynchronous sensing + deterministic scanning readout*의 hybrid 구조.
+
+**⑦ Global Hold — scan만으로는 부족함.** Gen3는 픽셀마다 event storage를 두고 Global Hold를 적용한다. 원문(슬라이드 14): *"Global hold is implemented with an event storage in each pixel and its global control signal."* 이는 "읽는 동안에도 scene이 계속 변해서 column마다 서로 다른 시간 상태를 나타내는 문제"를 줄이기 위한 것으로, 일종의 **event-domain global shutter**에 가까운 역할이다. 즉 Gen3 설계는 *Event detection → Event storage/Global Hold → Sequential Column Read*로 볼 수 있다.
+
+**⑧ Gen4 / ISCAS 2020 — 고해상도에서도 이 철학을 유지, 그러나 "해결"의 정체가 정보이론적 최적화가 아니라 대역폭 하드웨어임이 원문으로 확인됨(2026-08-19).** 4-4/5-3의 Suh et al. 2020(1280×960, 4.95μm pixel pitch) 원문(12쪽)을 확보해 정독한 결과(paper_notes/P5), sequential column selection과 global event holding을 그대로 이용해 motion artifact를 줄인 건 맞지만(Gen2: throughput 개선 → Gen3: temporal consistency 개선 → Gen4: 고해상도로 확장이라는 계보), 두 가지가 새로 확인됨: (a) Global Hold를 실제로 오래(10ms+) 유지하려면 GIDL 누설전류로 인한 "주기적 가짜 이벤트"라는 새 아날로그 회로 문제가 따라오고, 전용 회로(GIDL-suppressed reset switch)가 별도로 필요했다 — Gen3(2019 슬라이드)엔 없던 디테일. (b) 성능비교표(슬라이드 11)에서 **이 세대(1.3 Geps)가 arbitration 방식(Gen2, 300Meps)보다 더 빠른데, 그 이유는 "2.5Gbps 4-lane MIPI"라는 압도적 인터페이스 대역폭으로 순차 스캔의 비효율 자체를 무의미하게 만들었기 때문**이다. 논문 12쪽 전체에서 "주소 오버헤드/비트 효율" 관련 단어는 단 한 번도 등장하지 않는다 — 즉 류 교수의 실제 최종·양산 해법은 **"인코딩을 정보이론적으로 최적화한다"는 축을 아예 택하지 않았고**, 대신 문제를 "주소가 덜 필요하게 만들기(sequential, 요청 자체를 없앰) + 남는 비효율은 하드웨어 대역폭으로 흡수"라는 다른 축으로 우회했다.
+
+### 5-B. 류현석 연구에서 도출할 수 있는 "전통적 AER의 문제점"
+
+Digital 1차 과제와 직접 연결하면 다음 여섯 가지로 정리할 수 있다.
+
+1. **Per-event address overhead** — 이벤트마다 주소를 독립적으로 처리하므로 발생률이 높아질수록 address/polarity/timestamp 전송량이 빠르게 증가한다. G-AER의 group addressing이 이에 대한 해법.
+2. **Shared-channel bandwidth bottleneck** — 다수 pixel이 하나의 통신 자원을 공유하므로 해상도·event rate가 증가하면 interface bandwidth가 병목이 된다. Gen2의 300 Meps G-AER가 이를 직접 겨냥.
+3. **Arbitration latency** — 동시 발생 이벤트 중 하나를 선택하는 과정에서 대기시간 발생, event traffic이 높아질수록 커진다("AER-induced latency").
+4. **Arbitration fairness** — 고정/구조적 arbitration 순서에 따라 pixel/column별 서비스 지연이 달라진다("unfair arbitration").
+5. **Timestamp distortion** — 실제 event generation time과 AER readout time이 어긋나 timestamp가 물리적 사건 시각을 정확히 반영하지 못할 수 있다.
+6. **Motion artifact** — 비균일 latency가 공간적으로 나타나면 움직이는 edge/물체 형상이 왜곡된다("AER-induced motion artifact").
+
+한 문장으로: **전통적인 AER는 개별 이벤트를 공유 통신 채널에서 arbitration하여 전송하기 때문에, event rate와 array size가 증가할수록 bandwidth와 arbitration이 병목이 되고, 그 결과 발생하는 비균일 readout latency가 event timestamp와 공간적 motion information을 왜곡할 수 있다.** 설계 개선 방향은 자연히 **bandwidth efficiency / fairness / bounded latency / temporal fidelity** 네 축으로 정리된다.
 
 **"Neuroreality Vision" 조사 — 확인 실패**: 영문/한글 다수 표기로 검색했으나 회사·제품·특허·팀에 대한 신뢰할 수 있는 공개 자료를 찾지 못함. 스타트업 DB, 뉴스, 학술 데이터베이스 어디에도 등장하지 않음. 초기 단계 비공개 기업이거나 표기가 다를 가능성 — **지도교수님께 정확한 회사명(영문 철자 포함)을 직접 확인 권장.**
 

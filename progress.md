@@ -1564,3 +1564,673 @@ quarantine(§54)이 CAM류 구조 때문에 PPA에서 완패한 교훈을 반영
 
 **Genus PPA**: **58.482um², 1.72637uW** — TX(695.286um²/19.9182uW) 대비 각각 **+8.4%, +8.7%**뿐. 예상대로 순수 주소 디코드라 거의 공짜에 가까움.
 
+## 57. 준영의 공용 벤치마크 게이트에 cluster2 qualified — 첫 팀 공용 검증 통과(2026-08-09)
+
+준영이 공용 clean-slate AER workload/TB + physical-PPA gate 인프라를 완성했다는 보고를 받음 — 강희 원본 fovea는 이미 이 게이트에서 검증돼 있었지만(10개 core sink-always-ready workload PASS), 그 이후 만든 cluster/cluster2/steal/buf/결합판은 아직 이 공용 게이트를 안 거친 상태였음. 마침 준영이 cluster2 전용 바인딩(`tb/clean/native/aer_ganghee_cluster2_binding.sv`)과 러너(`scripts/run_ganghee_cluster2_benchmark.sh`)까지 미리 만들어둬서, 우리 RTL은 전혀 수정하지 않고 그대로 돌릴 수 있었음.
+
+**실행**: `~/redred-faer/rtl/{arbiter2,arbiter4_tree,aer_tx16_trad_rowcol_fovea_cluster2}.v`를 filelist로 묶어서 `AER_GANGHEE_CLUSTER2_TOP=aer_tx16_trad_rowcol_fovea_cluster2` + `AER_GANGHEE_CLUSTER2_FILELIST`로 Xcelium 23.09 실행.
+
+**결과**: core 10개 워크로드(`basic_single/basic_sparse/basic_simultaneous/limit_load/limit_elephant_mouse/limit_global_fanin/limit_local_cluster/limit_distributed_burst/limit_retrigger/limit_timing_fidelity`) 전부 `AER_CLEAN_TEST_PASS`, `errors=0`. `limit_retrigger`(128/256 overrun)와 `limit_elephant_mouse`(128/272 overrun)에서 손실이 잡히는데, 이건 새 버그가 아니라 우리가 이미 알고 있던 cluster2 자체의 구조적 한계(재발화·극단편중 부하 — cluster2_steal_buf가 해결하는 바로 그 두 축)와 정확히 일치함. 즉 correctness(errors=0)는 완전히 유지된 채로, 이미 알던 capacity 한계만 그대로 드러난 것 — 공용 게이트가 우리 자체 측정과 일관된 결과를 낸다는 뜻이라 오히려 신뢰도가 올라감.
+
+(§58에서 정정: `limit_retrigger`의 overrun은 사실 DUT가 아니라 공용 TB(`aer_clean_tb.sv`)의 `offer_event_record`가 소스당 1-entry pending 게이트를 걸어서 TB 단에서 드롭한 수치임 — 즉 cluster2_steal_buf로 바꿔도 이 특정 숫자 자체는 똑같이 나올 것이라 "결합판이 푸는 문제"라는 위 서술은 부정확함. cluster2_steal_buf의 재발화 생존 이점은 이 공용게이트로는 원천적으로 측정이 안 됨, 우리 자체 TB(`tb_steal_buf_correctness.v`)로만 확인 가능.)
+
+**남은 일**: 이 게이트는 아직 cluster2까지만 커버함(steal/buf/결합판 전용 바인딩은 준영이 아직 안 만듦, arrival/overrun 포트와 steal로 인한 레인-행 매핑 가변성 때문에 기존 cluster2 바인딩을 그대로 못 씀). 준영이 언급한 "강희·현수·준영 후보를 동일 trace로 실제 Genus/Innovus flow까지 돌리는" physical-PPA gate 단계는 아직 우리 쪽에서 안 거쳤음 — 다음에 필요하면 결합판용 바인딩을 새로 만들거나, 우선 cluster2 결과만으로 공용 비교에 참여하는 방안을 상의할 것.
+
+## 58. cluster4(4레인 완전분리, arbiter 없음) 실험 — 준영 DREC(K=4)과의 uniform 고부하 격차 원인 규명(2026-08-12)
+
+**배경**: 서버 재확인 중 `~/AI-semi/integration/reports/common-multilane/ganghee-cluster2-qualification.md`(준영, 2026-08-08, TEAM_PROGRESS.md엔 링크 안 걸려 있었음)에서 준영 DREC(K=4)가 uniform 200% 부하에서 손실 0%인데 우리 cluster2는 12.5% 손실이라는 4후보 비교표를 발견함. 처음엔 "DREC은 범용 K-way 중재기라 우리 fovea 계열의 공간적 클러스터링 가정(생체모방 DVS)이 uniform 트래픽에서는 안 맞아서 밀리는 것"이라고 가설을 세웠는데, 실제로 원인을 파고드니 그게 아니었음 — cluster2는 4개 행을 2개 팀(중심/주변)으로 묶어 각 팀이 레인 하나를 공유하고, 팀 내부에서 두 행이 `arbiter4_tree`로 여전히 경쟁함. 지속적 고부하에서는 한 팀의 두 행이 거의 항상 동시에 대기 상태라, 그 팀의 레인이 한 사이클에 행 하나만 처리할 수 있다는 게 진짜 병목 — 트래픽이 공간적으로 뭉쳤는지 여부와 무관하게 순수하게 "레인 수(2) < 행 수(4)"에서 나오는 구조적 한계였음.
+
+**검증**: 이 가설이 맞다면 레인을 4개로 늘려 팀 내부 경쟁 자체를 없애면(행마다 전용 레인) 손실이 0%가 돼야 함 — `rtl/aer_tx16_trad_rowcol_fovea_cluster4.v` 작성(arbiter 완전 제거, 각 행의 열 요청 4비트를 그대로 그 행 전용 레인에 등록만 함, 조합논리 0단). `tb/tb_cluster4_correctness.v`(`tb_cluster2_correctness.v`와 동일 방법론, 레인 4개로 확장, ARRIVAL_PCT=15%/20000cycle)로 iverilog 검증: `generated=47735 delivered=47735 phantom=0 overflow=0 avg_latency=0`, `CLUSTER4_CORRECTNESS_PASS` — 가설대로 완전 무손실(정의상 매 사이클 대기 요청 전부가 그대로 나가므로 지연도 0).
+
+**PPA 실측(Genus, `syn/run_genus_cluster4.tcl`, cluster2와 동일 SDC/library 조건)**: 면적 **142.272um²**(cluster2 138.852um² 대비 **+2.5%**), 전력 **13.9530uW**(cluster2 11.8744uW 대비 **+17.5%**), critical path 약 0.675ns(5ns 제약에서 slack 4325ps — cluster2의 1.21ns critical path보다 훨씬 짧아 Fmax 잠재력은 더 큼). **예상과 반대로 arbiter를 완전히 없앴는데도 PPA가 별로 안 싸짐** — 이유는 레지스터 수 증가(cluster2는 valid 2 + row 2×2 + col_mask 2×4 = 14 FF, cluster4는 row 필드가 없어지는 대신 valid 4 + col_mask 4×4 = 20 FF)가 arbiter4_tree 2개 제거로 아낀 것보다 큼. 핀도 20개로 늘어남(cluster2는 14개).
+
+**결론**: DREC과의 uniform 고부하 격차는 우리가 "capacity를 못 만들어서"가 아니라 **의도적으로 2레인(더 압축된 인터페이스, cluster2)을 택하고 4레인(무손실이지만 사실상 병렬버스, cluster4)을 포기한 트레이드오프**였음을 실측으로 확인함 — cluster4는 무손실은 달성하지만 PPA 이득이 없고, 핀이 늘고, 무엇보다 "여러 이벤트를 압축해서 보낸다"는 AER의 다중화 취지 자체가 사라짐(현수가 Dir2에서 이미 짚은 것과 정확히 같은 비판이 우리 쪽에도 그대로 적용됨). 팀 논의에서 이 결과를 근거로 "cluster2/cluster2_steal_buf가 capacity에서 밀리는 건 미완성이 아니라 의도된 설계공간 선택"이라고 설명할 수 있음.
+
+## 59. cluster2_steal_buf(결합판)를 준영 공용 trace로 직접 구동 — uniform 고부하에서 DREC과 동급(손실 0%) 확인(2026-08-12)
+
+**배경**: §58 결론은 "2레인(cluster2)은 DREC 대비 capacity가 밀리는 게 의도된 트레이드오프"였는데, 우리 실제 최종후보는 cluster2가 아니라 재발화까지 잡는 결합판(cluster2_steal_buf)임. 결합판이 이 uniform 고부하 격차를 얼마나 메꾸는지는 아직 아무 데이터도 없었음. 준영 하네스에 결합판용 바인딩을 만들어달라고 요청했었는데(TEAM_PROGRESS.md), 그건 남한테 미루는 것뿐이고 실제로 확인이 급하면 우리가 직접 할 수 있는 방법이 있었음 -- 준영이 공개해둔 trace 생성기(`generate_trace.py`)와 manifest(`manifest.multilane-n16.json`)는 "후보 지정 없이 누구나 쓰라고" 만든 공용 데이터/도구라, 이걸로 **준영 저장소를 전혀 건드리지 않고** 직접 우리 결합판을 검증할 수 있었음.
+
+**방법**: 서버에서 `python3 generate_trace.py --manifest .../manifest.multilane-n16.json --output-dir ~/redred-faer/common_traces_steal_buf`로 공식 trace를 **우리 자신의 디렉터리에** 생성(준영 트리엔 아무것도 안 씀). uniform 부하 4종(seed=2001, load=1.0/1.25/1.5/2.0)을 다운로드해서 jsonl → "사이클당 16비트 도착비트맵" 텍스트로 변환(`scripts/jsonl_to_cycle_bitmask.py`, 같은 사이클·같은 소스 중복 0건 확인). 새 TB(`tb/tb_steal_buf_common_trace.v`)가 이 trace를 **억제 없이 그대로** `arrival` 펄스로 흘려보내고 결합판 자신의 `overrun` 출력으로 손실을 직접 판정 -- 준영의 공용 TB(`aer_clean_tb.sv`)를 거치지 않은 이유는 §58 정정에서 확인했듯 그 TB가 소스당 1-entry pending 게이트를 걸어서 우리 2-deep 버퍼의 이점 자체를 못 보기 때문. (cluster2처럼 레벨 신호 인터페이스면 "동시 다중 대기"를 표현할 방법이 없어서 준영의 1-entry 드롭이 오히려 올바른 모델링이었음 -- 결합판은 펄스+내장 카운터라 그 제약이 없어서 다른 방식이 정당함.)
+
+**결과**: 4개 부하 전부 `STEAL_BUF_TRACE_CONSISTENT`(accepted=delivered 정확히 일치), **손실 0%**:
+
+| offered load | generated | overrun | throughput(event/cycle) |
+|---:|---:|---:|---:|
+| 1.00 | 2048 | 0 | 1.000 |
+| 1.25 | 2536 | 0 | 1.238 |
+| 1.50 | 3039 | 0 | 1.483 |
+| 2.00 | 4096 | 0 | 2.000 |
+
+준영이 이미 발표한 4후보 비교표(DREC K4: 손실 0%/처리량 0.9995~1.999, 우리 cluster2 단독: 손실 6~12.5%)와 나란히 놓으면, **결합판은 이 uniform 고부하 축에서 DREC과 동급(손실 0%, offered load를 그대로 처리량으로 흡수)**임. cluster2 자체의 row-arbitration 구조(§58에서 확인한 진짜 병목)는 안 바뀌었는데, steal(레인 유휴시 교차 대여)과 buf(소스당 2-deep 버퍼가 순간적 과다요청을 흡수)가 합쳐지니 이 특정 trace에서는 병목이 실제로 드러나지 않았음.
+
+**한계/다음에 확인할 것**: (1) 이건 우리가 직접 짠 드라이버 결과라 준영 하네스의 공식 receipt/SHA 검증을 거친 게 아님 -- 팀 공식 비교표에 넣으려면 여전히 준영 바인딩(TEAM_PROGRESS.md에 요청해둔 것, 레인-행 동적매핑만)이 필요함. (2) latency는 이번 TB에서 안 쟀음(accepted=delivered만 확인, 평균/최악 지연 없음) -- DREC의 평균 E2E 2.000, 결합판이 버퍼링 때문에 더 길 가능성 있어서 다음에 잴 것. (3) trace는 seed=2001 1개만 씀(준영 표는 3-seed 평균) -- 필요하면 2002/2003도 돌려서 재현성 확인. (4) generated_trace.py/manifest 자체는 read-only로 실행만 했고 출력은 전부 우리 디렉터리(`~/redred-faer/common_traces_steal_buf/`)에만 저장, 준영 트리엔 파일 하나도 안 씀.
+
+## 60. 활동도(VCD) 기반 전력 실측 — cluster2/결합판, 부하 2단계(2026-08-13)
+
+**배경**: 지금까지 모든 PPA 비교(fovea/cluster/cluster2/cluster4/steal_buf 포함)가 Genus의 vectorless(추정치) 전력이었음. 초창기 base 설계에서 딱 한 번 VCD 실측을 해봤을 때 vectorless의 47%밖에 안 나온 적이 있어서(§5-21-1), 최종 후보들도 실측하면 더 낮게(유리하게) 나올 거라는 가설을 세우고 검증함 -- 특히 결합판(cluster2_steal_buf)이 클록게이팅 덕에 저부하에서 거의 공짜일 거라는 기대.
+
+**방법**: `tb/tb_cluster2_vcd.v`, `tb/tb_steal_buf_vcd.v`(§5-21의 `tb_aer16_base_vcd.v`와 동일 방법론, `timescale 1ns/1ps` 명시) 작성 -- cluster2는 req 레벨, 결합판은 arrival 펄스로 각각의 native 계약에 맞게 자극. ARRIVAL_PCT=15%(기존 기준선)와 3%(실제 DVS급 희박 트래픽 근사) 두 지점씩, 총 4개 VCD 생성 후 서버로 옮겨 `syn/run_genus_cluster2_activity_power.tcl`/`run_genus_steal_buf_activity_power.tcl`로 `read_stimulus -format vcd -dut_instance /<top_tb>/dut` 방식 실측(두 스크립트 다 `lp_insert_clock_gating true` 유지).
+
+**결과**:
+
+| | vectorless(Genus) | 활동도 15% | 활동도 3% |
+|---|---:|---:|---:|
+| cluster2 | 11.8744 uW | 8.580 uW(**-27.7%**) | 4.687 uW(**-60.5%**) |
+| 결합판(steal_buf) | 19.9182 uW | 29.151 uW(**+46.4%**) | 23.047 uW(**+15.7%**) |
+
+cluster2는 가설대로(base 사례와 같은 방향) -- 저부하로 갈수록 vectorless보다 훨씬 낮게 나옴. **결합판은 가설과 반대로 vectorless보다 오히려 더 높게 나옴**, 특히 15%에서 +46.4%. `pending_cnt` 갱신 로직이 매 사이클 16소스 전부의 `{arrival, granted}` 조합을 평가하는데, 최종 레지스터값이 안 바뀌어도(default 케이스) 그 앞단 비교/셀렉트 조합논리 자체는 계속 스위칭해서 vectorless가 못 잡아낸 실제 활동이 있는 것으로 추정(원인 확정은 안 함). 부하가 낮아지면 결합판도 줄긴 함(29.151→23.047, -21%)이지만 cluster2(-45%)보다 기울기가 훨씬 완만함 -- "저부하에서 거의 공짜"라는 기대는 결합판엔 안 맞았음.
+
+**의의**: 상대비교(어느 설계가 더 작냐)는 지금까지 전부 vectorless로 일관되게 쟀으니 여전히 유효하지만, 절대 전력값은 설계마다 vectorless 신뢰도가 다름(cluster2는 보수적 상한, 결합판은 오히려 과소평가)을 확인함 -- 결합판을 최종 제출하게 되면 vectorless 19.9uW를 그대로 못 쓰고 이 실측치(23~29uW대)를 써야 함.
+
+## 61. cluster2_buf(steal 없는 버전) 실험 — 가설 기각, steal을 빼도 안 싸짐(2026-08-13)
+
+**동기**: cluster2의 유일한 잔여 손실(§44, 6.02%)은 "같은 소스 재발화"뿐이고 steal이 다루는 비대칭부하는 부하 125% 이상에서만 발생하는 엣지케이스(§43)라, "steal 없이 buf만 붙이면 결합판보다 싸게 재발화 손실을 없앨 수 있지 않을까"라는 가설로 시작함. steal2_buf 자체(steal 단독은 cluster2 대비 Genus +16%/+10%뿐이고 Fmax도 거의 그대로라는 §47 기록)를 보면 buf가 Fmax 붕괴(1052→333MHz)의 진범일 가능성이 높다고 추정했음.
+
+**구현**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_buf.v` -- `cluster2_steal_buf.v`에서 `steal_to_center`/`steal_to_periph` 분기만 제거하고 cluster2의 원래 `center_gnt`/`periph_gnt` 기반 레인 배정으로 되돌림(나머지 `pending_cnt`/`arrival`/`overrun` 로직은 그대로 재사용).
+
+**테스트벤치 버그 발견 및 수정**: `tb/tb_cluster2_buf_correctness.v`(`tb_steal_buf_correctness.v`와 동일 방법론)로 첫 실행했더니 `DRAIN_INCOMPLETE`(소스 3개, shadow_cnt=1 잔존) 발생. DUT의 `pending_gt0`는 해당 소스에서 이미 0으로 확인돼서 DUT 버그가 아니라 TB 버그로 추정하고 추적함 -- 원인: "이번 사이클 도착이 overrun으로 거부됐는지"를 판정할 때, `drain_lane`이 먼저 `shadow_cnt`를 깎아버린 **뒤에** 그 값으로 재확인해서, "가득 찼다가 마침 이번 사이클에 하나 빠져나간" 소스의 새 도착을 실제로는 거부됐는데도 TB가 이중으로 인정해버리는 레이스였음(같은 사이클에 pending_full 상태에서 grant+새 도착이 겹치는 드문 경우에만 발생). `was_overrun[i]`를 엣지 전 스냅샷으로 별도 저장해서 그 값으로만 판정하도록 수정 → `CLUSTER2_BUF_CORRECTNESS_PASS`(generated=47773, delivered=47377, dropped_overrun=396, phantom=0, collisions=0). **`tb_steal_buf_correctness.v`에도 완전히 동일한 잠재 버그가 있음** -- 그때는 우연히(시드/구조 차이) 안 걸렸을 뿐이라 마주칠 위험이 남아있음, 필요시 같은 패턴으로 수정할 것.
+
+**정확성**: 손실률 396/47773=0.83%(ARRIVAL_PCT=15%) -- fovea(57.6%)/cluster2(6.0%)보다 훨씬 낮지만 결합판(0.0%)만큼 완전하진 않음(steal 없이 buf만으론 비대칭부하 축의 손실이 일부 남음).
+
+**Genus 스크리닝 PPA** (`syn/run_genus_cluster2_buf.tcl`, cluster2/steal_buf와 동일 조건):
+
+| | cluster2 | cluster2_buf(신규) | steal_buf(결합판) |
+|---|---:|---:|---:|
+| 면적 | 138.852 um² | 645.012 um² | 695.286 um² |
+| 전력(vectorless) | 11.8744 uW | **43.8586 uW** | 19.9182 uW |
+| critical path(5ns 제약) | 1.21ns | 1.34ns(slack 3660ps) | (별도 미측정) |
+
+면적은 가설대로 steal을 빼니 소폭 작아짐(645 vs 695, -7.2%) -- steal 자체의 면적 비용은 크지 않다는 게 확인됨. **그런데 전력은 정반대로 나옴** -- steal 없는 쪽이 결합판보다 **2.2배 더 나쁨**(43.86 vs 19.92uW). 전력 리포트 분해해보면 register internal power가 60.86%로 압도적인데, `lp_insert_clock_gating`이 이 버전의 `pending_cnt` 갱신 로직을 결합판만큼 잘 게이팅하지 못한 것으로 보임(정확한 원인 미확정 -- 넷리스트 게이트 레벨 diff까지는 안 함).
+
+**결론(가설 기각)**: "steal을 빼면 더 싸질 것"이라는 예상이 틀림 -- 면적은 거의 그대로고 전력은 오히려 나빠짐. **cluster2_steal_buf(현재 결합판)를 그대로 유지하는 게 맞음**, steal을 빼는 부분 결합은 실익이 없음. 이번 실험에서 유일하게 남는 실질적 성과는 §steal_buf 계열 TB에 잠재하던 이중계산 버그를 찾아 수정한 것.
+
+## 62. 준영의 최신 공용 TB(v4)로 fovea/cluster2 재검증 — 공식 50개 워크로드 기준 cluster2 우위 재확인(2026-08-13)
+
+**배경**: 준영이 새 공용 평가 스크립트(`run_ganghee_fovea_cluster2_v4_eval.sh`, SHA-pinned 입력, 커밋 `47e1f2f`)를 만들어뒀다는 요청을 (본인이 다른 채널로 보낸 걸 강희가 전달) 받음. 요청 경로가 `/home/chickgoose/...`, 이후 `snu.polaris.09`로 두 번 다르게 와서 처음엔 접근 불가로 판단했으나, `snu.polaris.09`가 사실 우리가 이미 쓰는 `aiasic26911@210.126.11.79` 서버 자신의 내부 호스트명(ping 결과 동일 IP)임을 확인 — 실제로는 우리 서버 `/tmp/aer-eval-47e1f2f/`에 이미 준비돼 있었음. SHA 검증(스크립트 내 12개 입력 파일 해시가 우리가 직접 계산한 arbiter2.v/arbiter4_tree.v/cluster2.v 해시와 정확히 일치)으로 진위 확인 후 실행.
+
+**실행**: 사용자 요청으로 cluster2를 먼저 돌리는 순서로 스크립트 사본(`run_ganghee_cluster2_fovea_v4_eval.sh`, 준영 원본은 무수정 보존)을 만들어 실행. full50(50개) + capacity22(부분집합) + basic_reset_drain, fovea/cluster2 둘 다.
+
+**결과**: `AER_FOVEA_CLUSTER2_V4_EVAL_PASS`(exit 0), 50/50 워크로드 전부 PASS(양쪽 다), pairwise cross-map rankable, reset_drain PASS. Xcelium 23.09-s013. attempt: `/tmp/aer-eval-47e1f2f/eval-fovea-cluster2.yZr1kmYL`(+ 결과 전체를 담은 tar.gz와 SHA256도 별도 생성, 준영 스크립트 자체는 파일별 해시만 만듦).
+
+**손실률 합산(full50 전체)**: fovea 26.49%(28187/106416) vs cluster2 **11.52%**(12259/106416) — 우리 자체 15% 단일부하 테스트가 아니라 다양한 시나리오가 섞인 공식 suite 기준으로도 cluster2가 손실을 절반 이하로 줄인다는 게 제3자(준영) 인프라로 재확인됨.
+
+**워크로드별 손실률 분해**(cluster2, load_pct 순 정렬): `core_*/global_fanin/pairwise_contention/shape_b*/spatial_*/uniform_l0p125` 등 저부하군은 **0~2%**(사실상 무손실). uniform 계열은 부하에 비례해서 완만히 증가(0.5배~2%, 1.0배~6%, 1.5배~9~10%, 2.0배~12.5%). 반면 `retrigger_*`(50%!), `elephant_mouse_*`(33%), `moving_hotspot_single`(33%)은 부하 크기와 무관하게 항상 나쁨 — 이미 알던 구조적 한계(재발화, 극단편중)가 패턴 자체의 문제임을 재확인.
+
+## 63. cluster2 + 현수 Dir7(주소 중복 억제) 결합 실험 — 또 기각, 오늘 세 번째 확장 시도 전부 실패(2026-08-13)
+
+**동기**: 현수의 확장 7종 중 Dir7(연속 동일주소 재발화 시 row0/col_mask0 버스를 안 흔들고 유지, `repeat` 플래그만 세움 — UniSpike arXiv 2605.23796 착안)이 유일하게 우리 아키텍처와 독립적이고 AER 개념도 안 깨는 기법이라 판단해 이식 시도. 현수의 실제 RTL(`~/semi-ai/rtl/aer_cluster2_redundancy.sv`, 우리 cluster2를 무수정으로 감싸는 순수 wrapper)을 읽고 우리 repo에 동일 구조로 재구현.
+
+**구현**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_redundancy.v` — cluster2 코어를 그대로 인스턴스화하고, 직전 사이클과 (row,col_mask)가 완전히 같으면 출력 레지스터 갱신을 생략(버스 유지)하는 wrapper 1단 추가.
+
+**테스트벤치 버그 발견 및 수정**: 첫 실행에서 대량 PHANTOM 에러(10620건) 발생 — wrapper가 core 출력 위에 레지스터를 하나 더 얹어서 core→최종출력이 2사이클 지연이 됐는데, TB의 req 폐루프(레벨 신호, qcount 기반)는 여전히 1사이클 지연을 가정하고 최종(지연된) 출력으로 qcount를 내리다 보니, core 내부적으로 이미 grant된 주소의 req가 1사이클 더 남아서 **진짜 중복 grant**가 발생함(DUT 버그 아님). req 폐루프 갱신을 core의 raw(1사이클 지연) 신호(`dut.raw_valid0` 등) 기준으로 고치니 `CLUSTER2_REDUNDANCY_CORRECTNESS_PASS`(phantom=0, generated=delivered=47735, repeat_hits=817 전부 정합).
+
+**활동도(VCD) 전력 실측**(§60과 동일 방법론, ARRIVAL_PCT 15%/3%, cluster2 순정과 직접 비교):
+
+| | cluster2(순정) | cluster2+Dir7 |
+|---|---:|---:|
+| 면적(Genus) | 138.852 um² | **354.312 um²**(+155%) |
+| 전력(활동도 15%) | 8.580 uW | **17.472 uW**(+103%) |
+| 전력(활동도 3%) | 4.687 uW | **11.069 uW**(+136%) |
+
+**결론(기각)**: 현수 본인이 코드 주석에 "Genus vectorless로는 이 기법의 실제 이득(버스 비토글)을 못 본다"고 정직하게 적어뒀는데, 실측해보니 그 반대가 진실이었음 — 버스 토글 절감(row0/col_mask0 6비트, repeat 빈도만큼)보다 그걸 위해 추가한 비교기+상태 레지스터(last_valid/row/col_mask ×2레인)+출력 레지스터 이중화 비용이 훨씬 커서 순손해. **cluster2/결합판(§60)/cluster2_buf(§61)와 동일한 패턴** — 우리 규모(N=16, 2레인)에서는 어떤 부가 로직을 얹어도 오버헤드가 이득을 잡아먹음.
+
+**오늘 하루 요약**: cluster4(§58), cluster2_buf(§61), Dir7 결합(§63) — cluster2를 개선해보려는 시도 3종 전부 기각. cluster2 순정이 계속 최적점으로 남음. 준영 공용 인프라(§62)로도 독립 재확인됨.
+
+## 64. cluster2_dynamic(top-2 전역선택) 실험 — 처리량 2배지만 반대팀 99% 굶김, 기각(2026-08-13)
+
+**동기**: steal은 "반대팀이 완전히 idle일 때만" 레인을 빌려주는 좁은 조건 — 그 조건을 "덜 바쁜 쪽에 양보" 정도로 완화하면 더 넓은 상황에서 도움이 될지 확인. 현수의 multilane_rotation_arbiter(isolate-lowest-bit K회 연쇄)와 같은 원리로, 팀 구분 없이 매 사이클 4개 행 중 우선순위 top-2를 뽑아 레인 2개에 동적 배정하는 `rtl/aer_tx16_trad_rowcol_fovea_cluster2_dynamic.v` 작성(`arbiter4_tree` 2개, 1등 뽑고 마스킹 후 2등).
+
+**정확성**: `tb_cluster2_dynamic_correctness.v` PASS(phantom=0, collision=0, jain=1000 완벽 공정성 — 근데 이 공정성 지표는 "누적 방문 횟수 균등"만 보는 거라 아래 문제를 못 잡음).
+
+**치명적 문제 발견**(`tb_cluster2_dynamic_benefit.v`, 중심팀 항상 포화+주변팀 3%만 가끔 요청): 중심팀 처리량은 기대대로 거의 2배(4.0→7.994/cycle)로 늘었는데, **주변팀 배달량이 4812건→32건(-99.3%)으로 거의 완전히 굶어버림**. 원인: "항상 요청 중인" 팀이 회전우선순위에서 "가끔만 나타나는" 팀을 구조적으로 계속 이겨버림 — §37에서 고쳤던 영구기아 버그의 변종을 재도입한 셈.
+
+**결론(기각)**: steal의 "완전 idle일 때만" 조건은 안일한 보수성이 아니라 **반대팀 접근권을 절대 뺏지 않는 유일한 안전선**이었음을 역으로 증명함. 그 선을 넘으면(느슨한 "덜 바쁜 쪽 우대") 바로 굶주림이 재발하고, 안전하게 고치려면(aging/credit) 오늘 계속 봐온 오버헤드 패턴이 반복될 게 뻔함 — 그래서 시도 안 하고 기각. cluster2_dynamic은 채택 후보 아님, steal의 보수적 설계가 옳았다는 반증 자료로만 남김.
+
+## 65. cluster2_steal의 정확한 손실률 — 준영 바인딩 배선을 그대로 재현해서 검증(2026-08-13)
+
+**배경**: §64 다음 "그럼 steal은 얼마나 도움되나"를 준영 공식 trace로 재보려는데, 처음 만든 간이 드라이버(1-entry pending을 그냥 즉시 클리어하는 방식)가 `retrigger_identity`에서 0%를 냈음 — 준영 공식 결과(50.0%)와 정면으로 배치돼서 못 믿을 결과였음. **완전히 파고들기로 함**.
+
+**정확한 배선 재구현**(`tb/clean/native/aer_ganghee_cluster2_binding.sv`를 읽기만 하고 로직만 복제, 파일은 안 건드림): `native_ack_mask = result_mask & pending`(조합논리, 같은 사이클), `native_req = pending & ~ack_mask`(같은 사이클 재구동 방지), 그리고 `aer_clean_tb.sv`의 `pending[..] <= 1'b0`가 논블로킹이라 실제 클리어는 다음 사이클에야 보임(1단 지연). 손으로 검증: 1사이클 간격 4연속 재발화 시 admit,overrun,admit,overrun = 정확히 50% -- **재구현한 모델로 돌리니 retrigger_identity/affine 둘 다 정확히 50.0%, uniform_l2p00도 정확히 12.4~12.5%로 준영 공식 수치와 정확히 일치**(`tb/tb_cluster2_steal_common_trace.v`, 검증 확정).
+
+**공식 50개 워크로드 전체 결과**(cluster2 vs cluster2_steal):
+
+| | 전체 손실률 |
+|---|---:|
+| cluster2 | 11.52%(12259/106416) |
+| cluster2_steal | **10.89%**(11593/106416) |
+
+**개선된 15개**(전부 "지속적/동적 경쟁" 계열): mixed_phase_always_ready(20.6~20.8%→19.0~19.1%), phase_transition(9.8~9.9%→8.6~8.8%), rotating_victim(4.8%→4.7%), uniform_l1.25~l2.00(7.3~12.5%→7.0~11.2%).
+
+**변화없는 35개**: retrigger(50.0%=50.0%, 예상대로 — steal은 재발화를 안 건드림), elephant_mouse(33.3%=33.3%, 단일소스 폭주형이라 팀간 경쟁 문제가 아님), moving_hotspot(0.0%=0.0%, 애초에 손실 자체가 없었음 — 예전 부정확한 모델에서 11~33%로 보였던 건 순전히 버그), pairwise_contention/shape_*/spatial_*/timing_pair/저부하 uniform(≤100%) 등.
+
+**결론**: steal은 순수하게 "지속적 고부하에서의 팀간 경쟁"만 고침(uniform 125%+, mixed_phase, phase_transition, rotating_victim) — 재발화나 극단편중은 원래 설계대로 손도 안 댐. Genus 기준 비용(면적+16%/전력+10%, Fmax 거의 그대로)을 생각하면 이 정도 개선도 순이득. **cluster2_steal(단독, buf 없이)을 cluster2보다 나은 기본 후보로 승격 검토할 만함** — cluster2보다 전반적으로 나음. (§66에서 정정: "결합판급 이득을 거의 공짜로 얻음"은 과장이었음 — buf까지 합치면 손실이 0.47%까지 떨어져서 steal 단독의 10.89%와는 차원이 다름. steal은 결합판의 값싼 대체재가 아니라 훨씬 좁은 효과만 냄.)
+
+## 66. cluster2_steal_buf(결합판)의 진짜 손실률 — 재발화를 근본적으로 해결한다는 것을 정확한 숫자로 확정(2026-08-13)
+
+**동기**: §65에서 steal 단독의 손실 개선이 미미하다는 걸 확인한 뒤, "재발화를 근본적으로 해결해보자"는 논의에서 시작 — 이미 만들어둔 buf(2-deep 카운터)가 이론적으로는 재발화를 없애야 하는데, 공식 50개 워크로드 기준으로는 아직 실측 안 됨.
+
+**1차 시도(간이 드라이버) 결과 이상**: §59에서 쓴 `tb_steal_buf_common_trace.v`를 50개 전체로 확장(런타임 `+TRACE_FILE=` plusarg로 개조) — retrigger_identity/affine 둘 다 **0% 손실**(cluster2/steal의 50%와 극명히 대비, 예상대로 buf가 재발화를 없앰) 확인. 근데 `mixed_phase_always_ready_identity/bit_reverse` 2개에서 `generated=accepted+overrun` 보존식이 깨짐(delivered가 accepted보다 많음) — DUT 버그인지 TB 버그인지 불확실한 상태로 남김.
+
+**추가로 판**: `tb_steal_buf_trace_phantom_debug.v`(§44/tb_steal_buf_correctness.v와 동일한 shadow_cnt 2-deep 방식, phantom/보존식 전부 엄격 체크) 새로 작성해서 mixed_phase만 재검증. 첫 실행에서 drain 루프 상한을 `cyc+15000`로 매 반복마다 재계산하는 실수로 사실상 무한루프에 빠짐(`for(cyc=cyc; cyc<cyc+15000; ...)` — cyc가 바뀌면 상한도 같이 밀림) → `drain_until` 변수로 상한을 미리 고정해서 수정. 재실행 결과 **`PHANTOM_DEBUG_PASS`**(phantom=0, collisions=0, generated=delivered+dropped_overrun 정확히 성립: 9228=8731+497) — **DUT는 결백**, 문제는 간이 드라이버(`tb_steal_buf_common_trace.v`)의 overrun 샘플링 타이밍 쪽이었음(정확한 원인은 안 팜, 엄격한 버전으로 대체하는 걸로 충분).
+
+**공식 50개 워크로드 전체 결과**(엄격한 phantom-check 버전, 50개 전부 `PHANTOM_DEBUG_PASS`, 버그 없음):
+
+| | 전체 손실률 | 손실 있는 워크로드 |
+|---|---:|---:|
+| cluster2 | 11.52% | 15개+ |
+| cluster2_steal | 10.89% | 15개 |
+| **cluster2_steal_buf(결합판)** | **0.47%**(502/106416) | **딱 2개** |
+
+48개 워크로드는 완전히 0% 손실(retrigger/elephant_mouse/uniform 전 구간 포함). 유일하게 손실이 남은 건 `mixed_phase_always_ready_identity`(5.39%, 497/9228)와 `_bit_reverse`(0.05%, 5/9228)뿐 — 재발화+비대칭부하가 극단적으로 뒤섞인 워크로드라 2-deep 버퍼 용량 자체를 넘어서는 것으로 보임(버그 아님, 위에서 DUT 결백 확인됨).
+
+**결론**: buf가 재발화를 근본적으로 해결한다는 게 정확한 숫자로 확정됨 — Fmax 손해(1052→333MHz)와 전력 증가(§60, 저부하 실측 기준 vectorless보다 더 나쁨)라는 대가는 여전히 크지만, 그 대가로 사는 게 "약간의 개선"이 아니라 **손실을 거의 완전히(11.52%→0.47%) 없애는 것**이었음. steal 단독(§65, 10.89%)과는 차원이 다른 결과라, "결합판 대신 steal만 써도 비슷한 효과"라는 §65의 낙관적 평가는 틀렸음(위에서 정정). cluster2(빠르지만 11.52% 손실)와 결합판(느리지만 0.47% 손실) 사이의 트레이드오프가 이제 진짜 숫자로 뒷받침됨 — 최종 선택은 여전히 대회의 손실 허용 기준에 달려있음(아직 미확인).
+
+## 67. 지도교수(류현석) 문제의식 대조 — timestamp/motion-artifact fidelity 실측(2026-08-19)
+
+**배경**: 류현석 교수의 CVPRW19 발표자료(`paper_notes/P4_Ryu2019_TraditionalAER_ProblemTimeline.md`)를 원문 정독한 뒤, 그가 커리어에서 재정의해온 "전통적 AER의 문제" 6가지(주소당 오버헤드/공유채널 대역폭/중재지연/중재 불공정/timestamp 왜곡/motion artifact)에 우리 설계(cluster2 계열)를 대조해봄. 4번(공정성)은 강하게 잡았지만, 5번(timestamp fidelity)에 대한 기존 낙관(§13 근처, `avg_timing_error=0.0847`)이 **load_pct=3(저부하)에서만 잰 결과라 일반화할 수 없다**는 지적이 나와, 실제로 부하를 올려가며 재검증함.
+
+### (A) 준영 공용 하네스의 `avg_timing_error`(같은 소스 내 간격 충실도) — load_pct 스윕
+
+이미 컴파일된 cluster2 스냅샷(`aer_clean_ganghee_cluster2_n16`)을 재사용해서 `limit_timing_fidelity` 워크로드를 `+LOAD_PCT=`만 바꿔가며 재실행(재컴파일 불필요).
+
+| load_pct | avg_timing_error(cycle) | max_e2e | fairness |
+|---:|---:|---:|---:|
+| 3 | 0.0847 | 4 | 0.915 |
+| 10 | 0.2810 | 4 | 0.966 |
+| 25 | 0.4321 | 4 | 0.968 |
+| 50 | **0.4864(peak)** | 4 | 0.966 |
+| 75 | 0.3948 | 4 | 0.965 |
+| 100↑ | 0.0140 | 4 | 0.959 |
+
+(생성기가 소스당 사이클에 최대 1개만 offer 가능한 구조라 100% 이상은 실제로 포화돼 100과 동일한 값이 나옴 — 150에서도 완전히 같은 수치로 재확인.)
+
+**예상(부하가 오를수록 계속 나빠짐, Ryu 그래프와 같은 모양)과 다르게 종형(hump) 곡선**임을 확인 — 중간부하(~50%)에서 최악이고, 완전포화에서 오히려 좋아짐. 완전포화 시 모든 소스가 매 사이클 요청해서 중재 패턴이 규칙적(주기적)이 되기 때문으로 추정. `max_e2e`는 전 구간 4cycle로 고정 — 최악지연 폭주는 없음. 다만 이 지표는 **같은 소스 내부**의 간격 충실도만 재기 때문에, Ryu가 말한 motion artifact(서로 다른 소스 간 상대 지연 편차)와는 정확히 같은 개념이 아님 — 그래서 (B)를 새로 만듦.
+
+### (B) 새 로컬 TB — cross-source 동시성 보존(진짜 motion-artifact 대응 지표)
+
+`tb/tb_cluster2_crosssource_fidelity.v` 신규 작성. 기존 `event_scoreboard.v`(수정 없이 재사용) 위에 "동시에 발화한 소스들(batch)의 실제 배달 사이클이 서로 얼마나 벌어지는가(spread)"를 재는 배치 추적 로직만 얹음. 배치 판별은 `record_departure`가 돌려주는 latency로 원래 발생 사이클을 역산(`cyc - latency`)해서 batch id(=주입 사이클)와 매칭하는 방식이라, 큐 포지션이나 배경부하와 충돌할 걱정 없이 다중 배치를 동시에 추적 가능.
+
+**시나리오 A/C (배경부하 0, 구조적 증명)**:
+- A. 같은 행(row) 4열 동시발화 → **avg_spread=0.0, max_spread=0**(4배치 전부) — cluster2의 행-비트맵이 한 그랜트로 4열을 통째 보내기 때문에 원천적으로 왜곡 불가능함을 실측 재확인.
+- C. 서로 다른 레인(중심 1개+주변 1개) 동시발화 → **avg_spread=0.0, max_spread=0**(20배치 전부) — 레인 독립성이 실제로 완벽한 병렬임을 실측 확인.
+
+**시나리오 B/D (배경부하 0, 실제 중재 발생)**:
+- B. 같은 레인 내 다른 행 2개 동시발화 → avg_spread=1.0, max_spread=1(40배치)
+- D. 양쪽 레인 동시에 경합(K=4) → avg_spread=1.0, max_spread=1(30배치) — 레인이 독립적이라 양쪽이 동시에 경합해도 서로의 지연을 늘리지 않음.
+
+**시나리오 E (D패턴 버스트를 배경부하 위에서 40사이클마다 반복, 배경부하 스윕)**:
+
+| bg_load | avg_spread | max_spread |
+|---:|---:|---:|
+| 0% | 1.0 | 1 |
+| 5% | 1.0 | 2 |
+| 15% | 1.2 | 3 |
+| 30% | 1.9 | 6 |
+| 35% | 2.3 | 6 |
+| 40% | 5.1 | 33 |
+| 50% | 11.9~47.7 | 33~99 |
+
+**30~40% 구간에서 급격히 발산** — Ryu의 timestamp-error-vs-event-rate 그래프와 정성적으로 같은 패턴이 cross-source 지표에서도 나타남. 40%/50% 구간 수치는 두 번 실행에서 흔들렸음(단일 시드라 RNG 상태에 민감, 여러 시드 평균은 아직 안 함) — 정확한 무릎(knee) 위치까지 확정하긴 이르지만, "임계 부하를 넘으면 폭발적으로 나빠진다"는 정성적 결론은 두 실행에서 일관됨.
+
+### 결론 — 5번 문제는 "해결"이 아니라 "정확히 진단됨"
+
+이전 낙관(저부하 0.0847)이 일반화 안 된다는 우려가 실측으로 확인됨. 구조적으로 증명된 강점(같은 행/다른 레인 간 완벽한 동시성 보존)과, 배경부하 임계점을 넘으면 폭발하는 취약점(같은 레인 내 경합)을 둘 다 정량적으로 확정했지만, **Ryu가 Gen3에서 한 것처럼(global hold / deterministic sequential scan) 이 취약점을 능동적으로 완화하는 메커니즘은 아직 설계하지 않았음** — 진단은 끝났고 해법은 아직 없는 상태.
+
+- 로컬: `tb/tb_cluster2_crosssource_fidelity.v`(신규)
+- 서버: `~/redred-faer/tb/tb_cluster2_crosssource_fidelity.v` 업로드+Xcelium 23.09 실행 확인 완료(`CROSSSOURCE_FIDELITY_PASS`)
+- 참고: `paper_notes/P4_Ryu2019_TraditionalAER_ProblemTimeline.md`, `reference_papers.md` §5-A/5-B
+
+## 68. 5번(timestamp jitter) 실제 고치기 시도 — TDM 기각, 이론적 하한 증명(2026-08-19)
+
+**정확한 메커니즘 도출**: `aer_clean_tb.sv`의 `interval_error = |(dep2-dep1)-(occ2-occ1)|`을 재배열하면 `= |latency2 - latency1|` — 즉 §67의 avg_timing_error는 **같은 소스의 연속 이벤트가 겪는 서비스 지연시간(latency)의 변동폭(jitter)** 그 자체임을 수식으로 확인. `arbiter2`(round-robin, "진 쪽이 다음번 반드시 이김")를 읽어보면 한 이벤트의 latency는 **{기본값, 기본값+1cycle} 딱 두 가지뿐**이라, jitter는 원천적으로 최대 1cycle로 상한이 걸려있음(그래서 §67 실측 peak가 0.4864로 1 미만이었던 것, `max_e2e`도 전 부하구간 4로 고정이었던 것과 일치).
+
+**시도 1 — 고정 시분할(TDM)**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_tdm.v` 신규 작성 — 레인 내부 row-vs-row 경합을, 요청 여부와 무관하게 매 사이클 위상(phase)이 뒤집히며 번갈아 검사하는 고정 스케줄로 교체(round-robin 완전 제거). `tb/tb_cluster2_tdm_vs_baseline.v`로 원본 cluster2와 **동일한 물리적 이벤트 스트림**(공유 RNG draw, 소스당 1-entry 모델)에 나란히 태워 비교.
+
+| load | BASE jitter | TDM jitter | BASE overrun | TDM overrun |
+|---:|---:|---:|---:|---:|
+| 3% | 0.1 | 0.4(악화) | 1 | 16(악화) |
+| 15% | 0.4 | 0.4(동일) | 313 | 494(악화) |
+| 30% | 0.4 | 0.4(동일) | 2036 | 2174(악화) |
+| 50% | 0.4 | 0.4(동일) | 6031 | 6052(악화) |
+| 100% | 0.0 | 0.0(동일) | 23992 | 23992(동일) |
+
+**결론(기각)**: jitter는 전혀 안 줄고 처리량(overrun)만 전 구간에서 나빠짐 — 이중 손해. 원인: 고정 스케줄로 바꿔도 **진짜 이벤트는 비주기적(랜덤)으로 도착**하기 때문에, "도착시각과 고정 슬롯 사이의 위상 어긋남"이 round-robin에서 없앤 것과 같은 크기의 jitter를 다른 형태로 재생산함. 게다가 상대가 안 쓰는 슬롯도 무조건 버리므로 처리량까지 손해.
+
+**시도 2(계산만, RTL 없이 검증)** — "이긴 쪽도 무조건 1cycle 지연시켜서 진 쪽과 맞추면?": req를 1cycle 레지스터에 태워 그 지연된 신호로 중재하면, 이긴 쪽 latency 0→1, 진 쪽 latency 1→2로 **전체가 +1만큼 밀릴 뿐 둘 사이의 격차(=jitter)는 그대로 1cycle** — 수식으로 바로 반증되어 RTL 작성 없이 기각.
+
+**이론적 결론**: 2개 자원(행)이 1개 출력슬롯(레인)을 공유하는 실시간 work-conserving 중재기는, 랜덤하게 도착하는 이벤트에 대해 "경합에서 이기냐 지냐"라는 이진 결과가 존재하는 한 그 사이 지연 격차가 최소 1cycle 구조적으로 불가피함 — **이걸 없애는 방법은 경합 자체를 없애는 것(행마다 전용 레인, 이미 cluster4로 시도·기각됨, §58)뿐**. cluster2는 이미 이 이론적 하한(peak 0.49, 상한 1)에 있음. **5번은 지금 2행-1레인 공유 아키텍처 안에서는 해결 불가능하다는 게 실측(TDM 실패)과 이론(격차 불변 증명) 둘 다로 확정됨.**
+
+- 로컬: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_tdm.v`(기각됨, 참고용 보존), `tb/tb_cluster2_tdm_vs_baseline.v`
+- 서버: 둘 다 업로드+Xcelium 실행 확인 완료(`TDM_VS_BASELINE_PASS`, 기능은 정상 — 다만 목적인 jitter 개선을 달성 못해서 기각)
+
+## 69. 1번(주소당 오버헤드) — 위치기반(dense bitmap) vs cluster2 비트비용 실측, 손익분기점 확정(2026-08-19)
+
+**동기**: reference_papers.md §5-B의 1번 문제("전통적 AER는 이벤트마다 주소를 독립 전송해서 오버헤드가 크다") 관련해서, G-AER류 그룹주소화의 극단적 형태 — **매 사이클 16비트를 그냥 통째로 보내는 방식(위치=주소, 중재 자체가 불필요)** — 을 cluster2와 정면으로 비교. 제이엔유팀(질문지 PDF)의 "결정적 순회+좌표생략 packet" 제안과 같은 방향성.
+
+**1차 시도 방법론 오류**: 처음엔 cluster2의 (2레인 상한이 있는) delivered 카운트를 분모로 bitmap의 bits/event까지 계산했다가, bitmap은 처리용량 제한이 없다는 걸 놓친 불공정 비교였음을 바로 알아채고 정정 — 두 스코어보드(`score_c2`, `score_bm`)를 완전히 독립적으로 굴려서(같은 물리적 이벤트 스트림, 각자 자기 능력만큼 admission/drain) 재실행.
+
+**결과** (`tb/tb_cluster2_bitcost_vs_bitmap.v`, 소스당 1-entry 모델):
+
+| load | C2 bits/event | BM bits/event | C2 overrun | BM overrun |
+|---:|---:|---:|---:|---:|
+| 3% | 5.6 | 32.1 | 1 | 0 |
+| 15% | 4.2 | 6.8 | 313 | 0 |
+| 30% | 2.8 | 3.3 | 2036 | 0 |
+| **50%** | **1.9** | **1.9(손익분기)** | 6031 | 0 |
+| 75% | 1.5 | 1.3 | 13524 | 0 |
+| 100%↑ | **1.5(2레인 상한에 막혀 더 안 내려감)** | **1.0(이론적 최솟값, 포화)** | 99.9%(24008 중 23992) | **0(항상)** |
+
+**손익분기점 = 소스당 부하 약 50%.** 그 아래(우리가 실제 테스트해온 3~30% 구간 대부분)에서는 cluster2가 압도적으로 유리(저부하일수록 격차 커짐). 위로는 bitmap이 역전하고 완전포화에서 최대 33% 더 쌈(1.0 vs 1.5). **더 결정적인 건 bitmap이 전 구간에서 손실률 0%**(처리용량 무제한 — 위치마다 전용 채널이라 서로 경합할 필요 자체가 없음)라는 것. cluster2는 100% 부하에서 이미 99.9% 손실.
+
+**결론**: 손익분기점을 실제 숫자로 확정함 — 저부하엔 주소기반(cluster2), 고부하엔 위치기반(bitmap)이 각각 유리하다는 게 이제 근거 있는 설계 방향이 됨. §70에서 이 둘을 부하에 따라 전환하는 하이브리드 설계를 진행.
+
+- 서버: `~/redred-faer/tb/tb_cluster2_bitcost_vs_bitmap.v` 업로드+Xcelium 실행 확인 완료
+
+## 70. 1번 — cluster2+dense bitmap 하이브리드 설계, 정확성+비트비용 실측(2026-08-19)
+
+**설계**: `rtl/aer_tx16_hybrid_cluster2_bitmap.v` — cluster2와 완전히 동일한 주소기반 경로(center_arb/periph_arb, 레인0/1)를 그대로 두고, 매 사이클 "활성 행이 3개 이상"(row_req 4비트 popcount > 2, 4-input popcount 하나뿐이라 비용 작음)이면 그 사이클만 dense bitmap 모드(req를 그대로 16비트 레지스터에 래치)로 전환하는 1비트 `mode` 출력 추가. 근거: cluster2는 물리적으로 레인이 2개뿐이라 한 사이클에 최대 2개 행만 덮을 수 있음 — 그 한계를 넘는 순간(행 3~4개 동시활성)은 구조적으로 반드시 밀림(백로그)이 생기므로, 그 조건에서만 무제한용량인 bitmap으로 전환.
+
+**검증**(`tb/tb_hybrid_correctness_bitcost.v`, §69와 동일한 부하 스윕):
+
+| load | bits/event | overrun(손실) | cluster2 단독 대비 |
+|---:|---:|---:|---|
+| 3% | 5.6 | 1 | 동일(대부분 addressed 유지, bm_cyc=22/3000) |
+| 15% | 4.2 | **64** | 손실 313→64(5배 감소), bit는 동일 |
+| 30% | 3.0 | **109** | 손실 2036→109(95% 감소), bit만 소폭↑(2.8→3.0) |
+| 50% | 1.9 | **23** | 손실 6031→23(거의 제거) |
+| 75%↑ | 1.3→1.0 | **0** | bitmap 단독과 완전히 동일(무손실) |
+
+**결론**: `HYBRID_CORRECTNESS_BITCOST_PASS`(phantom/중복 없음). 저부하에선 cluster2와 사실상 동일한 비트비용을 유지하면서, 중간부하(크로스오버 근처)에서는 비트비용을 거의 그대로 두고 손실만 극적으로 줄이고(5~260배), 고부하에선 bitmap과 완전히 동일한 무손실 성능으로 자연스럽게 전환됨 — 저부하 효율과 고부하 강건성을 동시에 잡음.
+
+**Genus PPA 실측**(`syn/run_genus_hybrid.tcl`, cluster2와 완전히 동일 조건: 5ns 제약, slow_vdd1v0, lp_insert_clock_gating true):
+
+| | cluster2 | 하이브리드 | 차이 |
+|---|---:|---:|---:|
+| 면적 | 138.852 um² | 282.492 um² | **+103%**(거의 2배) |
+| 전력(vectorless) | 11.8744 uW | 21.8606 uW | **+84%** |
+| critical path(5ns 제약) | 1.21ns | 1.24ns | +2.4%(Fmax 사실상 그대로) |
+| 셀 개수 | 52 | 107 | +106% |
+
+**종합 결론**: Fmax는 거의 안 깎이지만 면적/전력이 거의 2배 — bitmap 경로(16bit 래치+popcount 비교기+2:1 mux 다발)를 통째로 추가한 대가. §69/§70의 손실 감소(중간부하 5~260배, 고부하 100% 제거)와 비트비용 개선(고부하 최대 33%↓)이 이 비용에 걸맞는지는 대회의 손실 허용 기준과 면적/전력 가중치에 달려있음(아직 미확인) — cluster2_steal_buf(§66, 손실 11.52%→0.47%, 대신 Fmax 절반 이하)와는 다른 지점의 트레이드오프(이쪽은 Fmax 유지, 면적/전력 2배)라 나란히 후보로 놓고 비교할 만함.
+
+- 로컬: `rtl/aer_tx16_hybrid_cluster2_bitmap.v`(신규), `tb/tb_hybrid_correctness_bitcost.v`(신규), `syn/run_genus_hybrid.tcl`(신규)
+- 서버: 전부 업로드+Xcelium/Genus 실행 확인 완료
+
+## 71. 하이브리드 3종 후속 검증 — qualified P&R Fmax, 공용 50-workload 재검증(중요 정정), 임계값 스윕(2026-08-19)
+
+### (1) P&R qualified Fmax(`syn/resynth_pnr_sweep.sh` 재사용, per_target_resynthesis, 1.0/1.4/1.8ns 스윕)
+
+| period | 결과 | slack |
+|---:|---|---:|
+| 1.0ns(1000MHz) | **VIOLATED**(clock gating setup) | - |
+| 1.4ns(714.3MHz) | **MET** | +8ps(턱걸이) |
+| 1.8ns(555.6MHz) | MET | - |
+
+1.4ns 지점 hold MET, DRC 0건, antenna 0건 — qualified. **하이브리드 qualified Fmax bracket = [714.3, 1000)MHz**(cluster2의 [1052.6,1111.1)MHz 대비 최소 -32%, 더 촘촘한 스윕 안 해서 정확한 경계는 아직 모름). P&R post-route 실측(1.4ns 지점): 면적 **355.338 um²**(cluster2 288.990um² 대비 +23%), 전력 **98.926 uW**(cluster2 77.28uW 대비 +28%, vectorless 0.2 기본활동도).
+
+### (2) 공용 50-workload 재검증 — 중요 정정: 실제 이득은 합성실험보다 훨씬 작음
+
+기존 cluster2 바인딩(`aer_ganghee_cluster2_binding.sv`)은 mode/bitmap 출력을 모르므로 그대로 못 씀(bitmap 사이클을 전부 무응답으로 오판할 것) — 공유 dispatch 파일은 손대지 않는 팀 원칙대로, 준영의 실제 배선(`native_ack_mask`/`native_req`/논블로킹 pending 지연)을 그대로 재구현한 자체 trace-replay TB(`tb/tb_hybrid_common_trace.v`, §65 방법론과 동일)로 `common_traces_full50/*.cyclemask.txt`(50개 전부, 이미 로컬/서버에 있는 공식 trace) 재생.
+
+**결과**: 50/50 PASS(phantom 없음), **총 손실 12118/106416=11.39%**(cluster2 11.52% 대비 -1.1%p, 거의 개선 없음) — §70의 합성 Bernoulli 부하 실험이 보여준 극적 개선(중간부하 손실 95% 감소)이 **실제 워크로드에선 재현 안 됨**.
+
+**원인(워크로드별 분해로 확인)**: `retrigger_*`(50.0%, cluster2와 완전히 동일)와 `elephant_mouse_*`(33.3%, 동일)에서 **bitmap 모드가 단 한 번도 발동 안 함**(`bm_cyc=0`). 이 두 워크로드는 소스 1~2개가 반복 폭주하는 패턴이라, 소스당 1-entry 모델에서는 아무리 재발화해도 그 소스의 `req` 비트 1개만 계속 켜져있을 뿐 — "활성 행 3개 이상"이라는 전환 기준이 구조적으로 트리거될 수 없음. 반면 `mixed_phase_always_ready`(bm_cyc 328~713)와 고부하 `uniform_l*`(bm_cyc 15~130)에서는 실제로 발동해 소폭 개선됨. **결론: 하이브리드(bitmap 전환)는 "넓게 퍼진 동시다발 부하"에만 듣고, cluster2 손실의 진짜 핵심 원인(재발화·극단편중, §44/§65 이후 계속 확인된 구조적 한계)에는 전혀 안 듣는다** — 그건 cluster_buf(§53~56, 소스별 2-deep 카운터)가 푸는 별개의 문제. §69의 합성 실험이 낙관적이었던 이유는 순수 균등(per-source Bernoulli) 부하가 저절로 여러 행에 퍼지기 때문 — 실제 대회 워크로드의 적대적/집중형 패턴과는 다름.
+
+### (3) 전환 임계값 스윕(`ROW_THRESHOLD` 파라미터화, 공용 50-workload 기준)
+
+| ROW_THRESHOLD(active_rows > T) | 총 손실 | cluster2(11.52%) 대비 |
+|---:|---:|---|
+| T=1(2행 이상이면 전환, 가장 공격적) | **10.86%**(11554/106416) | -5.7%(그나마 제일 나음) |
+| T=2(3행 이상, 기본값) | 11.39%(12118/106416) | -1.1%p |
+| T=3(4행 전부일 때만, 가장 보수적) | 11.51%(12247/106416) | 사실상 cluster2와 동일 |
+
+단조적이지만 셋 다 미미한 차이 — 어떤 임계값을 골라도 retrigger/elephant_mouse는 안 건드리므로 근본적 한계는 그대로.
+
+### 종합 결론
+
+이번 하이브리드는 **PPA 비용(면적+23%, 전력+28%, Fmax -32%↓)에 비해 실제 워크로드 손실 개선(-1~6%p)이 작아 현재 형태로는 채택하기 어려움** — §69/§70의 낙관적 시뮬레이션은 순수 균등부하라는 비현실적 가정 때문이었다는 게 정직하게 확인됨. 다만 발견 자체는 유효함(위치기반이 넓은 동시부하엔 확실히 유리) — 향후 방향은 "행 개수" 대신 "실제 손실 원인(같은 소스 반복재발화)"을 직접 겨냥하는 전환 기준으로 재설계하거나, cluster_buf와 결합하는 쪽이 유망해 보임(둘 다 미착수).
+
+- 로컬: `rtl/aer_tx16_hybrid_cluster2_bitmap.v`(ROW_THRESHOLD 파라미터화), `tb/tb_hybrid_common_trace.v`(신규)
+- 서버: P&R(`syn/pnr/resynth_hybrid/`), trace 재검증(`hybrid_common_trace_results*/`) 전부 업로드+실행 확인 완료
+
+## 72. 정정 — retrigger/elephant_mouse 손실은 설계 문제가 아니라 동기회로 구조적 한계임을 증명(2026-08-19)
+
+**계기**: §71에서 "row-count 기준이 안 맞아서 하이브리드가 retrigger/elephant_mouse를 못 고쳤다"고 적었는데, 더 파보니 **어떤 TX 재설계로도 원천적으로 못 고치는 문제**였음을 확인 — §71의 "원인" 서술을 이걸로 대체.
+
+**근거**: `elephant_mouse_identity.cyclemask.txt` 원문 확인 결과 소스 0("elephant")이 거의 매 사이클 연속 재발화(`retrigger_*`는 정확히 매 사이클). 동기회로는 `always @(posedge clk)` 출력이라 최소 1cycle의 등록-응답 지연이 있음 — 재발화 간격이 1cycle이면: cyc0 도착→수락, cyc1 DUT가 cyc0 요청을 막 그랜트하는 도중 새 재발화가 오는데 pending이 아직 논블로킹으로 안 지워져서 **무조건 거부**, cyc2 지워짐→수락, cyc3 또 거부... **"동기회로 최소지연(1cycle) vs 재발화 간격(1cycle)"의 위상충돌**이 정확히 50%/33.3%를 만듦 — 중재기·전환기준·레인 구성 등 TX 쪽 설계와 완전히 무관.
+
+**실증**: 완전히 다른 두 설계(cluster2, 하이브리드)가 retrigger에서 **정확히 동일한 50.0%**, elephant_mouse에서 **정확히 동일한 33.3%**을 냄 — TX 설계를 실제로 크게 바꿨는데도 숫자가 1도 안 움직인 것 자체가 "TX 재설계로 못 고친다"는 증거.
+
+**결론**: retrigger/elephant_mouse 손실을 줄이려는 시도(row-count 임계값 조정, bitmap 확대 등)는 여기서 막다른 길 — 이론적으로 유일한 탈출구는 등록-응답 지연이 없는 비동기/조합논리 응답인데, 이건 완전히 다른 회로 스타일 질문(그리고 대회의 동기/비동기 허용 여부가 아직 미확인, §PPA 관련 앞선 질의 참고). **§69의 원래 발견(비트비용 손익분기점 ~50% 부하, 저부하 cluster2 유리/고부하 bitmap 유리)은 손실 문제와 무관하게 그 자체로 여전히 유효** — 1번의 남은 유효한 성과는 이쪽.
+
+## 73. 하이브리드 + cluster2_buf 결합 — retrigger를 버퍼링으로 실제 해결(2026-08-19)
+
+**동기**: §72에서 retrigger/elephant_mouse는 TX 재설계(bitmap 전환 포함)로 원천적으로 못 고친다는 걸 증명했지만, 그건 "공용 하네스의 소스당 1-entry admission 게이트를 통과할 때"라는 조건부였음 — cluster2_buf(§53~56, 소스별 2-deep 카운터)는 애초에 이 문제를 admission이 아니라 DUT 내부 버퍼링으로 풀었던 설계라, 하이브리드에 얹으면 될지 확인.
+
+**설계**: `rtl/aer_tx16_hybrid_cluster2_buf_bitmap.v` — cluster2_buf의 `pending_cnt`(소스별 2-deep 포화카운터)+`arrival` 펄스 입력을 그대로 쓰고, 그 카운터가 만드는 `pending_gt0`를 §70의 row-threshold bitmap 전환 로직에 그대로 연결(bitmap 출력도 `pending_gt0` 그대로 내보냄 — 카운터가 2까지 쌓인 소스도 bitmap 한 번에 1개만 비워짐, addressed 모드의 col_mask와 동일한 한계).
+
+**검증**(`tb/tb_hybrid_buf_correctness.v`, `tb_cluster2_buf_correctness.v`와 동일 방법론 + 재발화 스트레스 구간 추가):
+- `HYBRID_BUF_CORRECTNESS_PASS`(phantom=0, collision=0)
+- 무작위 15% 부하: 생성 47773개 중 손실 **74개(0.15%)** — cluster2_buf 단독(396개, 0.83%)보다도 낮음(bitmap이 추가로 도움)
+- **재발화 스트레스(소스 0이 매 사이클 연속 재발화 2000cyc): 손실 0, 생존율 100%** — §72에서 "TX 재설계로 못 고친다"고 증명했던 게 맞지만, **버퍼링(admission 자체를 우회)으로는 실제로 완전히 해결됨**을 우리 자체 TB(공용 하네스의 1-entry 게이트가 없는, 진짜 다중 pending을 허용하는 모델)로 확인.
+
+**Genus PPA**(`syn/run_genus_hybrid_buf.tcl`, 동일 조건):
+
+| | cluster2 | cluster2_buf | 하이브리드(bitmap만) | **하이브리드+buf(결합)** |
+|---|---:|---:|---:|---:|
+| 면적 | 138.852 um² | 645.012 um² | 282.492 um² | **823.194 um²** |
+| 전력(vectorless) | 11.8744 uW | 43.8586 uW | 21.8606 uW | **71.229 uW** |
+| critical path(5ns 제약) | 1.21ns | (별도) | 1.24ns | **1.863ns** |
+
+cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, critical path도 더 나빠짐(속도 손해) — bitmap을 얹은 추가 비용이 상당히 큼. **재발화 생존(0% 손실)이라는 핵심 이득은 cluster2_buf 단독으로도 이미 100% 달성되는 것**이라, bitmap을 얹어서 추가로 얻는 건 §69/§72에서 확인한 "넓게 퍼진 고부하에서의 비트비용/소폭 손실 개선"뿐 — 그 부가 이득이 이 정도 추가 비용을 정당화하는지는 대회 평가기준(면적/전력 가중치)에 달려있음(미확인).
+
+- 로컬: `rtl/aer_tx16_hybrid_cluster2_buf_bitmap.v`(신규), `tb/tb_hybrid_buf_correctness.v`(신규), `syn/run_genus_hybrid_buf.tcl`(신규)
+- 서버: 전부 업로드+Xcelium/Genus 실행 확인 완료
+
+## 74. 1번 새 아이디어 — 연속 동일주소 압축(repeat-compression), 단독으론 순손해지만 타겟 워크로드엔 큰 이득(2026-08-19)
+
+**동기**: bitmap/buf 모두 "여러 소스 동시" 또는 "재발화 생존(손실)"을 겨냥했는데, §72에서 손실 자체는 admission 게이트 한계로 못 고친다는 게 증명됐음 — 그럼 "손실"이 아니라 "이미 배달된 이벤트의 비트비용"을 줄이는 축은 안 건드려봄. retrigger/elephant_mouse는 같은 소스가 반복 발화하니, 연속 그랜트가 같은 주소면 flag 1비트만 보내는 아이디어.
+
+**1차 시도 버그**: "직전 사이클과 비교"로 구현했더니 50개 전부 `repeat_hits=0` — §72에서 확인한 admission 지연(재발화가 admit/reject를 오가며 gap 생김) 때문에 같은 주소가 다시 나와도 "바로 직전 사이클"이 아니라서 못 잡음. **"마지막 유효 grant"(gap 무시, sticky)로 비교 기준을 바꿔서 해결**(`rtl/aer_tx16_trad_rowcol_fovea_cluster2_repeat.v`).
+
+**결과**(`tb/tb_repeat_common_trace.v`, 공용 50-workload, 그랜트당 repeat=1b/new=7b vs 순정 6b 고정):
+
+| | 순정(494706b) 대비 |
+|---|---|
+| elephant_mouse | **-41%**(7308→4296~4308b) |
+| retrigger | **-39%**(1536→934~952b) |
+| moving_hotspot_single | **-38~43%**(7302~7362→4181~4563b) |
+| **전체 50개 합산** | **+8%(534023b, 순손해)** |
+
+원인: repeat_hits=7189건(5비트씩 절약, -35945)보다 new_hits=75262건(91%, flag 1비트씩 추가, +75262)이 훨씬 많아서 순손실 +39317비트. **타겟 워크로드에선 확실히 이기지만, 압도적 다수인 비반복 트래픽에 "혹시 몰라서" 매번 무는 flag 비용이 더 큼.**
+
+## 75. 3-way 결합(bitmap+repeat) — 개선되지만 여전히 순정 cluster2보다 나쁨, 1번 최종 결론(2026-08-19)
+
+**가설**: bitmap이 넓은/동시다발 트래픽을 먼저 걸러가면, addressed 모드에 남는 트래픽은 상대적으로 집중형(반복) 비중이 높아져서 repeat압축의 손익비가 나아질 것.
+
+**설계**: `rtl/aer_tx16_hybrid3_bitmap_repeat.v` — §70의 bitmap 전환 로직과 §74의 repeat압축을 하나로 결합(bitmap 모드엔 repeat압축 안 얹음, addressed 모드에만 적용).
+
+**결과**(`tb/tb_hybrid3_common_trace.v`, 공용 50-workload 전부 `HYBRID3_TRACE_PASS`):
+
+| 방식 | 총 비트 | 순정(494706b) 대비 |
+|---|---:|---|
+| 순정 cluster2 | 494706 | 기준 |
+| repeat 단독 | 534023 | +8.0% |
+| **3-way 결합** | **523245** | **+5.8%(개선됐지만 여전히 순손해)** |
+
+가설대로 개선은 됨(+8.0%→+5.8%, bitmap이 6696건의 "new" 그랜트를 대신 처리해서 약 11800비트 절약) — 하지만 **여전히 순정보다 나쁨**. 원인은 구조적: 이 워크로드 스위트가 압도적으로 "cluster2가 이미 거의 최적인 저~중부하 분산 트래픽"으로 채워져 있어서, 아무리 똑똑하게 조합해도 "가끔 도움되는" 메커니즘의 상시 오버헤드(모드 판단/flag 비트)가 소수 워크로드에서 버는 것보다 큼.
+
+**1번(주소당 오버헤드) 최종 결론**: bitmap 단독(§69~72), buf 결합(§73), repeat 단독(§74), 3-way 결합(§75) 네 가지를 전부 정직하게 50-workload 실측 — **어느 것도 이 워크로드 분포에서 순정 cluster2의 평균 비트비용을 못 이김.** 다만 **개별 워크로드 단위로는 진짜 이득이 있음**(elephant_mouse/retrigger/moving_hotspot_single -38~43%, 넓은 고부하 우니폼 -33%). "전체 평균 비트비용"이 아니라 "최악 케이스 견고성" 또는 "특정 트래픽 클래스 대응력"이 평가 기준이라면 이 결합판들이 유의미할 수 있음 — 어느 쪽이 대회 평가에 맞는지는 미확인.
+
+- 로컬: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_repeat.v`, `rtl/aer_tx16_hybrid3_bitmap_repeat.v`(둘 다 신규), `tb/tb_repeat_common_trace.v`, `tb/tb_hybrid3_common_trace.v`(둘 다 신규)
+- 서버: 전부 업로드+Xcelium 실행 확인 완료(50/50 PASS 양쪽 다)
+
+## 76. 진짜 Global Hold(Ryu Gen3 방식) 구현·실측 — 이론 예측을 실증으로 확정(2026-08-19)
+
+**동기**: §68에서 "TDM으론 jitter를 못 줄인다"를 증명했지만, TDM은 Ryu의 진짜 Global Hold(주기적 스냅샷)와 다름(TDM=고정 스케줄, Global Hold=고정 스케줄이 아니라 "무엇이 보이는지"를 고정) — 진짜로 만들어서 우리 기준(ground-truth 대비 jitter)으로 재도 여전히 안 통하는지 직접 확인.
+
+**구현**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_globalhold.v` — `HOLD_PERIOD`(기본 4cycle)마다 현재 pending 상태를 `batch_snapshot`에 얼림. 스냅샷 경계 사이에 새로 도착한 이벤트는 실제 `req`는 뜨지만 `batch_snapshot`엔 안 들어가서 다음 경계까지 중재기에 안 보임(진짜 스냅샷 의미론) — 그랜트된 소스는 즉시 배치에서 빠져서(sticky 방지) 재발화가 즉시 재편입되지 않음.
+
+**실측**(`tb/tb_cluster2_globalhold_vs_baseline.v`, §68과 동일한 dual-DUT 비교 방법론):
+
+| load | BASE avg_jit | GlobalHold avg_jit | BASE max_lat | GlobalHold max_lat | BASE overrun | GlobalHold overrun |
+|---:|---:|---:|---:|---:|---:|---:|
+| 3% | 0.1 | **1.3** | 1 | 5 | 1 | 115 |
+| 15% | 0.4 | **1.2** | 1 | 5 | 313 | **2043** |
+| 30% | 0.4 | 1.1 | 1 | 5 | 2036 | 6574 |
+| 50% | 0.4 | 0.8 | 1 | 5 | 6031 | 14008 |
+| 75% | 0.3 | 0.4 | 1 | 5 | 13524 | 24508 |
+
+**결과: jitter/최악지연/손실 세 축 전부 악화**(전 부하구간). §68 이론(랜덤 도착과 고정 창 사이 위상어긋남이 jitter를 재생산)이 TDM뿐 아니라 진짜 Global Hold에도 그대로 적용됨을 실증으로 확정 — 오히려 HOLD_PERIOD만큼 대기가 길어져 TDM보다 더 나쁨.
+
+**결론**: Ryu의 Global Hold가 실제로 개선하는 건 우리 정의의 "5번"(ground-truth 절대시각 대비 정확도)이 아니라 "6번"(같은 배치 내 상대적 일관성/공간 왜곡)이라는 게 이론(§5번 답변)과 실측 둘 다로 확정됨 — 그리고 6번은 §67에서 이미 다른 메커니즘(행-비트맵+레인분리)으로 구조적으로 해결해둔 상태. **5번은 이 아키텍처(2행-1레인 공유, 동기클럭) 안에서 어떤 형태의 재설계로도 (TDM, 진짜 Global Hold 둘 다 시도) 개선 불가능하다는 게 최종 확정됨.**
+
+- 로컬: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_globalhold.v`(신규), `tb/tb_cluster2_globalhold_vs_baseline.v`(신규)
+- 서버: 업로드+Xcelium 실행 확인 완료(`GLOBALHOLD_VS_BASELINE_PASS`)
+
+## 77. 1번 재검토 — N(배열 크기) 스케일 스윕, cluster2의 숨은 약점 발견(2026-08-19)
+
+**동기**: §69~75에서 bitmap류가 N=16 기준 "전체 평균 비트비용"을 못 이긴 게, 우리 테스트 규모(N=16) 자체가 bitmap에 불리한 장난감 규모라서일 수 있다는 가설 — Ryu의 실제 센서(640×480=307,200)에 가까운 규모에서 재확인.
+
+**방법**: 실제 cluster2 RTL을 N=64/256으로 재설계하는 대신(중재기 트리 재작업 필요), cluster2의 핵심 구조규칙(2레인 고정, 그랜트당 최대 4열 묶음, 소스당 1-entry)만 반영한 동작모델(`tb/tb_bitcost_scale_sweep.v`)로 N=16/64/256을 스윕(레인 내 행선택은 공정성 실험이 아니므로 단순 우선순위로 근사 — 정확한 손익분기점 위치는 §69 실측과 약간 다를 수 있으나 스케일링 추세는 구조적으로 견고).
+
+**핵심 발견 — cluster2의 처리용량은 N과 무관하게 고정**: 100% 부하에서 delivered가 N=16/64/256 **전부 정확히 16000**(=2레인×4열×2000cycle) — 배열이 커져도 레인이 2개뿐이라 사이클당 처리량이 안 늘어남.
+
+| N | 100%부하 ADDR bits/event | BITMAP bits/event | 100%부하 ADDR 손실(overrun) |
+|---:|---:|---:|---:|
+| 16 | 1.5 | 1.0 | 15,992 |
+| 64 | 2.0 | 1.0(불변) | 111,944(7배) |
+| 256 | 2.5 | 1.0(불변) | **495,752(31배)** |
+
+**결론**: bitmap의 효율은 스케일 불변(정보이론적 최적치 1.0bit/event 그대로), cluster2는 N이 커질수록 (a) 행주소 자체가 길어져 bits/event가 계속 나빠지고 (b) 처리용량이 안 늘어나 손실이 N에 비례가 아니라 훨씬 가파르게 폭증함(N=256에서 N=16 대비 31배). **N=16 규모에서 bitmap은 "가끔 도움되는 보너스"였지만, 실제 센서급 규모에서는 "손실을 막는 필수 장치"로 성격이 바뀜** — §69~75의 "1번은 조건부 성공"이라는 결론이 **테스트 규모 자체의 한계**였을 가능성이 큼을 실증.
+
+- 로컬: `tb/tb_bitcost_scale_sweep.v`(신규)
+- 서버: 업로드+Xcelium 실행 확인 완료(`SCALE_SWEEP_DONE`)
+- 다음: cluster2를 N=64/256으로 실제 RTL 확장하거나(레인 개수를 N에 비례해서 늘리는 재설계 포함), 대규모 AER의 대역폭 문제를 다룬 문헌(HiAER 등) 재조사 예정
+
+## 78. 준영(REDRED-system-goal) 팀원 저장소 교차검증 — 실제 버그 발견·수정 확인 + A2/A3 1~6번 실측(2026-08-19)
+
+**배경**: 준영이 카톡 등 외부채널로 보낸 "REDRED 현재 설계" 문서(3회 개정판)를 사용자가 전달 — 과거 경험(§project_team_shared_progress 메모리)상 이런 메시지는 경로/사실관계부터 검증하는 게 원칙이라 실제로 clone해서 확인함.
+
+**1차 검증**: `github.com/chickgoose/AI-semi.git`, 브랜치 `integration/redred-system-goal` 전부 실존 확인(`git ls-remote`, clone, `merge-base --is-ancestor`로 기준커밋 계보 확인). **로컬 호환성 게이트(`flow.py compatibility`) 실제로 PASS.** 그런데 `tests/k2_single_edge_endpoint/run_all.sh`를 fresh clone에서 돌려보니 **여러 테스트가 에러로 실패** — `contract.json`의 `rtl_authority.source_commit`(`6fc5e167...`)이 실제로는 origin에 없는 커밋이었음(`git cat-file -e` exit=1로 확인) — 즉 "317/317 PASS"라는 claim이 깨끗한 clone에서는 재현 안 됨을 실측으로 확인.
+
+**2차 검증(수정판)**: 새 기준커밋(`77977091...`)과 "6fc5e167... 접근 가능"이라는 개정 문서 도착 → 재검증 결과 **실제로 고쳐짐 확인**: 기준커밋 계보 정상, 이전에 없던 커밋도 이제 존재, fresh fetch 후 `tests/k2_single_edge_endpoint` **37/37 PASS** 재확인. (fetch 도중 `agents/*`, `codex/*`, `surge/*` 등 수십 개의 병렬 후보 탐색 브랜치 발견 — REDRED 문서는 그 중 하나(`integration/redred-system-goal`)일 뿐임을 확인.)
+
+### A2/A3 RTL 직접 분석 + 실측 (§67/§68/§64 방법론 그대로 적용)
+
+- **A2**(`a2_batched_iwrr_k2.sv`): 12토큰 순환 캘린더(1,2,0,1,2,3,1,2,1,2,1,2)로 행 선택 — 정확히 우리 **원조 fovea의 [1,5,5,1] 가중치**를 재구현한 것(문서도 인정). 사이클당 최대 2개 accept(우리 cluster2는 8개).
+- **A3**(`a3_exact_scalar_prefix_k2.sv`): `CENTER_MASK`/`PERIPH_MASK`/`arb2_grant` 공식이 **우리 cluster2/arbiter2.v와 완전히 동일** — 그 위에 "하나의 전역순위에서 순차로 2개 뽑기" 방식. 처음엔 §64에서 기각한 `cluster2_dynamic`(top-2 전역선택, 굶주림)과 같은 함정으로 의심했으나, **`round_in==5`일 때 강제로 주변 우선시키는 로테이션이 실제로 존재**함을 코드로 확인.
+- **§64 스트레스 테스트 실측**(`tb_a3_starvation_stress.v`, 중심 항상포화+주변 3% 희소): **주변 생존율 100%**(4351/4351 배달, cluster2_dynamic의 -99.3%와 정반대) — **처음 우려가 틀렸음을 실측으로 정정, A3의 공정성은 실제로 견고함.**
+- **cross-source spread + jitter 실측**(`tb_a3_crosssource_and_jitter.v`): 같은행 4열 동시발화 spread=**1.0**(우리 cluster2는 0.0 — 열단위 묶음 없어서 우리보다 나쁨), 다른그룹 동시발화 spread=0.0(우리와 동일), **jitter는 load15%에서 avg=2.0/max_lat=32**(우리 cluster2는 avg=0.4/max_lat=1 — **32배 나쁨**, 레인분리가 없어서 broad 부하 하에서 훨씬 취약).
+
+**1~6번 최종 비교**: 4번(공정성)은 A2/A3가 우리보다 낫고, 1·2·5·6번(오버헤드/대역폭/jitter/일부 motion artifact)은 우리 cluster2가 명백히 낫다 — 서로 다른 지점을 최적화한 설계.
+
+### A4(moving-block-tree)/A6(Elias-Fano) 탐색
+
+- **A4**(`agents/a4-quadtree-fabric` → 실제론 `a4_moving_block_tree`): 이진힙 구조로 이벤트를 리프→루트로 이동. 주소압축과 무관, `retire_valid` 단일포트라 처리량 1개/cycle로 추정(우리보다 작음) — 1번 해법 아님.
+- **A6**(`agents/a6-lossless-aer-codec` → `a6_elias_fano_monotone_link`): **진짜 Elias-Fano 인코딩**(정렬집합을 상위=unary gap, 하위=고정폭으로 분할, 손해면 raw로 자동폴백) 구현 확인. RTL 조합논리(`ef_length_comb`/`raw_length_comb`)를 직접 읽어 K(동시활성 소스 수)=1,2,4,8,16 스윕 실측(`tb_a6_ef_bitcost.v`):
+
+  | K | EF | raw | 인코더선택 | 우리 bitmap |
+  |---:|---:|---:|---:|---:|
+  | 1 | 11.0 | 4.0 | raw | 16 |
+  | 8 | 28.7 | 32.0 | **EF승** | 16 |
+  | 16 | 37.0 | 64.0 | **EF승** | **16(EF보다 나음)** |
+
+  EF는 raw는 이기지만(고밀도), **우리 bitmap한테는 짐** — N=16이 너무 작아 EF의 헤더 오버헤드가 이론적 이득을 잡아먹음.
+
+### 3단 적응형(raw+EF+bitmap) 설계·실측 — 결정적 발견
+
+`rtl/a6_tristate_raw_ef_bitmap.v`(준영 a6의 검증된 EF 수식 재사용 + bitmap 옵션 신규 추가) 실측(`tb_tristate_bitcost_sweep.v`, K별 30회):
+
+| K | 3단(우리) | 준영 2단(raw+EF) | 선택모드 |
+|---:|---:|---:|---|
+| 1~4 | 동일(raw) | 동일 | raw |
+| **8** | **18.0** | 29.7 | **bitmap(-39%)** |
+| **16** | **18.0** | 38.0 | **bitmap(-53%)** |
+
+**EF가 30번 시도 전부, 어떤 K에서도 단 한 번도 선택 안 됨** — bitmap을 옵션에 넣자마자 EF가 이기던 자리(K=8,16)를 전부 가져감. §77(N-스케일링)과 정확히 같은 패턴: **EF의 이론적 이득도 N이 커야 살아나고, N=16에서는 "raw+bitmap" 2단만으로 사실상 충분함**(우리 하이브리드 §70과 수렴). 준영의 2단(raw+EF) 대비 고밀도에서 39~53% 개선을 bitmap 하나 추가로 달성 — 팀 간 아이디어 결합의 실질적 성과.
+
+**다음**: N=64/256에서 EF가 실제로 필요해지는 지점이 있는지 §77 스케일스윕과 결합해서 확인 필요(미착수).
+
+- 로컬: `tb/tb_a3_starvation_stress.v`, `tb/tb_a3_crosssource_and_jitter.v`, `tb/tb_a6_ef_bitcost.v`, `tb/tb_tristate_bitcost_sweep.v`, `rtl/a6_tristate_raw_ef_bitmap.v`(전부 신규)
+- 서버: `~/review-junyoung-redred-goal/`(준영 저장소 clone, 별도 검토용 디렉토리)에서 전부 실행 확인 완료
+
+## 79. "1번 해결"의 정의 확정 + 조건①(N이 커져도 bits/event가 안 터짐) 정보이론 하한 대비 실측 완료(2026-08-19)
+
+**동기**: N=64 tristate 실측(K=8에서 EF가 처음으로 단독 승리) 이후 "N=64 진짜 cluster2 RTL을 만들지, 여기서 정리할지" 갈림길에서, 사용자가 먼저 "1번을 해결한다는 게 정확히 뭐냐"고 되물음. 이에 4개 조건으로 분해해 답함: ①N이 커져도 bits/event가 안 터짐(Ryu 원문의 진짜 정의: "bandwidth minimization for higher event rate **and spatial resolution**") ②진짜 스트리밍 RTL(지금까지는 조합논리 계산기뿐) ③정확성(손실없는 배달) 검증 ④스위칭 회로 자체의 PPA 비용까지 포함한 순이득. 사용자가 "①번부터 완벽히 해결해"라고 지시.
+
+**설계**: `tb/tb_entropy_scale_sweep.v`(신규) — `rtl/a6_tristate_raw_ef_bitmap.v`(이미 N 파라미터화되어 있어 RTL 수정 없이 재사용)를 N=16/64/256/1024로 컴파일 타임에 스윕(`` `NSRC`` 매크로, `iverilog -DNSRC=…`). 각 N·K 조합마다 30회 무작위 배치를 만들어 (a) adaptive(3단) 실제 비트수 (b) raw 단독 비트수 (c) **정보이론 하한** `log2 C(N,K) = Σ_{i=0}^{K-1} [log2(N-i) - log2(i+1)]`(조합 하나를 지정하는 데 필요한 최소 비트수, 실수 로그 누적합으로 정확히 계산)을 같이 뽑아 **"하한 대비 몇 배 오버헤드인지"** 비율로 비교. bitmap 단독(§69)이나 raw/EF 비교(§78)와 달리, **처음으로 절대적 최적 기준선(엔트로피)에 대비**했다는 게 이번 실험의 핵심.
+
+**결과** (밀도 K/N을 고정하고 N만 키운 두 계열 — K=N일 때는 C(N,N)=1로 엔트로피가 0이 되는 퇴화 케이스라 제외):
+
+| 밀도 | N=16 | N=64 | N=256 | N=1024 |
+|---|---:|---:|---:|---:|
+| **K=N/2, raw/entropy** | 2.49배 | 3.20배 | 4.08배 | **5.03배** ← 계속 발산 |
+| **K=N/2, adaptive/entropy** | 1.32배 | 1.09배 | 1.03배 | **1.01배** ← 거의 최적에 수렴 |
+| **K=N/8, raw/entropy** | 1.45배 | 1.56배 | 1.91배 | **2.32배** ← 계속 발산 |
+| **K=N/8, adaptive/entropy** | 1.45배 | 1.49배 | 1.25배 | **1.18배** ← 오히려 줄어듦 |
+
+전체 스윕(N×K 44개 조합, 퇴화 케이스 제외)에서 **adaptive/entropy 비율은 항상 1.0~1.7배 구간에 머무름** — N이 16→1024로 64배 커져도 이 폭을 벗어나지 않음. 반면 **raw/entropy 비율은 밀도(K/N)를 고정하기만 하면 예외 없이 N과 함께 계속 커짐**(모든 밀도대에서 관찰).
+
+**왜 이렇게 되는지(이론적 이유)**: raw는 이벤트당 log2(N) 비트 고정 — N이 커지면 무조건 커짐. 반면 엔트로피 하한은 log2 C(N,K) ≈ K·log2(N/K)로, **밀도(K/N)가 고정이면 N/K도 고정이라 이벤트당 비트도 고정**(N 자체와 무관) — 이게 정확히 raw와 엔트로피가 벌어지는 이유. adaptive(3단)는 밀도에 따라 raw/EF/bitmap 중 최소를 골라 이 엔트로피 하한을 계속 쫓아가므로 벌어지지 않음.
+
+**결론 — 조건① 완료**: Ryu의 원래 정의("이벤트율/해상도가 커져도 대역폭이 안 터져야 함")를 문자 그대로, N을 16→1024까지 64배 스윕하며 **정보이론 절대 하한 대비 비율**로 정량 검증함. raw 단독 주소지정은 이 기준에서 명백히 실패(밀도 고정 시 N과 함께 무한정 발산)하고, 우리 3단 적응형은 전 구간에서 하한의 1.0~1.7배 안에 붙어있음 — **"안 터진다"는 주장이 추측이 아니라 실측으로 확정됨**. 다음은 ②(이 조합논리 계산기를 실제 스트리밍 admission이 있는 합성가능 RTL로 만들기) — 아직 미착수.
+
+- 신규: `tb/tb_entropy_scale_sweep.v`
+- 로컬 실행: `iverilog -DNSRC={16,64,256,1024} rtl/a6_tristate_raw_ef_bitmap.v tb/tb_entropy_scale_sweep.v` 4회, 전부 PASS(`input_error` 없음)
+
+## 80. "완벽히 해결 못하나?" — 류현석 교수 논문을 더 깊이 읽어서 확인(2026-08-19)
+
+**동기**: §79에서 조건①(정보이론 하한 대비 안 벌어짐)을 실측 확정한 뒤, 사용자가 "완벽히 해결은 못하나?"라고 물으며 류현석 교수 논문을 더 자세히 읽어보라고 지시. P4(2019 CVPRW 슬라이드)의 §2-B가 "ISCAS 2020(Gen4, 1280×960) 논문 자체는 원문 미확보, 2차 인용 기반"이라고 ⚠️ 표시해뒀던 걸 이번에 실제로 원문(12쪽 발표 슬라이드, IEEE 세션 공식 자료)을 찾아 확보·정독함 — **새 파일 `paper_notes/P5_Suh2020_ISCAS_MotionArtifactMinimization.md`**.
+
+**핵심 발견 — 류 교수의 실제 최종(양산) 해법은 "비트 최적화"가 아니었다**:
+
+1. **성능비교표(슬라이드 11) 실측**: 이 세대(1280×960, **1.3 Geps**, sequential 방식)가 Gen2(640×480, 300Meps, **arbitration** 방식)보다 오히려 빠름. 이유는 인코딩을 더 잘해서가 아니라 **"2.5Gbps 4-lane MIPI"라는 압도적 인터페이스 대역폭으로 순차 스캔의 낭비(이벤트 없는 칸까지 다 훑는 것) 자체를 무의미하게 만들었기 때문**.
+2. **논문 12쪽 전체에서 "주소 오버헤드/비트 효율" 관련 단어가 단 한 번도 등장하지 않음** — 류 교수의 관심사는 오직 event rate(처리량)와 motion artifact(화질)뿐, 우리가 §69~79에서 판 "비트를 얼마나 아끼는가" 축은 그의 실제 설계 궤적에 아예 없었음.
+3. **부수 발견**: Global Hold를 실제로 오래(10ms+) 유지하려면 GIDL(Gate-Induced Drain Leakage) 누설전류로 "주기적 가짜 이벤트"가 생기는 새 아날로그 문제가 따라오고, 이를 막는 전용 회로(GIDL-suppressed reset switch)가 별도로 필요했음을 확인 — Gen3(2019 슬라이드)엔 없던 디테일. §76에서 우리가 만든 "real Global Hold" RTL은 디지털 레지스터로 값을 그냥 붙잡아두는 모델이라 이 문제 자체가 애초에 존재하지 않음 — 즉 그가 실제로 극복해야 했던 난관은 우리 문제(동기 클럭 중재 지연)와는 다른 층위(아날로그 회로 신뢰성)의 것이었음이 확인됨.
+
+**"완벽히 해결"에 대한 답**: 두 갈래로 나눠야 함.
+- **정보이론 하한(§79의 entropy bound) 자체는 "완벽히"(비율 1.0배) 도달 불가능** — 모드 헤더(2비트) 등 최소한의 구조적 오버헤드가 항상 붙고, 이건 어떤 인코딩을 써도 사라지지 않는 수학적 하한(조합론적 최소 비트수)이라 그 자체가 "완벽"의 정의상 도달 불가능한 극한임. 우리가 §79에서 확인한 1.0~1.7배는 이미 이 극한에 상당히 근접한 값.
+- **류 교수 자신도 "완벽히"(정보이론적 최적) 풀지 않았고, 애초에 그 축으로 풀려는 시도조차 안 함** — 그는 문제 정의 자체를 바꿔서(요청을 아예 없애는 sequential + 남는 비효율은 압도적 대역폭으로 흡수) 우회했음. 그의 논문 제목·요약 문구도 전부 "Minimization"(최소화)이지 "Elimination"/"Solved"가 아님(Introduction 슬라이드의 유일한 "solved"라는 단어조차 문맥상 "실용적으로 충분히 줄였다"는 톤).
+
+**그래서 우리 대회 설계에 시사하는 것**: 류 교수의 "대역폭으로 흡수" 해법은 그가 실리콘 공정에서 무제한에 가까운 직렬 인터페이스 대역폭(MIPI SerDes)을 하드웨어로 그냥 더 태울 수 있었기에 가능했던 것 — 우리 대회처럼 게이트/핀 수가 제한된 환경에서는 그 축이 그대로 재현 가능한지 불확실함. 반대로 우리가 §69~79에서 판 "비트를 정보이론적으로 아끼는" 축은 그가 아예 시도하지 않은 다른 방향이라, **"류가 못 푼 걸 우리가 풀었다"는 주장은 성립 안 하지만(그는 이 축을 풀려고 하지도 않았으므로), 자원 제약이 빡빡한 우리 환경에 오히려 더 적합한 답일 가능성**이 있음 — 이게 우리 3단 적응형(§78~79) 작업의 새로운 정당화 근거.
+
+- 신규: `paper_notes/P5_Suh2020_ISCAS_MotionArtifactMinimization.md`
+- 수정: `paper_notes/P4_...md`(§2-B를 원문 확보로 갱신), `paper_notes/00_README.md`(P5 행 추가), `reference_papers.md`(4-4/5-3/5-A ⑧ 갱신)
+
+## 81. 류현석 교수 실제 Q&A 세션(2026-08-19 라이브) 정리 — "완벽히 해결"의 평가기준이 교수 본인 입으로 확인됨
+
+**동기**: §80에서 문헌으로 "완벽히 해결"을 추론하던 중, 사용자가 실제 교수님 Q&A 세션(개인 Zoom, ~76명 참가) 녹화 스크립트를 붙여넣고 정리를 요청. 레드레드팀 박준영(질문1-3)에 대한 답변은 사용자가 직접 재확인한 정정본, 나머지(Q4~6)는 자동 스크립트 최대한 복원(확실도 낮음, 표시함) — **새 파일 `professor_qna_20260819.md`**.
+
+**§79/§80의 답을 교수 본인이 사실상 확정해줌** — 평가 기준 4단계를 교수가 직접 명시: ①문제를 잘 정의했는가 ②정의된 문제를 해결하는 방향이 얼마나 혁신적/성공적인가 ③실질적으로 구현 가능한 회로로 function이 달성됐는가(PPA 좋아도 비현실적 규모면 감점) ④전체 시스템이 안정적으로 동작할지 팀이 debate해서 제시할 수 있는가. **"정보이론 하한에 얼마나 가까운가"라는 절대 기준이 아니라 "우리가 정의한 문제를 얼마나 설득력 있게 논증하는가"가 진짜 평가축**이라는 게 확인됨 — P5(류 교수 실제 양산칩)의 "완벽한 최적화가 아니라 실용적 minimization" 기조와 정확히 일치.
+
+**그 외 우리 설계와 직결되는 확인 사항**:
+- 성능지표 가이드(N Gbps 링크 대비 이벤트율, 손실률을 팀이 스스로 정의)가 우리가 §65~79에서 이미 써온 손실률(%) 중심 지표 체계를 그대로 인정.
+- 임채균(질문자) 답변에서 교수 본인이 과거 "랜덤 부하를 천천히→빈번하게 스윕하며 고정 대역폭 대비 처리량을 최적화"한 경험을 언급 — 우리 §67 이후 load_pct/K-밀도 스윕 방법론과 정확히 같은 틀.
+- payload(intensity) 제외, 극성(polarity)만 다룬다는 확인 — 우리가 이미 내린 결정(커밋 `fa41278`)과 정확히 일치, 뒤늦게 근거 확인.
+- PPA 평가: post-P&R timing/PVT/activity power는 가산 요소(필수 아님), vectorless 전력평가가 기본선 — 우리가 지금까지 해온 Genus 합성+resynth_pnr_sweep 방법론이 이미 "기본선 이상"임을 확인.
+- 45nm 교육용 PDK 명시적 확인, 2차 과제(월드좌표 변환) 단계적 접근 힌트(모션 파라미터 주어짐 가정 → 이후 추정 시스템 구현)는 아직 미착수.
+
+- 신규: `professor_qna_20260819.md`
+
+## 82. "3단 결합은 실효가 있어?" — 공식 50-workload 실측으로 처음 확인(2026-08-19)
+
+**동기**: 지금까지 3단 적응형(§78~79)은 전부 합성 K-밀도 스윕(무작위 subset 샘플링)으로만 검증됐음 — §71에서 "합성 스윕 낙관치가 실제 워크로드에선 재현 안 됨"을 이미 한 번 겪은 전례가 있어서, 공식 50-workload trace로 직접 재검증하지 않고는 "실효 있다"고 말할 수 없음. 사용자 질문에 답하기 위해 `tb/tb_tristate_common_trace.v`(신규) 작성 — §69/§71과 같은 방식으로 cluster2(admission-limited, 실제 RTL)와 tristate(무제한용량, pending 전량 매 사이클 즉시 배달)를 독립 스코어보드로 같은 trace에 태워 비교.
+
+**버그 발견·수정**: 1차 작성본은 `pending`을 지난 사이클 ack 반영(`pending = pending & ~pending_clear_q`)보다 **새 도착 처리를 먼저** 해버려서 손실률이 17.9%로 부풀려짐(정답은 11.52%). §65의 검증된 배선 순서(`tb_cluster2_steal_common_trace.v` 참고 — 클리어를 도착처리보다 먼저)로 고친 뒤 재실행하니 **C2_loss=11.5199%**로 정확히 재현됨(기존 확정치와 일치) — 이걸로 이번 TB의 admission 모델이 정확함을 먼저 확인.
+
+**결과(공식 50-workload 전체, 106,416개 이벤트)**:
+
+| | 총 비트 | 손실률 |
+|---|---:|---:|
+| cluster2(순정, admission-limited) | 577,157 | 11.52% |
+| **3단 적응형(tristate, 무제한용량)** | **565,306** | **0%** |
+| flat bitmap(무제한용량) | 1,184,592 | 0% |
+
+**3단 적응형이 cluster2보다 비트도 더 적게 쓰면서(-2.1%) 손실도 0%로 완전히 없앰** — 지금까지 §70~75에서 시도한 4가지 하이브리드(bitmap 단독/buf결합/repeat/3-way bitmap+repeat)는 전부 순정 cluster2를 못 이겼는데, 이번(raw+EF+bitmap 3단, 준영 a6 재사용)이 **처음으로 실제 트래픽에서 순정 cluster2를 이김**. flat bitmap 대비로도 -52.3%로 압도적.
+
+**단, "완벽히 해결"의 조건 ②③④(§80)는 여전히 미충족**: 이 결과는 여전히 "그 사이클에 pending 전량을 조합논리로 즉시 인코딩하면 몇 비트냐"는 이상화된 무제한용량 모델이지, 실제 스트리밍 admission이 있는 합성가능 RTL이 아님. 매 사이클 가변 길이(최대 18비트: bitmap 모드 시 2+16)를 실어 보내는 물리적 링크 폭 문제, raw/EF/bitmap 실시간 비교·선택 회로 자체의 PPA 비용(과거 하이브리드 사례에서 +23~84% 면적/전력 전례 있음)은 전혀 반영 안 됨. **"실효가 있다"는 지금까지 중 가장 강한 증거지만, 진짜 RTL로 만들어 PPA까지 재본 것은 아직 아님.**
+
+- 신규: `tb/tb_tristate_common_trace.v`
+
+## 83. 진짜 스트리밍 RTL로 만들어보니 정반대 결론 — §82의 "실효 있음"이 이상화된 모델의 착시였음을 확인(2026-08-19)
+
+**동기**: §82가 "3단 적응형이 cluster2보다 비트도 적고 손실도 0%"라고 결론냈지만, 그건 여전히 "그 사이클에 pending 전량을 조합논리로 즉시 인코딩"하는 무제한용량 모델이었음 — 사용자가 "실제 스트리밍 RTL로 만들어봐"라고 지시. 조건②(§80)를 실제로 착수.
+
+**설계**: `rtl/aer_tx16_adaptive2_serial.v`+`rtl/aer_rx16_adaptive2_serial.v`(신규) — 좁은 링크(4비트 데이터+valid, 5핀, cluster2의 14핀보다 좁음)로 헤더(1청크: mode+count)+데이터(raw는 K개 주소청크, bitmap은 4개 마스크청크)를 여러 사이클에 걸쳐 순차 전송하는 진짜 FSM. **N=16에서 EF는 §78 실측으로 단 한 번도 선택 안 됨이 확정된 죽은 코드라 아예 안 넣음(YAGNI)** — raw+bitmap 2단만 구현, mode 필드는 2비트로 잡아둬서 향후 EF(준영 a6 재사용) 확장 여지는 남김.
+
+**검증 1: 정확성 — 65,535개 전체 req 패턴 전수 테스트, 전부 PASS**(현수의 961개 exhaustive 전례보다 68배 강한 전수검증). 도중 테스트하네스 자체의 사이클 동기화 버그(패턴 전환 시 정착 사이클 부족)를 한 번 잡음 — RTL 자체는 처음부터 맞았음(고립 디버그로 확인).
+
+**검증 2: 공식 50-workload 재생 — 여기서 §82를 뒤집는 결과가 나옴**:
+
+| | 총 이벤트 | 손실률 |
+|---|---:|---:|
+| cluster2(순정) | 106,416 | 11.52% |
+| **3단 적응형(진짜 순차 RTL)** | 106,416 | **38.43%** |
+
+**§82의 "무제한용량, 즉시배달" 가정이 완전히 무너짐** — cluster2는 한 사이클에 최대 8개 이벤트를 동시에 낼 수 있는데(row+col_mask 병렬 구조), 내가 만든 좁은 직렬 링크는 이벤트 하나당 최소 2사이클(헤더+데이터 1개)이 걸림. **"비트/이벤트"는 여전히 3단 적응형이 유리하지만, "이벤트/사이클"(진짜 처리율)은 cluster2가 훨씬 유리** — 바쁜 실시간 트래픽에서 병목은 비트 총량이 아니라 처리율이었음. §82의 조합논리 모델은 "링크 폭이 무한하거나 전송이 순간적"이라는, 실제로 만들 수 없는 가정 위에 서 있었던 것.
+
+**정직한 결론**: **"3단 결합은 실효가 있냐"에 대한 답은 "링크를 어떻게 만드느냐에 완전히 달렸다"** — 이번에 만든 좁은(5핀) 직렬 버전은 cluster2보다 명백히 나쁨(손실 3.3배). 링크를 넓히면(예: 8비트) 사이클당 정보량이 늘어 처리율이 개선될 가능성이 높지만, 그러면 핀 수가 cluster2의 14핀에 근접/역전될 수 있어 애초에 "적은 핀으로 더 잘한다"는 원래 동기 자체가 흐려짐 — 이게 정확히 조건④(스위칭 회로의 PPA 비용)가 경고했던 트레이드오프가 실물로 드러난 것. **§82의 낙관적 결론은 폐기**, "실효 있음"은 아직 미확정 — 링크 폭 스윕이 다음 단계(미착수).
+
+- 신규: `rtl/aer_tx16_adaptive2_serial.v`, `rtl/aer_rx16_adaptive2_serial.v`, `tb/tb_adaptive2_serial_exhaustive.v`, `tb/tb_adaptive2_serial_common_trace.v`, `tb/tb_adaptive2_debug.v`(디버그용)
+
+## 84. 링크폭 스윕 — "그럼 이제 어떡하냐"에 대한 답: 폭을 넓히면 처리율은 개선되지만 핀 이득이 사라지는 지점을 정확히 찾음(2026-08-19)
+
+**동기**: §83에서 좁은 링크(4비트)가 처리율 병목으로 cluster2보다 3.3배 나쁜 손실을 낸 걸 확인한 뒤, 사용자가 "그럼 이제 어떡하냐"고 물음 — 링크폭을 늘리면 병목이 풀리는지, 몇 비트가 필요한지, 그 대가로 핀을 얼마나 더 써야 하는지를 실측으로 확인.
+
+**설계**: `rtl/aer_tx16_adaptive2_serial_w16.v`(+RX, 링크폭 16비트로 확장판) + `rtl/aer_tx16_adaptive2_parallel.v`(직렬화를 아예 없앤 단일사이클 병렬판, §82의 조합논리 모델을 cluster2와 동일한 관례(등록출력)로 승격). W16도 65,535개 전수 정확성 재검증 통과.
+
+**공식 50-workload 재생 — 완전한 크로스오버 지도**:
+
+| 설계 | 핀 수 | 손실률 |
+|---|---:|---:|
+| cluster2(기준) | 14 | 11.52% |
+| adaptive2 직렬 W=4(§83) | 5 | 38.43% |
+| adaptive2 직렬 W=16 | 17 | 22.42% |
+| **adaptive2 병렬(단일사이클)** | **19** | **0%** |
+
+**병목의 정체 확정**: 링크를 4→16비트로 넓혀도(핀 3배) 손실이 반토막(38%→22%)날 뿐 cluster2를 못 이김 — 원인은 "배치당 최소 2사이클(헤더+데이터)"이라는 FSM 구조 자체였음, 링크 폭이 아니라. 직렬화를 완전히 없애서 배치 하나를 1사이클에 다 내보내니(§82가 원래 가정했던 그대로) **정확히 0% 손실**로 돌아옴 — cluster2가 갖는 "한 사이클에 최대 8개 병렬 처리"라는 낮은 지연 구조를 이번엔 진짜로 재현한 것.
+
+**정직한 결론 — 트레이드오프가 실물 숫자로 확정됨**: 병렬판은 0% 손실(cluster2 11.52% 대비 압도적)을 19핀으로 달성 — cluster2(14핀) 대비 **+35.7% 핀**, 대신 §79/82에서 확인한 비트당 정보이론적 근사-최적 인코딩 효과는 그대로 유지(같은 이벤트를 보내는 데 필요한 평균 실비트는 여전히 적음, 핀 자체가 넓어졌을 뿐). **이건 이미 알고 있는 cluster2_steal_buf(0.47% 손실, 하지만 Fmax 333MHz로 3배 손해)와 "0% 손실을 사는 다른 방식의 트레이드오프"라 나란히 놓고 비교할 후보** — 다음 단계는 이 병렬판을 실제로 Genus 합성해서 cluster2/cluster2_steal_buf와 PPA로 직접 비교하는 것(조건③④ 완성).
+
+- 신규: `rtl/aer_tx16_adaptive2_serial_w16.v`, `rtl/aer_rx16_adaptive2_serial_w16.v`, `rtl/aer_tx16_adaptive2_parallel.v`, `tb/tb_adaptive2_serial_w16_exhaustive.v`, `tb/tb_adaptive2_serial_w16_common_trace.v`, `tb/tb_adaptive2_parallel_common_trace.v`
+
+## 85. adaptive2_parallel(0%손실) Genus 합성 — 조건④ 완성, 최종 결론: cluster2_steal_buf보다 훨씬 비쌈(2026-08-19)
+
+**동기**: §84에서 병렬판(19핀, 0%손실)이 정확성·처리율 다 만족함을 확인했지만 스위칭 회로 자체의 PPA 비용(조건④, §80)이 아직 미확인이었음. `syn/run_genus_adaptive2_parallel.tcl`(신규, cluster2와 동일 5ns SDC/45nm 라이브러리)로 합성.
+
+**결과** (cluster2 기준 138.852um²/11.8744uW/critical path 1.21ns @5ns, 기존 스크립트 주석에서 재확인):
+
+| | 면적 | 전력 | critical path |
+|---|---:|---:|---:|
+| cluster2(기준) | 138.852 um² | 11.87 uW | 1.21 ns |
+| **adaptive2_parallel** | **1019.16 um²(+634%)** | **72.34 uW(+509%)** | **3.58 ns(2.96배, Fmax 약 1/3)** |
+
+**cluster2_steal_buf(§53~56, 이미 확정된 후보)와 나란히 비교**:
+
+| | 손실률 | 면적 | 전력 | Fmax |
+|---|---:|---:|---:|---:|
+| cluster2(순정) | 11.52% | 기준 | 기준 | ~1052MHz |
+| cluster2_steal_buf | 0.47% | +27.6% | +62.4% | ~333MHz |
+| adaptive2_parallel | **0%** | **+634%** | **+509%** | ~기준의 1/3 |
+
+**최종 결론 — 조건①②③④(§80) 전부 완료, "1번 문제"에 대한 정직한 마무리**: adaptive2_parallel은 손실을 cluster2_steal_buf(0.47%)보다 더 줄이지만(0.47%→0%, 아주 작은 추가 개선), 그 대가로 면적/전력이 cluster2_steal_buf 대비도 압도적으로 더 비쌈(cluster2_steal_buf +27.6%/+62.4% vs adaptive2_parallel +634%/+509%). **원인은 이미 §84에서 짐작한 그대로**: raw/bitmap 중 뭐가 싼지 매 사이클 popcount+비교+최대4개 주소추출을 통짜 조합논리로 다시 계산하는 구조라, cluster2의 구조화된 행/열 중재 트리보다 훨씬 무거운 로직이 매 사이클 돌아감. **"비트를 아낀다"는 아이디어 자체는 §79의 정보이론 하한 대비 실측으로 유효했지만, 그걸 실제 회로로 만드는 비용이 이득을 압도** — cluster2_steal_buf가 이미 이 설계공간에서 더 나은 트레이드오프를 차지하고 있음이 최종 확인됨. **1번 문제는 "완벽히"(정보이론적 절대 최적)가 아니라 cluster2_steal_buf 수준(0.47% 손실, 합리적 PPA)에서 실용적으로 해결된 것으로 마무리.**
+
+- 신규: `syn/run_genus_adaptive2_parallel.tcl`, `syn/reports/aer_tx16_adaptive2_parallel_{area,timing,power,gates}.rpt`(서버)
+
+## 86. row-trim(14→12비트) 우리 자체 구현·독립검증 — §85와 다른 종류의 접근(스위칭 없는 순수 죽은비트 제거)(2026-08-19)
+
+**동기**: §85에서 "1번을 완벽히는 아니어도 납득 가능하게 해결하고 싶다, 우리가 고민했다를 보여주고 싶다"는 요청. 오늘 시도한 raw/EF/bitmap 적응형(§78~85)은 전부 "이번 배치에 뭐가 싼지 매 사이클 계산"하는 스위칭 로직이라 PPA가 비쌌음(§85: +634%/+509%) — **현수가 발견한 row-trim(TEAM_PROGRESS.md 2026-08-19 항목, 아직 서버 미업로드)은 스위칭이 아예 없는 다른 종류의 아이디어**: cluster2의 row 필드(2비트)가 우리 아키텍처(CENTER_MASK=4'b0110/PERIPH_MASK=4'b1001, `aer_tx16_trad_rowcol_fovea_cluster2.v`) 때문에 레인당 2가지 값만 쓴다는 걸 우리 자신의 소스로 이미 직접 확인해뒀었음(§85 이전 턴) — 이번엔 그 코덱을 **우리가 직접 만들고 독립적으로 검증**함(현수 파일은 아직 서버에 없어 재사용 불가하기도 했고, "우리가 고민했다"는 취지에도 맞음).
+
+**설계**: `rtl/aer_cluster2_rowtrim_encode.v`+`rtl/aer_cluster2_rowtrim_decode.v`(신규, 순수 조합논리, 상태 없음) — row0_bit=(row0==2)(0=row1/1=row2), row1_bit=(row1==3)(0=row0/1=row3)로 재코딩. cluster2 RTL은 무수정, 순수 다운스트림 모듈.
+
+**3단계 검증 전부 우리 손으로 재현, 전부 0에러**(현수가 보고한 방법론과 동일하게, 독립적으로):
+1. **전수(exhaustive) 961개 상태**(레인당 idle 1+활성 2행×15열마스크=30→31, 31×31=961): mismatch=0
+2. **실제 cluster2 RTL + 무작위 트래픽 20,000사이클**: mismatch=0
+3. **공식 50-workload 전체 재생**: `native_bits=577,157 → packed_bits=494,706`(정확히 **-14.29%**, 12/14 수학과 정확히 일치), `roundtrip_mismatch=0`, 손실률 11.52%(admission 모델 정확성 재확인용) 그대로 유지 — 트래픽 패턴과 무관하게 항상 성립.
+
+**PPA 결과 — 예상대로 사실상 공짜**:
+
+| | 면적 | 전력 | 비고 |
+|---|---:|---:|---|
+| cluster2(기준) | 138.852 um² | 11.8744 uW | |
+| **cluster2+rowtrim** | **139.878 um²(+0.74%)** | **11.4132 uW(-3.9%, 합성 노이즈 수준)** | critical path 728ps, 5ns 제약 여유 충분 |
+
+**§85(raw/EF/bitmap 적응형, +634%/+509%)와 정반대 결과** — rowtrim은 매 사이클 뭘 계산할지 판단하는 스위칭 로직이 아니라 이미 계산된 2비트 row 필드 중 죽은 절반을 순수 조합논리로 재매핑만 하는 것이라, 면적은 오차범위 수준(+0.74%), 전력은 오히려 미세하게 낮게 나옴(합성 최적화 변동 범위 내로 봐야 함 — "더 좋아졌다"고 과장하지 않음). 타이밍 크리티컬 패스는 cluster2 코어 내부(req→col_mask0 레지스터)에 있어 rowtrim 자체가 새 병목을 만들지 않음(rowtrim은 이미 등록된 출력 뒤에 붙는 순수 조합논리라 레지스터 스테이지 자체를 늘리지 않음).
+
+**최종 결론 — "완벽히는 아니어도 납득 가능하게" 1번을 해결한 실제 사례**: 손실률(§65~66)은 이미 cluster2_steal_buf가 해결했고, 이번 rowtrim은 **그 위에 얹어도 되는, 사실상 공짜인 14.3% 비트비용 절감**을 3단계 독립검증(전수 961/961, 실코어 20,000사이클, 공식 50-workload 전체)과 실제 Genus PPA로 전부 확정함. cluster2/cluster2_steal_buf 둘 다에 그대로 적용 가능(무수정 다운스트림 모듈이므로) — **다음은 팀(특히 현수)과 최종 설계에 반영할지 논의**(미착수).
+
+- 신규: `rtl/aer_cluster2_rowtrim_encode.v`, `rtl/aer_cluster2_rowtrim_decode.v`, `rtl/aer_tx16_cluster2_rowtrim.v`, `tb/tb_rowtrim_correctness.v`, `tb/tb_rowtrim_common_trace.v`, `syn/run_genus_cluster2_rowtrim.tcl`, `syn/reports/aer_tx16_cluster2_rowtrim_{area,timing,power,gates}.rpt`(서버)
+
+## 87. [정정] row-trim이 cluster2_steal_buf엔 무수정 적용 안 됨 — steal이 row 값 범위를 넓힘을 직접 확인(2026-08-19)
+
+**동기**: 사용자가 "더 해보자"고 해서, §86에서 "cluster2/cluster2_steal_buf 어디에든 무수정으로 적용 가능"이라 적었던 걸 실제로 검증. **틀렸음을 발견함** — `aer_tx16_trad_rowcol_fovea_cluster2_steal_buf.v` 원본을 직접 읽어보니, steal_to_periph일 때 lane0의 row가 0(원래 lane0는 CENTER_MASK로 {1,2}만 써야 함)이 되고, steal_to_center일 때 lane1의 row가 2(원래 lane1은 PERIPH_MASK로 {0,3}만 써야 함)가 됨 — **steal은 정확히 "다른 쪽 행을 훔쳐 쓴다"는 게 그 존재 목적**이라 row-trim의 전제(레인당 2값 고정)를 구조적으로 깬다.
+
+**실측 확인**(`tb/tb_steal_buf_row_reachability.v`, 편중 트래픽 30,000사이클): `row0_seen={0,1,2}`(3값 전부 도달), `row1_seen={0,2,3}`(3값 전부 도달), **steal_to_center 21.4%, steal_to_periph 21.2%** — 편중된 트래픽에서 steal이 발동하는 게 드문 예외가 아니라 **전체 사이클의 40%가 넘게** 일어남(steal이 잘 작동하고 있다는 뜻이기도 함 — §65~66에서 이게 손실을 크게 줄인 이유). row-trim을 그대로 얹으면 이 상태들에서 디코더가 잘못 복원해 **조용한 데이터 손상**이 났을 것.
+
+**joint(레인 결합) 인코딩 검토**: steal_to_center/steal_to_periph는 상호배타적이고, 발동 시 두 레인의 row가 전부 결정론적으로 정해짐(추가 비트 불필요) — 이를 이용해 "2비트 steal_state(00=평시,01=steal_to_periph,10=steal_to_center) + 평시에만 레인당 1비트 row선택"으로 재설계하면: steal 중엔 2비트(native 4비트 대비 -2), 평시 양쪽 valid면 4비트(동률), **평시 한쪽만 valid이거나 완전 유휴면 오히려 native보다 1~2비트 더 씀**(steal_state 필드를 매 사이클 무조건 보내야 하므로) — 순이득이 트래픽 구성에 크게 좌우되고, §85에서 이미 확인한 "조건부 스위칭 로직은 PPA에서 손해"라는 교훈과 같은 함정을 다시 안고 있어 추가로 만들지 않기로 함.
+
+**정정된 결론**: row-trim(14→12비트, 공짜)은 **순정 cluster2에만** 안전하게 적용됨. **최종 후보인 cluster2_steal_buf에는 적용 불가**(단순 버전은 데이터손상, 확장판은 순이득 불확실+또 스위칭 로직) — 팀 최종 설계 논의 시 이 제약을 반드시 알려야 함. §86의 "어디에든 적용 가능" 서술은 이 항목으로 대체.
+
+- 신규: `tb/tb_steal_buf_row_reachability.v`
+

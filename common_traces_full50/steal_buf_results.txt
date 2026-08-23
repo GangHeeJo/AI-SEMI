@@ -1,0 +1,150 @@
+TRACE=common_traces_full50/core_simultaneous_identity.cyclemask.txt generated=16 overrun=0 accepted=16 delivered=16 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 30656000 (1ps)
+TRACE=common_traces_full50/core_sparse_identity.cyclemask.txt generated=16 overrun=0 accepted=16 delivered=16 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 34826000 (1ps)
+TRACE=common_traces_full50/core_sparse_rotate180.cyclemask.txt generated=16 overrun=0 accepted=16 delivered=16 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 34826000 (1ps)
+TRACE=common_traces_full50/elephant_mouse_affine.cyclemask.txt generated=1827 overrun=0 accepted=1827 delivered=1827 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/elephant_mouse_identity.cyclemask.txt generated=1827 overrun=0 accepted=1827 delivered=1827 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/global_fanin_identity.cyclemask.txt generated=512 overrun=0 accepted=512 delivered=512 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 49856000 (1ps)
+TRACE=common_traces_full50/mixed_phase_always_ready_bit_reverse.cyclemask.txt generated=9228 overrun=33 accepted=9195 delivered=9223 overrun_ratio_x1000=3
+COUNT_MISMATCH accepted=9195 delivered=9223
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70966000 (1ps)
+TRACE=common_traces_full50/mixed_phase_always_ready_identity.cyclemask.txt generated=9228 overrun=540 accepted=8688 delivered=8731 overrun_ratio_x1000=58
+COUNT_MISMATCH accepted=8688 delivered=8731
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70966000 (1ps)
+TRACE=common_traces_full50/moving_hotspot_multi_column_s3301.cyclemask.txt generated=1821 overrun=0 accepted=1821 delivered=1821 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/moving_hotspot_multi_disperse_s3301.cyclemask.txt generated=1821 overrun=0 accepted=1821 delivered=1821 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/moving_hotspot_multi_row_s3301.cyclemask.txt generated=1821 overrun=0 accepted=1821 delivered=1821 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/moving_hotspot_single_s3301.cyclemask.txt generated=1821 overrun=0 accepted=1821 delivered=1821 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/moving_hotspot_single_s3302.cyclemask.txt generated=1827 overrun=0 accepted=1827 delivered=1827 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/pairwise_contention_affine.cyclemask.txt generated=480 overrun=0 accepted=480 delivered=480 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 49146000 (1ps)
+TRACE=common_traces_full50/pairwise_contention_identity.cyclemask.txt generated=480 overrun=0 accepted=480 delivered=480 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 49146000 (1ps)
+TRACE=common_traces_full50/phase_transition_s3501.cyclemask.txt generated=3139 overrun=0 accepted=3139 delivered=3139 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 65816000 (1ps)
+TRACE=common_traces_full50/phase_transition_s3502.cyclemask.txt generated=3167 overrun=0 accepted=3167 delivered=3167 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 65726000 (1ps)
+TRACE=common_traces_full50/retrigger_affine.cyclemask.txt generated=512 overrun=0 accepted=512 delivered=512 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 49246000 (1ps)
+TRACE=common_traces_full50/retrigger_identity.cyclemask.txt generated=512 overrun=0 accepted=512 delivered=512 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 49246000 (1ps)
+TRACE=common_traces_full50/rotating_victim_affine.cyclemask.txt generated=4217 overrun=0 accepted=4217 delivered=4217 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70966000 (1ps)
+TRACE=common_traces_full50/rotating_victim_identity.cyclemask.txt generated=4217 overrun=0 accepted=4217 delivered=4217 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70966000 (1ps)
+TRACE=common_traces_full50/shape_b1.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70956000 (1ps)
+TRACE=common_traces_full50/shape_b16.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70656000 (1ps)
+TRACE=common_traces_full50/shape_b4.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 70896000 (1ps)
+TRACE=common_traces_full50/spatial_dispersed.cyclemask.txt generated=1536 overrun=0 accepted=1536 delivered=1536 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50436000 (1ps)
+TRACE=common_traces_full50/spatial_local.cyclemask.txt generated=1536 overrun=0 accepted=1536 delivered=1536 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50436000 (1ps)
+TRACE=common_traces_full50/spatial_local_mirror.cyclemask.txt generated=1536 overrun=0 accepted=1536 delivered=1536 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50436000 (1ps)
+TRACE=common_traces_full50/timing_pair_s3901.cyclemask.txt generated=1259 overrun=0 accepted=1259 delivered=1259 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50476000 (1ps)
+TRACE=common_traces_full50/timing_pair_s3902.cyclemask.txt generated=1279 overrun=0 accepted=1279 delivered=1279 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l0p125_s2001.cyclemask.txt generated=251 overrun=0 accepted=251 delivered=251 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50256000 (1ps)
+TRACE=common_traces_full50/uniform_l0p125_s2002.cyclemask.txt generated=261 overrun=0 accepted=261 delivered=261 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50226000 (1ps)
+TRACE=common_traces_full50/uniform_l0p125_s2003.cyclemask.txt generated=231 overrun=0 accepted=231 delivered=231 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50386000 (1ps)
+TRACE=common_traces_full50/uniform_l0p50_s2001.cyclemask.txt generated=982 overrun=0 accepted=982 delivered=982 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50466000 (1ps)
+TRACE=common_traces_full50/uniform_l0p50_s2002.cyclemask.txt generated=1038 overrun=0 accepted=1038 delivered=1038 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50476000 (1ps)
+TRACE=common_traces_full50/uniform_l0p50_s2003.cyclemask.txt generated=1032 overrun=0 accepted=1032 delivered=1032 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l0p90_s2001.cyclemask.txt generated=1868 overrun=0 accepted=1868 delivered=1868 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l0p90_s2002.cyclemask.txt generated=1851 overrun=0 accepted=1851 delivered=1851 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l0p90_s2003.cyclemask.txt generated=1837 overrun=0 accepted=1837 delivered=1837 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p00_s2001.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p00_s2002.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p00_s2003.cyclemask.txt generated=2048 overrun=0 accepted=2048 delivered=2048 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p25_s2001.cyclemask.txt generated=2536 overrun=0 accepted=2536 delivered=2536 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p25_s2002.cyclemask.txt generated=2574 overrun=0 accepted=2574 delivered=2574 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p25_s2003.cyclemask.txt generated=2550 overrun=0 accepted=2550 delivered=2550 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p50_s2001.cyclemask.txt generated=3039 overrun=0 accepted=3039 delivered=3039 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p50_s2002.cyclemask.txt generated=3094 overrun=0 accepted=3094 delivered=3094 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l1p50_s2003.cyclemask.txt generated=3045 overrun=0 accepted=3045 delivered=3045 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l2p00_s2001.cyclemask.txt generated=4096 overrun=0 accepted=4096 delivered=4096 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l2p00_s2002.cyclemask.txt generated=4096 overrun=0 accepted=4096 delivered=4096 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
+TRACE=common_traces_full50/uniform_l2p00_s2003.cyclemask.txt generated=4096 overrun=0 accepted=4096 delivered=4096 overrun_ratio_x1000=0
+STEAL_BUF_TRACE_CONSISTENT
+tb/tb_steal_buf_common_trace.v:106: $finish called at 50486000 (1ps)
