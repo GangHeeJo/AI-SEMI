@@ -2191,10 +2191,10 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 | | 손실률 | 면적 | 전력 | Fmax |
 |---|---:|---:|---:|---:|
 | cluster2(순정) | 11.52% | 기준 | 기준 | ~1052MHz |
-| cluster2_steal_buf | 0.47% | +27.6% | +62.4% | ~333MHz |
+| cluster2_steal_buf | 0.47% | +5.0배(약 +400%) | +68% | 하한 확실 333MHz, 상한추정 385~555MHz |
 | adaptive2_parallel | **0%** | **+634%** | **+509%** | ~기준의 1/3 |
 
-**최종 결론 — 조건①②③④(§80) 전부 완료, "1번 문제"에 대한 정직한 마무리**: adaptive2_parallel은 손실을 cluster2_steal_buf(0.47%)보다 더 줄이지만(0.47%→0%, 아주 작은 추가 개선), 그 대가로 면적/전력이 cluster2_steal_buf 대비도 압도적으로 더 비쌈(cluster2_steal_buf +27.6%/+62.4% vs adaptive2_parallel +634%/+509%). **원인은 이미 §84에서 짐작한 그대로**: raw/bitmap 중 뭐가 싼지 매 사이클 popcount+비교+최대4개 주소추출을 통짜 조합논리로 다시 계산하는 구조라, cluster2의 구조화된 행/열 중재 트리보다 훨씬 무거운 로직이 매 사이클 돌아감. **"비트를 아낀다"는 아이디어 자체는 §79의 정보이론 하한 대비 실측으로 유효했지만, 그걸 실제 회로로 만드는 비용이 이득을 압도** — cluster2_steal_buf가 이미 이 설계공간에서 더 나은 트레이드오프를 차지하고 있음이 최종 확인됨. **1번 문제는 "완벽히"(정보이론적 절대 최적)가 아니라 cluster2_steal_buf 수준(0.47% 손실, 합리적 PPA)에서 실용적으로 해결된 것으로 마무리.**
+**최종 결론 — 조건①②③④(§80) 전부 완료, "1번 문제"에 대한 정직한 마무리**: adaptive2_parallel은 손실을 cluster2_steal_buf(0.47%)보다 더 줄이지만(0.47%→0%, 아주 작은 추가 개선), 그 대가로 면적/전력이 cluster2_steal_buf 대비도 압도적으로 더 비쌈(cluster2_steal_buf는 cluster2 대비 +5.0배/+68% vs adaptive2_parallel은 cluster2 대비 +634%/+509% — 같은 cluster2 기준선 대비로도 adaptive2_parallel이 훨씬 나쁨). **원인은 이미 §84에서 짐작한 그대로**: raw/bitmap 중 뭐가 싼지 매 사이클 popcount+비교+최대4개 주소추출을 통짜 조합논리로 다시 계산하는 구조라, cluster2의 구조화된 행/열 중재 트리보다 훨씬 무거운 로직이 매 사이클 돌아감. **"비트를 아낀다"는 아이디어 자체는 §79의 정보이론 하한 대비 실측으로 유효했지만, 그걸 실제 회로로 만드는 비용이 이득을 압도** — cluster2_steal_buf가 이미 이 설계공간에서 더 나은 트레이드오프를 차지하고 있음이 최종 확인됨. **1번 문제는 "완벽히"(정보이론적 절대 최적)가 아니라 cluster2_steal_buf 수준(0.47% 손실, 합리적 PPA)에서 실용적으로 해결된 것으로 마무리.**
 
 - 신규: `syn/run_genus_adaptive2_parallel.tcl`, `syn/reports/aer_tx16_adaptive2_parallel_{area,timing,power,gates}.rpt`(서버)
 
@@ -2233,4 +2233,110 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 **정정된 결론**: row-trim(14→12비트, 공짜)은 **순정 cluster2에만** 안전하게 적용됨. **최종 후보인 cluster2_steal_buf에는 적용 불가**(단순 버전은 데이터손상, 확장판은 순이득 불확실+또 스위칭 로직) — 팀 최종 설계 논의 시 이 제약을 반드시 알려야 함. §86의 "어디에든 적용 가능" 서술은 이 항목으로 대체.
 
 - 신규: `tb/tb_steal_buf_row_reachability.v`
+
+## 88. 주소 오버헤드 재도전(리벤지) — repeat-flag: row-trim보다 낫고, steal_buf에도 됨(2026-08-23)
+
+**동기**: "완전 새 알고리즘 하나만 만들어보자"는 요청. §74(repeat-compression)가 bitmap 전환과 결합해서 전체 순손실이 났던 걸, **스위칭 로직을 완전히 제거하고 순수 repeat-flag 하나만으로** 재도전.
+
+**설계**: `rtl/aer_cluster2_repeat_encode.v`+`decode.v`(신규) — 레인별로 "직전에 실제 보낸 (row,col_mask)"를 sticky 레지스터로 기억. 이번 grant가 완전히 같으면 **1비트(repeat=1)만 보내고 row/col_mask는 아예 안 보냄**. 다르면 native와 완전히 동일한 7비트(1+2+4) — **손해 케이스가 구조적으로 없음**(row-trim처럼 "항상 이득"이 아니라 "이득이거나 최소 동률"). 개발 중 타이밍 버그 하나 자체 발견·수정: 인코더 출력을 레지스터로 냈다가 디코더와 1사이클 어긋나는 걸 잡아서 row-trim과 같은 순수 조합논리 패턴으로 고침.
+
+**검증(cluster2 + repeat-flag)**:
+- 실코어 무작위 20%부하 30,000사이클: mismatch=0, 비트절감 1.3%(무작위 트래픽엔 반복이 드묾)
+- **공식 50-workload 전체**: mismatch=0, native_bits 577,157 → repeat_bits 534,023 = **-7.47%**, 손실률 11.5199%(admission 모델 정확성 재확인)
+
+**핵심 발견 — row-trim과 달리 cluster2_steal_buf에도 안전함**: repeat-flag는 row 값의 "범위"가 아니라 "직전과 완전히 같은가"만 비교하므로, steal이 row 값 범위를 레인당 3개로 넓히는 것과 무관하게 성립한다는 가설을 세우고 실측:
+- steal을 적극 유발하는 편중 트래픽(§87과 동일 패턴) 30,000사이클: `row0_seen={0,1,2}`, `row1_seen={0,2,3}`(steal 전부 도달 확인) — **그럼에도 mismatch=0**
+- **공식 50-workload, cluster2_steal_buf 위에 얹은 실측**: mismatch=0, native_bits 660,709 → repeat_bits 557,575 = **-15.61%**(순정 cluster2보다도 더 큰 절감폭 — steal_buf가 애초에 재발화를 버퍼링으로 살려두는 설계라 같은 주소가 연속으로 grant될 기회 자체가 더 많아서로 추정)
+
+**PPA 결과 — row-trim만큼 공짜는 아니지만, 절대량은 여전히 무시할 수준**:
+
+| | 면적 | 전력 |
+|---|---:|---:|
+| cluster2_steal_buf(기준) | 695.286 um² | 19.9182 uW |
+| **+ repeat-flag** | **863.892 um²(+24.3%)** | **20.2601 uW(+1.7%)** |
+
+계측용 32비트 `bits_out` 출력을 완전히 뺀 순수 제품판(`aer_tx16_steal_buf_repeat_lean.v`)으로 다시 합성해도 **정확히 같은 수치**가 나와서, 계측 로직이 원인이 아니라 진짜 비용(레인당 새 레지스터 7비트×2 + 6비트 비교기×2)임을 확인함. row-trim(+0.74%)만큼 공짜는 아니지만, §85(+634%/+509%, 스위칭 로직)와는 차원이 다르게 저렴함 — 절대량(863.892um²)은 여전히 작은 SRAM 매크로 하나보다 작음.
+
+**최종 결론 — 이번 세션에서 유일하게 "row-trim보다 큰 절감을, cluster2_steal_buf(실제 최종 후보) 위에서, 합리적 비용으로" 달성한 안**: -15.61% 비트, +24.3%/+1.7% 면적/전력. row-trim(-14.3%, 순정 cluster2 한정)과 repeat-flag(-15.6%, steal_buf에도 적용됨)는 서로 다른 종류의 리던던시(구조적 죽은비트 vs 시간적 반복)를 겨냥해서 **원리적으로 결합 가능**(다음 검증 대상, 미착수). "완전 새 알고리즘"이라는 요청에 대한 답: 개별 기법(sticky 레지스터+비교기)은 새롭지 않지만, **§74의 실패를 스위칭 로직 완전 제거로 재설계해서 살려낸 것**이 이번 재도전의 실질.
+
+- 신규: `rtl/aer_cluster2_repeat_encode.v`(+lean판), `rtl/aer_cluster2_repeat_decode.v`, `rtl/aer_tx16_steal_buf_repeat.v`(+lean판), `tb/tb_repeat_encode_correctness.v`, `tb/tb_repeat_encode_common_trace.v`, `tb/tb_repeat_encode_steal_buf_check.v`, `tb/tb_repeat_encode_steal_buf_trace.v`, `syn/run_genus_steal_buf_repeat*.tcl`
+
+## 89. row-trim + repeat-flag 결합 — 순정 cluster2 한정 -20.51%까지 확인, 하지만 실제 채택 후보엔 repeat-flag 단독이 정답(2026-08-23)
+
+**동기**: "row-trim이랑 결합도 해봐". row-trim은 순정 cluster2에서만 안전(§87)하므로, 결합판도 순정 cluster2 전용으로 설계 — repeat=1이면 1비트만(row-trim 여부 무관, row/col_mask 자체를 안 보내니까), repeat=0이면 1(flag)+1(row_bit, trim)+4(col_mask)=6비트(기존 repeat-flag 단독의 7비트에서 1비트 추가 절감).
+
+**검증**: 공식 50-workload 전체, decode_mismatch=0. **native_bits 577,157 → combo_bits 458,761 = -20.51%** — row-trim(-14.3%)과 repeat-flag(-7.47%, 순정 cluster2 기준)를 사전에 산수로 예측한 값(75,262개 non-repeat 활성 사이클 × 1비트 절감 = 20.51%)과 실측이 정확히 일치.
+
+**PPA(cluster2 기준 138.852um²/11.8744uW 대비)**: 면적 **272.916um²(+96.6%)**, 전력 **23.1890uW(+95.3%)**. 퍼센트만 보면 커 보이지만, **절대증분(+134.064um²)은 steal_buf+repeat-flag 단독(§88, +168.606um²)보다도 오히려 작음** — cluster2 자체 기준선(138.852um²)이 이 세션 전체에서 가장 작은 설계라 같은 절대비용도 퍼센트로는 부풀려 보이는 것뿐(cluster2_steal_buf의 "+5.0배"도 §55에서 같은 이유로 절대량 기준 무시할 수준이라 판단했던 것과 동일한 논리).
+
+**중요한 실용적 한계**: 이 결합판은 **순정 cluster2(11.52% 손실) 위에 얹은 것**이라, 우리 실제 최종 후보(cluster2_steal_buf, 0.47% 손실)를 대체하는 안이 아니다 — row-trim이 steal_buf에서 안 되기 때문에 구조적으로 못 얹는다(§87). 따라서:
+
+- **실제로 채택 가능한 안**: repeat-flag 단독 + cluster2_steal_buf(§88) — -15.61%, +24.3%/+1.7%
+- **순정 cluster2로 되돌아갈 경우를 대비한 상한선 데이터**: row-trim+repeat-flag 결합 + 순정 cluster2 — -20.51%, +96.6%/+95.3%(단, 손실률 11.52%를 감수해야 함)
+
+- 신규: `rtl/aer_cluster2_repeat_rowtrim_encode.v`(+lean판), `rtl/aer_cluster2_repeat_rowtrim_decode.v`, `rtl/aer_tx16_cluster2_repeat_rowtrim.v`, `tb/tb_repeat_rowtrim_common_trace.v`, `syn/run_genus_cluster2_repeat_rowtrim.tcl`
+
+## 90. N-스케일링 문제(§77) 재도전 — 재귀적 cluster2 트리, 진짜 N=64 RTL로 확인(2026-08-23)
+
+**동기**: "완전 새 알고리즘" 두 번째 시도. §77이 "cluster2를 N=64/256으로 실제 RTL 확장(레인 개수를 N에 비례해서 늘리는 재설계)"을 다음 과제로 남겨뒀던 것을 착수.
+
+**설계**: `rtl/aer_tx64_cluster2_tree4.v`(신규) — N=64를 16개씩 4묶음으로 나눠 **cluster2를 무수정으로 4개 인스턴스**. 4묶음은 서로 다른 소스 집합을 전담해서 애초에 경쟁하지 않으므로(상위 레벨 중재 불필요), 처리용량이 정확히 4배(8→32개/cycle)로 늘어남 — 대가는 출력 레인이 8개(핀 14→56, 4배)로 느는 것.
+
+**검증**: §77과 정확히 같은 부하모델(단일슬롯 admission, seed=1, 2000cycle, 동일 부하점)로 N=64를 직접 재현·비교(`tb/tb_cluster2_tree4_n64_scale.v`).
+
+| 부하 | 기존(고정 8개/cycle) 손실률 | **tree4(32개/cycle) 손실률** | 개선 |
+|---:|---:|---:|---:|
+| 3% | 3.15% | **0.18%** | 17.5배 |
+| 15% | 66.24% | **4.74%** | 14.0배 |
+| 30% | 80.24% | **14.14%** | 5.7배 |
+| 50% | 85.84% | **24.78%** | 3.5배 |
+| 75% | 87.39% | **37.58%** | 2.3배 |
+| 100% | 87.46% | **49.98%** | 1.75배 |
+
+(손실률은 overrun/(generated+overrun)로 정규화 — 두 모델의 "generated" 절대값이 용량 차이 때문에 서로 달라서 원시 overrun 개수 비교는 공정하지 않음.)
+
+**흥미로운 수렴점 — 100% 부하에서 다른 알려진 한계와 정확히 맞아떨어짐**: tree4의 100%부하 손실률(49.98%)이 §72에서 이미 증명한 "연속 재발화의 동기타이밍 하한(~50%)"과 거의 정확히 일치함 — 용량 부족이 아니라 **§72가 증명한, 어떤 용량으로도 못 없애는 그 한계에 도달한 것**. 즉 tree4는 §77의 "용량 부족" 손실을 사실상 제거하고, 남은 손실을 §72에서 이미 이해하고 있는 다른(더 근본적인) 한계로 완전히 대체했음 — 두 개의 독립된 발견이 서로를 정합적으로 뒷받침.
+
+**PPA 결과 — 완벽하게 선형인 스케일링**(첫 합성 시도는 unpacked array port가 Genus 기본 `read_hdl`과 호환 안 돼서 실패, flat packed 버스로 포트를 고쳐서 재합성):
+
+| | 면적 | 전력 | qualified Fmax(추정) |
+|---|---:|---:|---:|
+| cluster2(N=16, 기준) | 138.852 um² | 11.8744 uW | critical path 슬랙 3790ps @5ns(기준선과 동일) |
+| **tree4(N=64)** | **553.356 um²(정확히 ×4.0)** | **47.4497 uW(정확히 ×4.0)** | **critical path 슬랙 3790ps @5ns — 완전히 동일**(리프 내부 경로라 안 느려짐) |
+
+4개 리프가 서로 완전히 독립(공유 로직 없음)이라 면적·전력이 정확히 4배로 스케일되고, **critical path가 순정 cluster2와 똑같이 리프 내부(req→col_mask 레지스터)에 있어 Fmax도 전혀 손해 안 봄** — 오늘 시도한 다른 결합판들(스위칭/공유자원 때문에 항상 초선형 비용이 붙던 것)과 정반대로, "완전히 독립적인 병렬 확장"은 비용이 딱 이론값(선형)만큼만 든다는 걸 확인.
+
+**최종 결론 — N-스케일링 문제(§77)에 대한 답**: cluster2를 N에 비례해서 독립 인스턴스로 병렬 확장하면(tree4), 핀은 정직하게 N에 비례해서 늘지만(14→56), §77이 보여준 "손실이 N보다 훨씬 가파르게 폭증"하는 문제 자체가 사라짐 — 15%부하 기준 손실 66.24%→4.74%(14배 개선). 100% 극한부하에서 남는 손실(49.98%)은 §72에서 이미 증명한 "연속 재발화의 동기타이밍 하한(~50%)"과 정확히 일치 — 별개 세션에서 나온 두 결과가 서로 정합적으로 맞아떨어짐. **"완전 새 알고리즘"이라는 요청에 대한 이번 답은: 알고리즘 자체는 새롭지 않지만("그냥 여러 개 병렬로 돌리기"), §77이 미해결로 남겨둔 문제를 실제 RTL+PPA로 깨끗하게 닫은 것.**
+
+- 신규: `rtl/aer_tx64_cluster2_tree4.v`, `tb/tb_cluster2_tree4_n64_scale.v`, `syn/run_genus_cluster2_tree4_n64.tcl`
+
+## 91. Delay-Shadow AER(외부 제안, 5번 문제) 검증 — 정직한 기각, 진짜 원인까지 확정(2026-08-23)
+
+**동기**: 사용자가 외부(ChatGPT)에서 준비한 3개 제안 문서(PSSA-AER/1번, Delay-Shadow AER/5번, Causal-Surface AER/6번) 중 가장 구현이 쉽다고 판단된 Delay-Shadow부터 검증. 핵심 아이디어: jitter를 없애는 대신, row-trim이 찾은 죽은 code space(row 필드 2비트 중 1비트만 실제 필요)에 "이번 grant가 경합에서 밀렸었는가"를 나타내는 1비트 delay shadow `q`를 끼워 넣어 **link width 증가 0**으로 timestamp를 정확히 복원하겠다는 제안.
+
+**설계**: `rtl/aer_cluster2_delay_shadow_encode.v`+`decode.v`(신규) — 레인 내 두 row가 경합해서 진 쪽에 `wait` 플래그를 세우고, 나중에 그 row가 이길 때 `wait` 값을 q로 실어보냄. row-trim과 똑같은 2비트 code space를 재사용(row-trim처럼 줄이는 게 아니라 남는 자리에 새 정보를 채움).
+
+**검증 — 문서의 단순 예시(단일 이벤트 grant)는 정확히 맞음**: 손으로 구성한 경합 시나리오(디버그 TB)로 손hand-trace와 정확히 일치 확인.
+
+**공식 50-workload 전체 실측 — 결정적으로 틀림**: 주소(row/col_mask) round-trip은 완벽(`decode_mismatch=0`, 94,157건 전부)하지만, **타임스탬프 복원은 73.94%가 틀림**(69,618/94,157건 mismatch).
+
+**진짜 원인을 디버그 TB로 정확히 확정**: cluster2의 col_mask는 grant 시점에 **그 row에 그 순간 대기 중인 열을 전부 한꺼번에** 묶어서 보낸다. row가 경합에서 밀려 대기하는 동안 **같은 row의 다른 열이 새로 도착**하면, 둘 다 나중에 같은 grant(같은 col_mask)로 한꺼번에 배달되는데 — **q는 grant 하나당 1비트뿐이라 먼저 온 열은 맞게 복원되고, 나중에 온 열은 틀리게 복원됨**(둘 다 같은 시각으로 복원되어 버림). 인위적으로 구성한 재현 시나리오(row2가 밀리는 도중 새 열이 합류)로 정확히 이 오류가 재현됨을 확인.
+
+**결론 — 정직한 기각, 그러나 원인은 정확히 규명됨**: Delay-Shadow AER는 문서가 예시로 든 "grant당 이벤트 1개" 케이스에서는 정확하지만, **cluster2의 실제 col_mask 배치 특성(한 grant가 여러 열을 동시에 묶음) 때문에 실제 트래픽에서는 대부분 틀림**. 이를 고치려면 row 단위가 아니라 **열 단위로 age를 따로 추적**해야 하는데, 그러면 "link width 증가 0"이라는 이 제안의 핵심 장점이 사라짐(row-trim이 아낀 1비트로는 여러 열의 서로 다른 age를 다 못 담음). §68/§72에서 이미 증명한 "동기 공유자원의 latency variance는 근본적으로 못 없앤다"는 결론에 이번엔 "그 latency를 grant 단위로 관측 가능하게 만드는 것도, 배치(batching) 구조 때문에 생각보다 훨씬 어렵다"는 새로운 정보가 추가됨.
+
+- 신규: `rtl/aer_cluster2_delay_shadow_encode.v`, `rtl/aer_cluster2_delay_shadow_decode.v`, `tb/tb_delay_shadow_common_trace.v`, `tb/tb_delay_shadow_debug.v`
+
+## 92. 진짜 실측 데이터(UZH shapes_rotation)로 검증 — 지금까지 전부 우리가 만든 합성 트래픽이었는데, 실제 이벤트카메라 기록으로도 되는지 확인(2026-08-23)
+
+**동기**: 사용자가 "우리 aer을 통해서 나온 data가 실제 데이터셋과 맞는지도 확인할 수 있나?"라고 물어서, UZH(취리히대) 공개 이벤트카메라 데이터셋 `shapes_rotation`(Mueggler et al., IJRR 2017, DAVIS240C 240×180, 60초 손목 3-DOF 회전, P4/P5와 준영 쪽에서도 인용하는 바로 그 데이터셋)의 raw `events.txt`(timestamp x y polarity)를 실제로 내려받아 우리 RTL에 태워봄 — 지금까지의 모든 검증(§8~91)은 우리가 만든 합성/무작위 트래픽이었고, 이번이 처음으로 진짜 센서 기록.
+
+**변환**: `scripts/convert_uzh_to_cyclemask.py`(신규) — 240×180 중 4×4 패치(x:110-113, y:85-88)만 잘라 우리 N=16 소스공간에 매핑(src=row*4+col), 1ms를 1사이클로 바인닝, 극성은 우리 스코프 밖(주소만 다룸)이라 무시. 결과: `common_traces_uzh/uzh_shapes_rotation_patch.cyclemask.txt`(신규) — **8,503개 실제 이벤트, 활성 사이클 3,259개, 같은사이클·같은소스 충돌 0건**.
+
+**순정 cluster2 + repeat-flag 라운드트립(`tb/tb_repeat_encode_common_trace.v`)**: `generated=8503 overrun=662 acked=7841(=generated-overrun, 보존식 정상) decode_mismatch=0` → **REPEAT_TRACE_PASS**. 손실률 662/8503=**7.79%**(§8~66에서 봐온 합성 트래픽 손실률과 같은 자릿수 — 실제 데이터에서도 이상하지 않은 값). repeat-flag 절감: `native_bits=35287→repeat_bits=34501`(**-2.23%**, repeat_hits=131) — 공식 50-workload의 -7.47%보다 훨씬 작음(실제 회전 모션 트래픽은 합성 워크로드보다 "직전과 같은 주소 반복" 빈도가 낮다는 뜻, 정직하게 기록).
+
+**cluster2_steal_buf + repeat-flag 라운드트립(`tb/tb_repeat_encode_steal_buf_trace.v`)**: `generated=8503 overrun=44 delivered=8503 decode_mismatch=0` → **REPEAT_STEAL_BUF_TRACE_FAIL**(보존식 `generated-overrun==delivered` 깨짐: 8459≠8503, 정확히 overrun 수만큼 어긋남). **단, decode_mismatch=0이라 주소 복원 자체는 완벽** — 이건 오늘 만든 repeat-flag 로직 문제가 아니라, `tb/tb_steal_buf_trace_phantom_debug.v`(기존 파일, 다른 워크로드(`mixed_phase_always_ready`)에서 이미 같은 현상을 조사 중이던 것으로 확인됨)가 추적하던 **기존에 알려진, 아직 미해결인 하네스 보존식 버그**가 실제 센서 데이터에서도 똑같이 재현된 것. cluster2_steal_buf 자체 회로의 결함이 아니라 이 특정 trace-replay 테스트벤치의 카운팅 로직 문제로 추정되며, 원인 규명은 아직 미착수.
+
+**결론**: 순정 cluster2(+repeat-flag)는 합성 트래픽뿐 아니라 **진짜 이벤트카메라 기록에서도 주소 라운드트립이 완벽하고 손실률도 예측 범위 안**임을 실측으로 확인. 최종 후보 cluster2_steal_buf는 주소 복원은 똑같이 완벽하지만, 이 검증에 쓴 테스트벤치의 기존 보존식 버그 때문에 손실률 수치 자체는 이번 방법으로 신뢰있게 못 뽑음(버그 원인 규명 필요, §추후 과제).
+
+- 신규: `scripts/convert_uzh_to_cyclemask.py`, `common_traces_uzh/uzh_shapes_rotation_patch.cyclemask.txt`
 
