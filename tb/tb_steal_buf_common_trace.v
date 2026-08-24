@@ -33,6 +33,7 @@ module tb_steal_buf_common_trace;
   integer cyc;
   integer generated, overrun_count, delivered;
   integer c;
+  reg [15:0] overrun_sample;
 
   function automatic integer popcount16;
     input [15:0] bits;
@@ -79,8 +80,13 @@ module tb_steal_buf_common_trace;
         scan_ret = $fscanf(fd, "%d %h", next_cycle, next_mask);
         have_next = (scan_ret == 2);
       end
+      #1; // overrun은 조합논리(arrival & pending_full) -- pending_full이 엣지에서
+          // 갱신되기 전, 이번 사이클 arrival과 맞는 상태일 때 샘플링해야 함
+          // (§94/§95/§97에서 반복 확인된 타이밍버그, §66에서 원인 미상으로 남았던
+          // 바로 그 문제의 정확한 원인).
+      overrun_sample = overrun;
+      overrun_count = overrun_count + popcount16(overrun_sample);
       @(posedge clk); #1;
-      overrun_count = overrun_count + popcount16(overrun);
       drain_lane(valid0, row0, col_mask0);
       drain_lane(valid1, row1, col_mask1);
       cyc = cyc + 1;

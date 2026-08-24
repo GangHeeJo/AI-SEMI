@@ -2422,7 +2422,18 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - **실측 손실 개선폭**(official 50-workload): overrun **502→488**(loss 0.4717%→0.4586%), `mixed_phase_always_ready_bit_reverse`는 5→0(완전 해소), `mixed_phase_always_ready_identity`는 497→488(소폭 개선). 무작위 트래픽에서는 39,694→29,649(-25.3%)로 더 크게 개선됐는데, 실제 워크로드에서 개선폭이 이보다 작은 건 이 최적화가 겨냥하는 "꽉 찬 상태에서 마침 grant도 나는" 경계조건이 균등 무작위 트래픽보다 이 특정 구조화된 워크로드들에서 덜 자주 발생한다는 뜻(정직하게 기록).
 - UZH 실측(이미 0% 손실)은 개선 여지가 없어 그대로 0%.
 
-**Genus PPA**: 서버에서 합성 중, 결과 나오는 대로 §98에 추가 예정.
+**Genus PPA(원본 steal_buf 695.286µm²/19.9182µW 기준)**:
 
-- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2.v`, `tb/tb_steal_buf_polarity_v2_directed.v`, `tb/tb_steal_buf_polarity_v2_correctness.v`, `tb/tb_steal_buf_polarity_v2_trace.v`, `syn/run_genus_steal_buf_polarity_v2.tcl`
+| | v1(§95) | v2(이번) |
+|---|---:|---:|
+| 면적 | 1156.644µm²(+66.4%) | **1362.186µm²(+95.9%)** |
+| 전력 | 35.9133µW(+80.3%) | **49.3836µW(+147.9%)** |
+| critical path(5ns 제약) | 2381ps | 2243ps(오히려 더 짧음) |
+
+**정직한 결론**: 최적화 자체는 옳고(directed test·오라클 대조·실측 트레이스 전부 통과) 손실도 실제로 줄지만(502→488, -2.8%), **official 50-workload 기준으로는 이득(14건)에 비해 추가 비용(v1 대비 +17.8%면적/+37.5%전력)이 상당히 큼** — 무작위 트래픽에서 본 -25.3% 개선폭이 우리 실제 벤치마크에 그대로 반영되진 않음. 이 트레이드오프가 채택할 만한지는 팀 논의 필요.
+
+**부수 성과 — §66의 오래된 미해결 항목 해소**: 이번에 원인을 정확히 규명한 "overrun을 클럭엣지 후에 읽으면 안 됨" 버그가 `tb/tb_steal_buf_common_trace.v`에도 있었음(§66에서 "간이 드라이버가 이상하게 나왔는데 정확한 원인은 못 팜"으로 남겨뒀던 바로 그 버그) — pre-edge 샘플링으로 수정해서 UZH(overrun=0)·mixed_phase_always_ready_identity(overrun=497) 둘 다 기존 확정치와 정확히 일치함을 재확인, 몇 달 묵은 미상 원인이 이제 완전히 규명·해소됨.
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2.v`, `tb/tb_steal_buf_polarity_v2_directed.v`, `tb/tb_steal_buf_polarity_v2_correctness.v`, `tb/tb_steal_buf_polarity_v2_trace.v`, `syn/run_genus_steal_buf_polarity_v2.tcl`, `syn/reports/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2_*.rpt`(서버)
+- 수정: `tb/tb_steal_buf_common_trace.v`(overrun pre-edge 샘플링으로 타이밍버그 수정)
 
