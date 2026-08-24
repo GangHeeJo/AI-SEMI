@@ -2449,3 +2449,13 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 수정: `tb/tb_steal_buf_event_logger.v`(retire_lane 필드), `scripts/join_event_logger_output.py`(manifest 보강, 독립 순서검증)
 
+## 99. 최종 제출 RTL에 극성 포함 확정 — AER→CAV ledger를 극성판 기준으로 재구축(2026-08-25)
+
+**동기**: §98에서 남겨뒀던 확인사항("최종 RTL에 극성 포함시킬지") — 사용자가 "포함시켜야돼"로 확정. 그래서 §93/§98의 ledger(원본 무수정 steal_buf 기준)를 극성판(`aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v`, §95의 v1 — v2는 아직 팀이 채택 여부를 안 정해서 일단 기본판으로 진행, 필요시 쉽게 교체 가능하게 구조화)으로 다시 만듦.
+
+**설계**: `tb/tb_steal_buf_polarity_event_logger.v`(신규) — §93의 event-ID FIFO 로거와 §95의 극성판 DUT를 결합. 핵심 변화: 극성이 이제 sidecar 전용이 아니라 DUT가 `pol_mask0/1`로 실제로 하드웨어에 실어 보냄 — 그래서 ledger는 "하드웨어가 실제로 내보낸 극성"(`hw_polarity`)을 매 DELIVERED 라인에 기록하고, ground truth(eventmeta.tsv)와 대조해서 **주소뿐 아니라 극성도 진짜 end-to-end로 검증**함(예전엔 주소만 하드웨어 검증 대상이었고 극성은 TB 장부에만 있었음).
+
+**검증**: UZH 실측 addrpol.txt 재생 — `generated=8503 delivered=8503 dropped_overrun=0 phantom=0` → `EVENT_LOGGER_PASS`(§92/93/95와 동일 숫자, 회귀 없음 확인). `scripts/join_polarity_event_logger_output.py`(신규)로 join: **`polarity_roundtrip_ok=true`(polarity_mismatches=0/8503)** — 하드웨어가 실어 나른 극성이 실측 데이터의 진짜 극성과 8,503건 전부 정확히 일치. 기존 체크(순서보존/중복0/보존식)도 전부 유지, `JOIN_CHECK_PASS`.
+
+- 신규: `tb/tb_steal_buf_polarity_event_logger.v`, `scripts/join_polarity_event_logger_output.py`, `common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.{polarity_eventlog.txt,aer_transport_polarity.jsonl,polarity_manifest.json}`(서버)
+
