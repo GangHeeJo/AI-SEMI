@@ -2410,3 +2410,19 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `scripts/render_gds.py`, `syn/pnr/resynth_steal_buf_polarity/*`(서버, netlist/sdc/reports/gds/png per period point)
 
+## 97. steal_buf_polarity v2 — "full+grant 동시 수락" 최적화(2026-08-24)
+
+**동기**: §95의 극성 확장(v1)은 소스의 2-deep FIFO가 꽉 찬 상태에서 grant가 나도(=같은 사이클에 자리 하나가 비는데도) 새 도착을 무조건 버림(`overrun = arrival & pending_full`). 동기식 회로에서는 같은 clock edge 안에 "하나 빼고 하나 넣기"가 가능하다는 지적을 받아 검증·구현.
+
+**설계**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2.v`(신규) — admission 조건을 `overrun = arrival & pending_full & ~granted_bitmap`로, FIFO 갱신을 `pending_cnt`로 old depth(1 vs 2)를 직접 분기하도록 재작성(2'b11 케이스가 이제 old depth 1과 2 둘 다 될 수 있어서 단순 2비트 case만으론 구분이 안 됨 — 명시적 `if (pending_cnt[pc_k]==2'd2)` 분기 필요).
+
+**검증**:
+- **제안된 directed test 그대로**: 소스 하나를 depth=2 [front=0,back=1]로 계층참조 강제 세팅 → 그 소스가 grant되는 사이클에 새 polarity 0 도착 → grant#1은 old front(0)·overrun=0, grant#2는 old back(1), grant#3은 새로 받은 값(0) — 8개 체크 전부 `STEAL_BUF_POLARITY_V2_DIRECTED_PASS`.
+- 무작위 실코어 30,000사이클(v1과 나란히 구동, 독립 소프트웨어 FIFO 오라클과 대조): **210,424개 극성비트 전부 일치**(pol_mismatch=0). (첫 시도에서 "v1과 직접 비교" 어서션이 오탐 15,534건을 냈는데, 원인 규명 — v1/v2는 30,000사이클 동안 서로 다른 admission 이력으로 상태가 자연히 갈라지는 두 독립 stateful DUT라 사이클 단위 직접비교가 원천적으로 안 맞는 방법론이었음, 오라클 기반 체크만 유효.)
+- **실측 손실 개선폭**(official 50-workload): overrun **502→488**(loss 0.4717%→0.4586%), `mixed_phase_always_ready_bit_reverse`는 5→0(완전 해소), `mixed_phase_always_ready_identity`는 497→488(소폭 개선). 무작위 트래픽에서는 39,694→29,649(-25.3%)로 더 크게 개선됐는데, 실제 워크로드에서 개선폭이 이보다 작은 건 이 최적화가 겨냥하는 "꽉 찬 상태에서 마침 grant도 나는" 경계조건이 균등 무작위 트래픽보다 이 특정 구조화된 워크로드들에서 덜 자주 발생한다는 뜻(정직하게 기록).
+- UZH 실측(이미 0% 손실)은 개선 여지가 없어 그대로 0%.
+
+**Genus PPA**: 서버에서 합성 중, 결과 나오는 대로 §98에 추가 예정.
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2.v`, `tb/tb_steal_buf_polarity_v2_directed.v`, `tb/tb_steal_buf_polarity_v2_correctness.v`, `tb/tb_steal_buf_polarity_v2_trace.v`, `syn/run_genus_steal_buf_polarity_v2.tcl`
+
