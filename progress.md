@@ -2340,3 +2340,65 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `scripts/convert_uzh_to_cyclemask.py`, `common_traces_uzh/uzh_shapes_rotation_patch.cyclemask.txt`
 
+## 93. AER→CAV 연동을 위한 event-ID/occurrence-retire 로거 — 준영 스코프 요청에 맞춰 구현(2026-08-24)
+
+**동기**: 준영 쪽에서 AER→CAV(world-coordinate) 연동 보조증거를 만들기 위해, cluster2_steal_buf RTL은 무수정으로 두고 기존 검증된 `tb_steal_buf_trace_phantom_debug.v`(§66, shadow_cnt 2-deep 방식)를 확장해서 이벤트 단위 delivered/overrun + occurrence/retire 이중기록을 만들어달라고 요청. event_id/timestamp/polarity는 TB shadow 구조에만 존재하고 DUT 입력엔 절대 안 이어지도록(DUT는 여전히 순수 주소만 봄) 명시적으로 요구됨.
+
+**설계**: `tb/tb_steal_buf_event_logger.v`(신규) — shadow_cnt(카운트만)를 카운트+신원을 갖는 2-deep FIFO(`fifo_id0/1`, `fifo_arr0/1`)로 확장. 새 도착은 push(가득 차면 overrun), grant는 front pop(가장 오래된 것부터, order-violation 체크 포함) — phantom_debug의 기존 체크(phantom/bad_overrun_report/drain-incomplete/conservation)를 전부 그대로 상속하면서 event_id 단위 `DELIVERED event_id=.. source=.. arrival_cycle=.. retire_cycle=.. latency_cycles=..` / `OVERRUN event_id=.. source=.. arrival_cycle=..` 로그를 별도 파일(`+OUT_FILE=`)에 남김. event_id는 파일로 안 주고받고 TB가 cyclemask.txt를 읽는 순서(cycle asc→source asc)로 직접 매김 — `scripts/build_uzh_eventmeta.py`가 UZH `events.txt`에서 같은 순서 규칙으로 만드는 `eventmeta.tsv`(x/y/polarity/occurrence_timestamp_ns)와 파일 간 ID 전달 없이 자동 정렬됨(64비트 timestamp를 Verilog에서 파싱할 필요 없어짐).
+
+**검증**:
+- UZH 실측 트레이스(overrun=0, lossless 경로): `generated=8503 delivered=8503 dropped_overrun=0 phantom=0` → `EVENT_LOGGER_PASS`(§92와 동일 숫자로 재확인).
+- **nonzero-overrun 경로 별도 검증**(준영이 짚은 "8503/8503은 lossless 경로만 입증" 캐비어트에 대응) — 공식 50-workload 중 실제 손실 있는 `mixed_phase_always_ready_identity`(§66: 5.39%)로 OVERRUN 로깅 경로를 직접 태움: `generated=9228 delivered=8731 dropped_overrun=497`(§66와 정확히 일치) → `EVENT_LOGGER_PASS`, OVERRUN 라인 497개 전부 정상 기록 확인.
+- `scripts/join_event_logger_output.py`(신규) — TB 원시 로그를 eventmeta.tsv와 event_id로 join해서 최종 JSONL(`uzh_shapes_rotation_patch.aer_transport.jsonl`, 8503줄, 필드: logical_source/x4/y4/polarity/occurrence_cycle/occurrence_timestamp_ns/event_id/status/retire_cycle/latency_cycles) + manifest(`*.manifest.json`, sha1 해시·체크 결과 포함) 생성 — `JOIN_CHECK_PASS`(모든 ID가 정확히 한 번씩 존재, 중복/누락 0, generated=delivered+overrun).
+
+**분업 경계 준수**: CAV는 TB나 이 스크립트 안에서 전혀 호출 안 함 — AER transport evidence(JSONL+manifest)까지만 만들고, 준영 쪽 기존 CAV baseline이 이 JSONL을 입력으로 받아 RAW4x4-ALL/RAW4x4-MATCHED/AER-OCC/AER-RET 4-view 비교를 하는 건 그쪽 담당으로 분리.
+
+- 신규: `tb/tb_steal_buf_event_logger.v`, `scripts/build_uzh_eventmeta.py`, `scripts/join_event_logger_output.py`, `common_traces_uzh/uzh_shapes_rotation_patch.eventmeta.tsv`, `common_traces_uzh/event_logger_out/*`(서버)
+
+## 94. 극성(polarity) 스코프 갭 메우기 — 순정 cluster2에 1비트/열 확장, 실제 최종후보 계열 기준 진짜 PPA 확정(2026-08-24)
+
+**동기**: 교수님 Q&A 원문(`professor_qna_20260819.md` L80)을 다시 정확히 읽어보니 "intensity는 빼도 되지만 이벤트의 극성(polarity, ON/OFF)만 다룬다"고 명시돼 있었음 — 우리는 커밋 `fa41278`에서 극성까지 통째로 뺐고, 이전 §81 기록도 이 구분을 놓친 오독이었음(payload 제외=맞음, 극성 제외=원문과 안 맞음). 순정 cluster2에 극성 1비트/열을 얹는 최소 확장부터 시작.
+
+**설계**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_polarity.v`(신규) — cluster2 원본은 내부에 pending 저장소가 없음(req가 그 자체로 "지금 대기 중" 레벨 신호, pending 관리는 상위 시스템 몫)이라, 상위 시스템이 이미 들고 있을 `polarity_in[15:0]`(req[i]=1인 소스에 대해서만 유효)을 받아 col_mask를 뽑을 때와 완전히 같은 방식으로 이긴 행의 4개 열에 대한 극성만 함께 선택(`pol_mask0/1[3:0]`)해서 내보냄 — 새 저장소(FF) 추가 없이 순수 조합논리 mux 하나 추가. **중요한 구조적 인식**: 한 grant가 최대 4개 열을 동시에 묶어 보내므로(col_mask 비트맵), "극성 1비트"는 사이클당 1비트가 아니라 **레인당 최대 4비트**(그랜트된 열마다 하나씩) 필요함 — §43의 옛 fovea 대리측정(단일 승자 1비트/사이클 가정)은 이 구조적 차이를 반영 못 했던 것으로 확인됨.
+
+**검증 — 도중 테스트벤치 버그 하나 발견·수정**: 첫 UZH 실측 트레이스 테스트에서 손실이 46건(기대 662건과 크게 다름)으로 나와서 조사 — "req 세팅 직후 즉시 결과 읽기" 타이밍이 §92에서 검증된 관례(req는 이전 grant 결과를 반영해 다음 엣지용으로 세팅, 결과는 그 다음 반복에서 읽는 1단 파이프라인 컨벤션)와 달라서 손실을 과소집계하는 버그였음(RTL 문제 아님, TB 타이밍 버그). 검증된 컨벤션(`tb_tristate_common_trace.v`의 `step_one_cycle` 패턴)으로 맞춰 재작성:
+- 무작위 실코어 20,000사이클(`tb_cluster2_polarity_correctness.v`): 원본 cluster2와 valid/row/col_mask **완전히 동일**(중재 로직 무변화 확인) + 84,961개 극성비트 전수 일치, `POLARITY_CORRECTNESS_PASS`.
+- 실제 UZH 극성 데이터(`tb_cluster2_polarity_uzh_trace.v`, `common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt`(신규, eventmeta.tsv에서 재구성) 사용): `generated=8503 delivered=7841 overrun=662 pol_mismatch=0` — §92의 순정 cluster2 손실률(662/8503=7.79%)과 **정확히 일치**, `POLARITY_UZH_TRACE_PASS`.
+
+**Genus 실측 PPA(cluster2 기준 138.852µm²/11.8744µW/critical path 1210ps 대비)**:
+
+| | cluster2(기준) | cluster2+polarity |
+|---|---:|---:|
+| 면적 | 138.852 µm² | **211.356 µm²(+52.2%)** |
+| 전력 | 11.8744 µW | **18.9821 µW(+59.9%)** |
+| critical path | 1210ps | 1278ps(+5.6%) |
+
+**§43 옛 대리측정과의 대조**: fovea+1bit는 +24.2%/+30.4%/+35% critical path였는데, 이번 cluster2 계열 실측은 면적/전력이 그보다 훨씬 크게 나옴(+52.2%/+59.9%) — 이유는 위에서 밝힌 구조적 차이(fovea는 사이클당 승자 1개=1비트만 필요하지만, cluster2는 grant당 최대 4열 동시 승인이라 그 배수만큼 극성 비트 mux/배선이 늘어남). critical path는 오히려 덜 늚(+5.6% vs +35%) — 순수 조합논리 select 추가라 파이프라인 스테이지가 안 늘어서인 것으로 보임(fovea+1bit의 큰 critical path 증가는 다른 원인이었을 가능성, 재확인 필요).
+
+**남은 과제**: 이건 순정 cluster2에만 얹은 것 — 실제 최종후보인 cluster2_steal_buf는 소스당 2-deep 저장소(`pending_cnt`, 카운트만 저장, 신원 없음)라 극성 latch 하나로는 부족하고(같은 소스에 극성이 다른 이벤트 2개가 동시에 대기할 수 있음) 진짜 **2-deep 극성 FIFO**(레지스터 신규 추가, §93에서 TB shadow용으로 만든 event-ID FIFO와 같은 구조를 이번엔 실제 RTL에)가 필요함 — 아직 미착수.
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_polarity.v`, `tb/tb_cluster2_polarity_correctness.v`, `tb/tb_cluster2_polarity_uzh_trace.v`, `scripts`로 만든 `common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt`, `syn/run_genus_cluster2_polarity.tcl`, `syn/reports/aer_tx16_trad_rowcol_fovea_cluster2_polarity_{area,timing,power,gates}.rpt`(서버)
+
+## 95. 극성 확장 — 실제 최종후보 cluster2_steal_buf에 2-deep 극성 FIFO 완성(2026-08-24)
+
+**동기**: §94에서 순정 cluster2까지 끝냈고, 실제 채택 후보인 cluster2_steal_buf에도 마저 얹음.
+
+**설계**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v`(신규) — 원본의 소스당 `pending_cnt`(2-deep 포화카운터, 신원 없음) 옆에 `pol_fifo0[16]`(front)/`pol_fifo1[16]`(back) 레지스터를 신규로 둠. §93에서 테스트벤치 shadow용으로 만든 event-ID 2-deep FIFO와 완전히 같은 push/pop 규칙을 이번엔 실제 RTL로: `pending_cnt` 갱신의 4가지 case({arrival&&!full, granted})에 정확히 대응해서 pol_fifo도 같이 갱신(2'b10=push, 2'b01=pop+시프트, 2'b11=old depth 항상 1이라 pop한 자리에 새 도착을 바로 채움). 출력(`pol_mask0/1`)은 col_mask0/1과 완전히 같은 방식(현재 상태 조합논리 select 후 함께 레지스터)으로 만들어 grant와 정확히 정렬시킴.
+
+**검증**:
+- 무작위 실코어 30,000사이클(`tb_steal_buf_polarity_correctness.v`, 원본 steal_buf와 나란히 구동): 주소/overrun **완전히 동일**(addr_mismatch=0, 극성 추가가 중재에 전혀 영향 없음 확인) + 극성 전용 독립 소프트웨어 2-deep FIFO 오라클과 대조해 **200,400개 극성비트 전부 일치**(pol_mismatch=0), `STEAL_BUF_POLARITY_PASS`.
+  - **검증 도중 이번에도 타이밍 버그 하나 발견·수정**: `overrun`이 순수 조합논리(`arrival & pending_full`)인데 클럭 엣지 "이후"에 읽으면 `pending_full`은 이미 갱신된 반면 `arrival`은 그대로라 조합이 안 맞아 대량 오탐(19,821건)이 났음 — 엣지 "이전"(입력 세팅 직후)에 샘플링하도록 고쳐서 해결. RTL 문제 아니고 두 번째로 잡은 TB 타이밍 버그(§94에 이어 같은 종류).
+- 실제 UZH 극성 데이터(`tb_steal_buf_polarity_uzh_trace.v`): `generated=8503 delivered=8503 dropped_overrun=0 checked_pol_bits=8503 pol_mismatch=0` — §92/§93의 무손실 결과와 정확히 일치, `STEAL_BUF_POLARITY_UZH_PASS`.
+
+**Genus 실측 PPA(cluster2_steal_buf 기준 695.286µm²/19.9182µW 대비)**:
+
+| | cluster2_steal_buf(기준) | +polarity |
+|---|---:|---:|
+| 면적 | 695.286 µm² | **1156.644 µm²(+66.4%)** |
+| 전력 | 19.9182 µW | **35.9133 µW(+80.3%)** |
+| critical path(5ns 제약) | — | 2381ps |
+
+**정리 — 극성 스코프 갭이 실제로 얼마나 드는지 이제 정확히 앎**: 순정 cluster2는 +52.2%/+59.9%(§94), 최종후보 cluster2_steal_buf는 그보다 더 비쌈(+66.4%/+80.3%) — steal_buf 자체가 이미 pending_cnt 기반 저장구조라 극성 FIFO(544개 셀, 순정 cluster2+polarity는 76개 셀)가 더 크게 얹힘. 이걸 최종 제출에 포함시킬지, 아니면 "스코프상 필요하나 시간상 검증만 해두고 PPA 비용을 정직하게 명시"로 갈지는 팀 논의 필요 — row-trim/repeat-flag의 비트절감 계산도 극성 포함 여부에 따라 재검토 대상.
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v`, `tb/tb_steal_buf_polarity_correctness.v`, `tb/tb_steal_buf_polarity_uzh_trace.v`, `syn/run_genus_steal_buf_polarity.tcl`, `syn/reports/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_{area,timing,power,gates}.rpt`(서버)
+

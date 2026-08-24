@@ -1,0 +1,31 @@
+{
+  "source_trace": "uzh_shapes_rotation_patch.cyclemask.txt",
+  "patch": {
+    "x": [
+      110,
+      113
+    ],
+    "y": [
+      85,
+      88
+    ],
+    "bin_seconds": 0.001
+  },
+  "dut": "aer_tx16_trad_rowcol_fovea_cluster2_steal_buf.v (unmodified)",
+  "harness": "tb_steal_buf_event_logger.v (extends tb_steal_buf_trace_phantom_debug.v)",
+  "generated": 8503,
+  "delivered": 8503,
+  "overrun": 0,
+  "loss_rate": 0.0,
+  "checks": {
+    "generated_eq_delivered_plus_overrun": true,
+    "every_id_present_exactly_once": true,
+    "duplicate_count": 0,
+    "missing_id_count": 0
+  },
+  "sha1": {
+    "eventmeta_tsv": "2adc986cf0144891bfcd95a14cac3f5fafb80794",
+    "eventlog_txt": "9ade6078c949d0614a02524f66dcdc46c59ec617",
+    "jsonl_out": "2f88dce2726612680a0cd15c681972943f92cad0"
+  }
+}
