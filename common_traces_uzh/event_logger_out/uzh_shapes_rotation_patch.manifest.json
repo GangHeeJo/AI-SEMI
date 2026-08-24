@@ -21,11 +21,23 @@
     "generated_eq_delivered_plus_overrun": true,
     "every_id_present_exactly_once": true,
     "duplicate_count": 0,
-    "missing_id_count": 0
+    "missing_id_count": 0,
+    "per_source_retire_order_preserved": true,
+    "order_violations": 0
   },
   "sha1": {
+    "rtl_dut": "44d364a5cb4833843823b4c018240debff69b147",
+    "tb_harness": "eeb1943cfe8758ee6985ea3cbe626014e2f5c827",
+    "trace_file": "63ed68bf8e568db029e8e6e8518a1464f4f5d5da",
     "eventmeta_tsv": "2adc986cf0144891bfcd95a14cac3f5fafb80794",
-    "eventlog_txt": "9ade6078c949d0614a02524f66dcdc46c59ec617",
-    "jsonl_out": "2f88dce2726612680a0cd15c681972943f92cad0"
+    "eventlog_txt": "ad57ac1f7883309f89c3eadba02c0cf53648d1ca",
+    "jsonl_out": "2794e45fab8dd255a70443ca28b528ae7bb6b0d5"
+  },
+  "repro": {
+    "git_commit": "086bfb5085abea240f689059787b11bb5fd7bed1",
+    "simulator": "Icarus Verilog version 12.0 (devel) (s20150603-1539-g2693dd32b)",
+    "compile_cmd": "iverilog -g2012 -o event_logger.vvp rtl/*.v tb/tb_steal_buf_event_logger.v",
+    "run_cmd": "vvp event_logger.vvp +TRACE_FILE=common_traces_uzh/uzh_shapes_rotation_patch.cyclemask.txt +OUT_FILE=common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.eventlog.txt",
+    "join_cmd": "python3 scripts/join_event_logger_output.py"
   }
 }

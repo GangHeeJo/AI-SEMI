@@ -43,7 +43,7 @@ module tb_steal_buf_event_logger;
   integer    last_retired_id [0:15];
   reg        was_overrun  [0:15];
 
-  task automatic drain_lane(input integer valid_in, input integer row_in, input [3:0] mask_in);
+  task automatic drain_lane(input integer valid_in, input integer row_in, input [3:0] mask_in, input integer lane_in);
     integer idx, popped_id, popped_arr;
     begin
       if (valid_in) begin
@@ -67,8 +67,8 @@ module tb_steal_buf_event_logger;
                   idx, popped_id, last_retired_id[idx]);
               end
               last_retired_id[idx] = popped_id;
-              $fdisplay(out_fd, "DELIVERED event_id=%0d source=%0d arrival_cycle=%0d retire_cycle=%0d latency_cycles=%0d",
-                popped_id, idx, popped_arr, cyc, cyc - popped_arr);
+              $fdisplay(out_fd, "DELIVERED event_id=%0d source=%0d arrival_cycle=%0d retire_cycle=%0d retire_lane=%0d latency_cycles=%0d",
+                popped_id, idx, popped_arr, cyc, lane_in, cyc - popped_arr);
             end
           end
         end
@@ -135,8 +135,8 @@ module tb_steal_buf_event_logger;
         $display("LANE_COLLISION cyc=%0d row=%0d", cyc, row0);
       end
 
-      drain_lane(valid0, row0, col_mask0);
-      drain_lane(valid1, row1, col_mask1);
+      drain_lane(valid0, row0, col_mask0, 0);
+      drain_lane(valid1, row1, col_mask1, 1);
 
       // arrival[i]가 서고 overrun이 아니었던 소스만 새 event_id를 받아 FIFO에 push됨.
       // event_id는 (cycle asc, source asc) 순서로 매겨져서 eventmeta.tsv와 자동 정렬.
@@ -159,8 +159,8 @@ module tb_steal_buf_event_logger;
     drain_until = cyc + 15000;
     for (cyc = cyc; cyc < drain_until; cyc = cyc + 1) begin
       @(posedge clk); #1;
-      drain_lane(valid0, row0, col_mask0);
-      drain_lane(valid1, row1, col_mask1);
+      drain_lane(valid0, row0, col_mask0, 0);
+      drain_lane(valid1, row1, col_mask1, 1);
     end
 
     for (i = 0; i < 16; i = i + 1) begin

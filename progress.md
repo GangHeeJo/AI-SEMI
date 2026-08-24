@@ -2437,3 +2437,15 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2.v`, `tb/tb_steal_buf_polarity_v2_directed.v`, `tb/tb_steal_buf_polarity_v2_correctness.v`, `tb/tb_steal_buf_polarity_v2_trace.v`, `syn/run_genus_steal_buf_polarity_v2.tcl`, `syn/reports/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_v2_*.rpt`(서버)
 - 수정: `tb/tb_steal_buf_common_trace.v`(overrun pre-edge 샘플링으로 타이밍버그 수정)
 
+## 98. AER→CAV 브릿지 분업안(강희/준영/현수) 대응 — §93 ledger 보강(2026-08-25)
+
+**동기**: 준영 쪽에서 8/28 제출 기준 3인 분업안을 정리해서 공유(강희=AER RTL+transport ledger, 준영=CAV 연동+통합, 현수=독립검증+물리증거). "강희 완료조건" 체크리스트를 §93과 대조해보니 거의 다 됐고, 두 가지만 빠져있었음.
+
+**보강 1 — `retire_lane` 필드**: `tb/tb_steal_buf_event_logger.v`의 `drain_lane` 태스크에 `lane_in` 인자 추가, `DELIVERED` 로그에 `retire_lane=0/1` 포함. 재실행해서 §93/§92와 동일 숫자(generated=8503, delivered=8503, dropped_overrun=0) 재확인, `EVENT_LOGGER_PASS`.
+
+**보강 2 — manifest 재현성 정보**: `scripts/join_event_logger_output.py`에 RTL/TB/trace 파일 sha1, git commit hash, iverilog 버전, 정확한 compile/run/join 커맨드를 추가. 또한 "source별 순서 보존"을 Verilog TB의 자체 체크(ORDER_VIOLATION)와는 별개로 **Python에서 독립 재검증**(파일에 쓰인 실제 delivery 순서 기준으로 event_id가 항상 증가하는지) — `order_violations=0`, `JOIN_CHECK_PASS`.
+
+**정리 안 된 채 남은 것 — 스코프 확인 필요**: 이 브릿지 산출물(§93/§98)은 **원본(무수정) `aer_tx16_trad_rowcol_fovea_cluster2_steal_buf.v`** 기준이고 극성은 TB sidecar에만 존재함(분업안이 명시적으로 "polarity는 sidecar-only"라고 요구). 반면 §94~97에서 만든 극성 RTL(cluster2_polarity, steal_buf_polarity, steal_buf_polarity_v2)은 교수님 Q&A 스코프 요구사항(극성을 실제로 전송해야 함)에 대응하는 **별개의 트랙**임 — 최종 제출 RTL에 극성 확장을 포함시킬지, 포함시킨다면 이 CAV 브릿지도 극성 포함 버전 기준으로 다시 만들어야 하는지는 팀 확인 필요(현재는 두 트랙이 서로 다른 목적으로 병행 중이라고 이해하고 진행).
+
+- 수정: `tb/tb_steal_buf_event_logger.v`(retire_lane 필드), `scripts/join_event_logger_output.py`(manifest 보강, 독립 순서검증)
+
