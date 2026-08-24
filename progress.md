@@ -2402,3 +2402,11 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v`, `tb/tb_steal_buf_polarity_correctness.v`, `tb/tb_steal_buf_polarity_uzh_trace.v`, `syn/run_genus_steal_buf_polarity.tcl`, `syn/reports/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_{area,timing,power,gates}.rpt`(서버)
 
+## 96. cluster2_steal_buf_polarity 실제 P&R + 레이아웃 시각화(2026-08-24)
+
+**P&R 스윕**(`syn/resynth_pnr_sweep.sh` 재사용, period 3.0/3.5/4.0/4.5ns): **3.0ns FAIL**(critical path가 새로 추가된 `pol_fifo0_reg`를 지남), **3.5ns부터 PASS**(DRC 클린) — qualified Fmax는 [285.7, 333.3)MHz 어딘가, 원본 steal_buf(333.3MHz 하한)보다 확실히 느려짐(예상대로, 극성 FIFO가 critical path에 얹힘).
+
+**레이아웃을 실제로 눈으로 확인**: 서버에 klayout이 없어서 GDS→PNG 파이프라인을 새로 만듦 — Innovus `streamOut`으로 GDS 추출 → `pip install gdstk`(서버에 인터넷 되는 것 확인) → `scripts/render_gds.py`(신규, matplotlib+gdstk로 레이어별 폴리곤 렌더링)로 PNG 변환. 3.5ns 지점 레이아웃 확인(사용자에게 직접 전달) — 표준셀 행, 전원링, 배치·배선된 로직 블록이 실제로 보임.
+
+- 신규: `scripts/render_gds.py`, `syn/pnr/resynth_steal_buf_polarity/*`(서버, netlist/sdc/reports/gds/png per period point)
+
