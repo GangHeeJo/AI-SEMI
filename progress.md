@@ -2477,3 +2477,17 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_partA.v`, `rtl/aer_tx16_trad_rowcol_fovea_cluster2_partB.v`, `tb/tb_cluster2_partition_sweep.v`
 
+## 101. pressure-aware arbiter — 버그 하나 잡고 나니 손실 개선 0(구조적 이유 규명, 정직한 기각)(2026-08-25)
+
+**동기**: 같은 레인 안 두 행이 라운드로빈으로만 경쟁하는데, 한 행에 곧 넘칠(pending_cnt==2, urgent) source가 있어도 우선권이 없는 게 손실을 키울 수 있다는 제안 — "한쪽만 urgent면 그쪽 우선, 둘 다/둘 다 아니면 기존 RR".
+
+**설계**: `rtl/arbiter2_pressure.v`(신규) — arbiter2에 urgency 오버라이드 추가, 기아 방지 가드 포함(같은 쪽을 연속 2번 넘게 우선시키면 3번째부턴 강제 RR로 복귀, `consec_override` 2비트 포화 카운터). `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_pressure.v`(신규) — steal_buf의 arbiter4_tree 2개(각 레인이 실제 후보 2개뿐이라 원래도 부분적으로만 쓰이고 있었음, §100에서 확인된 사실 재활용)를 arbiter2_pressure로 교체, 나머지(steal 로직/pending_cnt/출력)는 원본과 동일.
+
+**검증 중 진짜 버그 하나 발견·수정**: 첫 컴파일 결과 UZH에서 241건 손실(기대 0)+`DRAIN_INCOMPLETE`(source 하나가 15,000사이클 드레인 동안도 안 비워짐) — 원인은 Verilog 비트연결 `{A,B}`가 A를 MSB(bit1)로 둔다는 걸 착각해서 center 레인의 `{row_req[2], row_req[1]}`가 실제로는 `req[1]=row_req[2]`가 되는데 코드는 `center_gnt[1]=row1 승리`로 잘못 가정 — row1/row2 라벨이 뒤바뀌면서 row2의 grant를 row1로 잘못 표시, `granted_bitmap`이 엉뚱한 행(row1)의 슬롯을 지워서 row2의 pending_cnt가 영원히 안 지워지는 데이터 손상 버그였음. 비트 순서 수정 후 재검증: UZH `PHANTOM_DEBUG_PASS`(0/8503), mixed_phase_always_ready_identity `PHANTOM_DEBUG_PASS`(497/9228, 원본과 정확히 동일) — 50개 전부 phantom=0.
+
+**실측 결과 — 손실 개선 정확히 0**: 공식 50-workload 전체 `generated=106416 overrun=502`(0.4717%) — **원본 steal_buf와 자릿수까지 완전히 동일**. UZH도 동일(0%). 디버그 계측으로 확인한 결과 우선순위 로직 자체는 실제로 자주 발동함(mixed_phase에서 override 185/187회, 기아방지 가드도 86회 작동, UZH에서 15/27회) — **버그로 무력화된 게 아니라 진짜로 효과가 없음**.
+
+**구조적 원인 규명**: 이 아비터는(원본도, pressure판도) 매 사이클 레인 안에 요청이 있으면 반드시 하나를 서비스하는 **work-conserving** 구조라, 두 행 중 "누가 먼저"를 바꿔도 레인의 총 드레인 처리량(사이클당 처리 개수)은 그대로임 — pressure-aware 우선순위는 개별 이벤트의 대기시간(latency) 분포는 바꿀 수 있어도(제로섬 재배치), 손실을 만드는 근본 원인(소스별 2-deep 버퍼 자체의 용량 한계)엔 손 못 댐. **row-partition 스윕(§100)과 함께, "레인 내부 스케줄링 순서를 바꾸는" 종류의 최적화는 이 설계공간에서 전부 소진된 것으로 보임** — 남은 손실을 더 줄이려면 버퍼 depth 자체를 늘리거나(면적 비용 직결) §97의 full+grant 동시수락류의 용량 활용 최적화 쪽이 유일한 방향.
+
+- 신규: `rtl/arbiter2_pressure.v`, `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_pressure.v`, `tb/tb_steal_buf_pressure_phantom_debug.v`
+
