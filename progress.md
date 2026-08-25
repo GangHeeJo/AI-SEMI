@@ -2459,3 +2459,21 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `tb/tb_steal_buf_polarity_event_logger.v`, `scripts/join_polarity_event_logger_output.py`, `common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.{polarity_eventlog.txt,aer_transport_polarity.jsonl,polarity_manifest.json}`(서버)
 
+## 100. row-partition 스윕 — 합성에선 이득, 실측에선 역전(정직한 기각)(2026-08-25)
+
+**동기**: cluster2가 4개 행을 2레인으로 묶는 방식(현재 partition C: {0,3}/{1,2})이 유일한 선택지는 아님 — {0,1}/{2,3}(A), {0,2}/{1,3}(B) 두 가지가 더 있고, 어느 두 행을 같은 레인에 두느냐로 손실이 달라질 수 있다는 제안. cluster2 원본 로직이 `CENTER_MASK`/`PERIPH_MASK` 상수만으로 완전히 일반화돼 있어서(`idx4`가 행 인덱스를 그대로 처리, diff로 상수 2줄만 다름을 확인) 새 RTL 로직 없이 상수만 바꿔서 세 가지 다 실측 가능.
+
+**설계/검증**: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_partA.v`, `_partB.v`(신규, 마스크 상수만 다름), `tb/tb_cluster2_partition_sweep.v`(신규, 컴파일타임 매크로로 DUT 선택, §92부터 쓴 검증된 admission 모델 재사용).
+
+**결과 — 정직한 반전**:
+
+| | 공식 50-workload | UZH 실측 |
+|---|---:|---:|
+| C(현재, {0,3}/{1,2}) | 11.52%(12,259/106,416) | **7.79%(662/8,503) — 제일 좋음** |
+| A({0,1}/{2,3}) | **11.37%(12,099/106,416) — 제일 좋음** | 8.77%(746/8,503) — 제일 나쁨 |
+| B({0,2}/{1,3}) | 11.37%(12,101/106,416) — 제일 좋음(A와 거의 동률) | 7.88%(670/8,503) |
+
+합성 벤치마크에서는 A/B가 현재(C)보다 살짝(-0.15%p) 낫지만, **실제 회전 모션 데이터에서는 정반대로 C가 제일 좋고 A는 오히려 1%p 가까이 나빠짐**(§71에서 이미 겪은 "합성 낙관치가 실제 워크로드에서 재현 안 됨" 패턴 재확인). 합성에서의 이득도 애초에 작았던 데다(0.15%p) 실측 역전폭이 더 커서, **현재 파티션(C)을 그대로 유지하는 게 맞다는 결론** — row-partition 변경은 채택 안 함.
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_partA.v`, `rtl/aer_tx16_trad_rowcol_fovea_cluster2_partB.v`, `tb/tb_cluster2_partition_sweep.v`
+
