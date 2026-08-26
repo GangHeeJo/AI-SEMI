@@ -14,6 +14,7 @@ EVENTMETA = "common_traces_uzh/uzh_shapes_rotation_patch.eventmeta.tsv"
 OUT_JSONL = "common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.aer_transport_polarity.jsonl"
 OUT_MANIFEST = "common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.polarity_manifest.json"
 RTL_FILE = "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v"
+RTL_DEPS = ["rtl/arbiter2.v", "rtl/arbiter4_tree.v"]  # DUT가 실제로 인스턴스화하는 의존 모듈
 TB_FILE = "tb/tb_steal_buf_polarity_event_logger.v"
 TRACE_FILE = "common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt"
 
@@ -83,11 +84,15 @@ with open(OUT_JSONL, "w") as out:
     for eid in sorted(records):
         out.write(json.dumps(records[eid]) + "\n")
 
-def sha1_of(path):
-    h = hashlib.sha1()
-    with open(path, "rb") as f:
-        h.update(f.read())
-    return h.hexdigest()
+def git_blob_hash(path):
+    # 현수 감사 지적(현수→강희, 2026-08-25): 순수 sha1(파일)은 Windows 워킹카피의
+    # CRLF를 해시하는데 git 저장소(GitHub 포함)엔 LF로 정규화돼 저장돼서 해시가 안 맞았음
+    # (직접 재현 확인: eventmeta.tsv 워킹카피=CRLF 8504개/LF 0개, git blob=LF 8504개/CRLF 0개).
+    # `git hash-object`는 git이 실제로 저장하는 blob 그대로의 해시를 내서 이 문제를 원천 차단.
+    try:
+        return subprocess.check_output(["git", "hash-object", path], text=True).strip()
+    except Exception:
+        return None
 
 def git_commit():
     try:
@@ -116,21 +121,34 @@ manifest = {
         "every_id_present_exactly_once": (len(missing_ids) == 0 and dup_count == 0),
         "duplicate_count": dup_count,
         "missing_id_count": len(missing_ids),
-        "per_source_retire_order_preserved": order_violations == 0,
-        "order_violations": order_violations,
+        "tb_ledger_self_consistent": order_violations == 0,
+        "tb_ledger_order_violations": order_violations,
         "polarity_roundtrip_ok": polarity_mismatches == 0,
         "polarity_mismatches": polarity_mismatches,
     },
-    "sha1": {
-        "rtl_dut": sha1_of(RTL_FILE),
-        "tb_harness": sha1_of(TB_FILE),
-        "trace_file": sha1_of(TRACE_FILE),
-        "eventmeta_tsv": sha1_of(EVENTMETA),
-        "eventlog_txt": sha1_of(EVENTLOG),
-        "jsonl_out": sha1_of(OUT_JSONL),
+    "known_limitations": [
+        "tb_ledger_self_consistent은 독립 오라클이 아님: TB가 event_id를 arrival 순서로 "
+        "직접 매기고 그 순서를 shadow FIFO로 재생하므로, 이 체크는 TB 자체 장부가 스스로 "
+        "일관적인지만 검증함(DUT가 같은 source 이벤트를 재정렬해도 검출 불가) -- 주소만 "
+        "전달하는 DUT는 이벤트 신원 자체를 하드웨어에 안 실으므로 독립 검증 신호가 없음 "
+        "(현수 감사 지적, 2026-08-25, HOLD 판정 반영).",
+    ],
+    "sha1": {  # git hash-object 기준 -- git 저장소(및 GitHub)에 실제 저장된 blob과 정확히 일치,
+               # 로컬 CRLF 워킹카피와 무관(현수 감사 지적 반영, 2026-08-25).
+        "rtl_dut": git_blob_hash(RTL_FILE),
+        "rtl_deps": {d: git_blob_hash(d) for d in RTL_DEPS},
+        "tb_harness": git_blob_hash(TB_FILE),
+        "trace_file": git_blob_hash(TRACE_FILE),
+        "eventmeta_tsv": git_blob_hash(EVENTMETA),
+        "eventlog_txt": git_blob_hash(EVENTLOG),
+        "jsonl_out": git_blob_hash(OUT_JSONL),  # git hash-object는 아직 add 안 한 파일도
+                                                  # 커밋했을 때 저장될 blob 해시를 그대로 예측함
     },
     "repro": {
         "git_commit": git_commit(),
+        "git_commit_note": "이 커밋에 RTL/TB/trace/eventmeta/eventlog가 전부 존재해야 재현 가능. "
+                            "manifest/jsonl 자체는 이 커밋 *이후* 별도 receipt 커밋으로 봉인함"
+                            "(생성 시점엔 아직 git에 없어서 같은 커밋에 자기 자신을 포함 못 함).",
         "simulator": iverilog_version(),
         "compile_cmd": f"iverilog -g2012 -o pol_event_logger.vvp rtl/*.v {TB_FILE}",
         "run_cmd": f"vvp pol_event_logger.vvp +TRACE_FILE={TRACE_FILE} +OUT_FILE={EVENTLOG}",
@@ -144,7 +162,7 @@ with open(OUT_MANIFEST, "w") as out:
 print(json.dumps(manifest, indent=2))
 if (not manifest["checks"]["generated_eq_delivered_plus_overrun"]
         or not manifest["checks"]["every_id_present_exactly_once"]
-        or not manifest["checks"]["per_source_retire_order_preserved"]
+        or not manifest["checks"]["tb_ledger_self_consistent"]
         or not manifest["checks"]["polarity_roundtrip_ok"]):
     print("JOIN_CHECK_FAIL", file=sys.stderr)
     sys.exit(1)

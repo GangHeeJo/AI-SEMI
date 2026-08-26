@@ -13,6 +13,7 @@ EVENTMETA = "common_traces_uzh/uzh_shapes_rotation_patch.eventmeta.tsv"
 OUT_JSONL = "common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.aer_transport.jsonl"
 OUT_MANIFEST = "common_traces_uzh/event_logger_out/uzh_shapes_rotation_patch.manifest.json"
 RTL_FILE = "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf.v"
+RTL_DEPS = ["rtl/arbiter2.v", "rtl/arbiter4_tree.v"]
 TB_FILE = "tb/tb_steal_buf_event_logger.v"
 TRACE_FILE = "common_traces_uzh/uzh_shapes_rotation_patch.cyclemask.txt"
 
@@ -77,11 +78,14 @@ with open(OUT_JSONL, "w") as out:
     for eid in sorted(records):
         out.write(json.dumps(records[eid]) + "\n")
 
-def sha1_of(path):
-    h = hashlib.sha1()
-    with open(path, "rb") as f:
-        h.update(f.read())
-    return h.hexdigest()
+def git_blob_hash(path):
+    # 현수 감사 지적 반영(2026-08-25): 순수 sha1(파일)은 Windows 워킹카피 CRLF를 해시하는데
+    # git 저장소엔 LF로 정규화돼 저장돼서 해시가 안 맞았음. `git hash-object`는 git이 실제로
+    # 저장하는 blob 그대로의 해시를 냄.
+    try:
+        return subprocess.check_output(["git", "hash-object", path], text=True).strip()
+    except Exception:
+        return None
 
 def git_commit():
     try:
@@ -110,19 +114,28 @@ manifest = {
         "every_id_present_exactly_once": (len(missing_ids) == 0 and dup_count == 0),
         "duplicate_count": dup_count,
         "missing_id_count": len(missing_ids),
-        "per_source_retire_order_preserved": order_violations == 0,
-        "order_violations": order_violations,
+        "tb_ledger_self_consistent": order_violations == 0,
+        "tb_ledger_order_violations": order_violations,
     },
-    "sha1": {
-        "rtl_dut": sha1_of(RTL_FILE),
-        "tb_harness": sha1_of(TB_FILE),
-        "trace_file": sha1_of(TRACE_FILE),
-        "eventmeta_tsv": sha1_of(EVENTMETA),
-        "eventlog_txt": sha1_of(EVENTLOG),
-        "jsonl_out": sha1_of(OUT_JSONL),
+    "known_limitations": [
+        "tb_ledger_self_consistent은 독립 오라클이 아님: TB가 event_id를 arrival 순서로 "
+        "직접 매기고 그 순서를 shadow FIFO로 재생하므로, 이 체크는 TB 자체 장부가 스스로 "
+        "일관적인지만 검증함 -- 주소만 전달하는 이 DUT는 이벤트 신원을 하드웨어에 안 실으므로 "
+        "독립 검증 신호가 없음(현수 감사 지적, 2026-08-25).",
+    ],
+    "sha1": {  # git hash-object 기준(로컬 CRLF 워킹카피와 무관, 현수 감사 지적 반영)
+        "rtl_dut": git_blob_hash(RTL_FILE),
+        "rtl_deps": {d: git_blob_hash(d) for d in RTL_DEPS},
+        "tb_harness": git_blob_hash(TB_FILE),
+        "trace_file": git_blob_hash(TRACE_FILE),
+        "eventmeta_tsv": git_blob_hash(EVENTMETA),
+        "eventlog_txt": git_blob_hash(EVENTLOG),
+        "jsonl_out": git_blob_hash(OUT_JSONL),
     },
     "repro": {
         "git_commit": git_commit(),
+        "git_commit_note": "이 커밋에 RTL/TB/trace/eventmeta/eventlog가 전부 존재해야 재현 가능. "
+                            "manifest/jsonl은 이 커밋 *이후* 별도 receipt 커밋으로 봉인함.",
         "simulator": iverilog_version(),
         "compile_cmd": f"iverilog -g2012 -o event_logger.vvp rtl/*.v {TB_FILE}",
         "run_cmd": f"vvp event_logger.vvp +TRACE_FILE={TRACE_FILE} +OUT_FILE={EVENTLOG}",
@@ -136,7 +149,7 @@ with open(OUT_MANIFEST, "w") as out:
 print(json.dumps(manifest, indent=2))
 if (not manifest["checks"]["generated_eq_delivered_plus_overrun"]
         or not manifest["checks"]["every_id_present_exactly_once"]
-        or not manifest["checks"]["per_source_retire_order_preserved"]):
+        or not manifest["checks"]["tb_ledger_self_consistent"]):
     print("JOIN_CHECK_FAIL", file=sys.stderr)
     sys.exit(1)
 print("JOIN_CHECK_PASS")
