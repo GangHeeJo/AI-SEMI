@@ -2491,3 +2491,20 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `rtl/arbiter2_pressure.v`, `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_pressure.v`, `tb/tb_steal_buf_pressure_phantom_debug.v`
 
+## 102. 현수 감사 HOLD 대응 — manifest 재현성 실제 결함 3개 확인·수정(2026-08-25)
+
+**동기**: 현수가 §98/§99 ledger를 감사해서 "기능 검증은 PASS지만 재현성 봉인은 HOLD"라고 판정, 3가지 구체적 결함을 지적함. 각각 직접 재현해서 확인한 뒤 수정.
+
+**확인된 결함 3개(전부 실제로 재현됨)**:
+1. **CRLF/LF sha1 불일치**: `sha1_of()`가 로컬 워킹카피(Windows, CRLF)를 해시했는데 git 저장소(GitHub 포함)엔 LF로 정규화돼 저장됨 — 직접 확인: `eventmeta.tsv` 워킹카피는 CRLF 8504개/LF 0개, 같은 파일의 git blob(`git show HEAD:...`)은 LF 8504개/CRLF 0개. 그래서 manifest에 적힌 sha1은 GitHub에서 그 파일을 받아 재계산한 값과 절대 안 맞음.
+2. **부모 커밋 오기록**: manifest의 `repro.git_commit`이 스크립트 실행 시점의 HEAD를 그대로 적었는데, 그 시점엔 아직 manifest/jsonl 자신도 커밋 안 된 상태라 실제로 `git show <기록된 커밋>:.../polarity_manifest.json`을 해보면 "그 커밋엔 없음" — 기록된 커밋만 체크아웃하면 재현이 안 되는 상태였음(직접 재현 확인).
+3. **의존성 미봉인**: DUT 파일 하나만 해시하고 `arbiter2.v`/`arbiter4_tree.v`(실제로 인스턴스화되는 의존 모듈)는 해시 안 함.
+
+**수정**: `scripts/join_event_logger_output.py`, `scripts/join_polarity_event_logger_output.py` 둘 다 — sha1_of()를 `git hash-object` 기반으로 교체(로컬 라인엔딩과 무관하게 git이 실제 저장하는 blob 그대로의 해시, 재현해서 실제 blob과 정확히 일치함을 확인), `RTL_DEPS` 추가해서 의존 모듈도 해시, `git_commit_note`로 "이 커밋 이후 별도 receipt 커밋으로 manifest/jsonl을 봉인한다"는 절차를 명시. 스크립트 수정 커밋(`58c132f`) 후 그 커밋을 기준으로 manifest 재생성 → jsonl은 내용 불변(같은 데이터라 바이트 동일) 확인 → receipt 커밋(`f2f93a8`)으로 봉인.
+
+**"독립 순서검증" 표현도 다운그레이드**: 현수 지적 — TB가 event_id를 arrival 순서로 직접 매기고 그 순서를 shadow FIFO로 재생하는 거라, Python 재검증은 "TB 자체 장부가 스스로 일관적인가"만 확인하지 DUT의 독립적인 신원 신호와 대조하는 게 아님(주소만 나르는 DUT는 애초에 이벤트 신원을 하드웨어에 안 실음). `checks.per_source_retire_order_preserved` → `checks.tb_ledger_self_consistent`로 이름 변경, `known_limitations` 필드로 이 한계를 명시적으로 기록.
+
+**남은 것**: 준영 쪽 `integration/cluster2-steal-buf-cav-bridge`가 이미 예전(결함 있던) manifest를 참조해서 만들어졌을 수 있음 — 새 receipt(`f2f93a8`) 기준으로 다시 확인 필요.
+
+- 수정: `scripts/join_event_logger_output.py`, `scripts/join_polarity_event_logger_output.py`, `common_traces_uzh/event_logger_out/*.manifest.json`(재생성)
+
