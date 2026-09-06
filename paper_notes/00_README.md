@@ -32,8 +32,17 @@
 | ★★★ | [P4_Ryu2019_TraditionalAER_ProblemTimeline.md](P4_Ryu2019_TraditionalAER_ProblemTimeline.md) | Ryu (2019, CVPR Workshop) | 류현석 교수 본인 발표자료(원문 전체 확보·정독) — Gen1~Gen3 4세대에 걸쳐 "전통적 AER의 문제"가 처리량→불공정 지연→timestamp 왜곡(motion artifact)→다시 대역폭으로 재정의되는 시간적 흐름을 원문 인용 기반으로 재구성 |
 | ★★★ | [P5_Suh2020_ISCAS_MotionArtifactMinimization.md](P5_Suh2020_ISCAS_MotionArtifactMinimization.md) | Suh et al. (2020, ISCAS) | P4의 Gen3 해법(순차스캔+global hold)을 1280×960/1.3Geps 양산칩으로 실증(원문 전체 확보) — 핵심 발견: 류 교수의 실제 최종 해법은 "비트 최적화"가 아니라 "압도적 대역폭으로 비효율을 무의미하게 만들기"였음(12쪽 전체에 주소오버헤드 언급 전무) |
 
+## Digital 2차 — 좌표 변환 / 월드 메모리 매핑
+
+| 파일 | 저자(연도) | 한줄 요약 |
+|---|---|---|
+| [D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md](D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md) | Kim et al. (2014, BMVC) | 회전 전용 이벤트카메라로 자세 추정+파노라마 모자이크 동시 구축 — 2차 과제와 문제 구조 사실상 동일 |
+| [D2_02_Guo2024_CMaxSLAM.md](D2_02_Guo2024_CMaxSLAM.md) | Guo & Gallego (2024, T-RO) | Contrast Maximization 기반 회전 전용 SLAM/번들조정 — 2014년 논문의 최신 SOTA 확장판, 연속시간 B-spline 궤적 |
+
+**두 논문에서 나온 전략적 결론**: reference_papers.md **2-A** 참고 — "회전각을 직접 추정"해야 하는 2단계 문제에서는 센서 커버리지와 회전추정 설계가 결합돼 있지만, 회전각이 주어지는 1단계에서는 결합되지 않음(4×4 patch로 좌표변환 메커니즘부터 증명하는 접근이 유효).
+
 ---
 
 **⚠️ 표시된 파일**: 유료 학회지라 원문 PDF를 구하지 못해 초록·서지정보 또는 관련 공개논문/특허 기반으로 작성함. 정식 인용 전 원문 확인 권장.
 
-**다음 계획(미착수)**: Digital 2차(좌표변환/월드메모리), Analog 1차(DVS 픽셀), Analog 2차(어레이+AER 리드아웃) 트랙 자체 논문 조사는 아직 진행 안 함(단, 지도교수 특허 P1이 Digital 2차와 상당 부분 겹침).
+**다음 계획(미착수)**: Analog 1차(DVS 픽셀), Analog 2차(어레이+AER 리드아웃) 트랙 자체 논문 조사는 아직 진행 안 함.

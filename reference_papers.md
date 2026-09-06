@@ -58,7 +58,7 @@
 | 4-1 | Boahen 2000 | (=1-1) | 대규모 어레이 AER 통신의 이론적 기반 |
 | 4-2 | Boahen 2004 | (=1-2) | 패드 수 절반화 — 256×256급 실질 참고 |
 | 4-3 | Son et al. 2017 (Ryu 공저) | 640×480 9μm 300Meps DVS | 삼성 VGA급 DVS, 대규모 AER 판독 핵심 |
-| 4-4 | Suh et al. 2020 (Ryu 공저) | 1280×960 4.95μm DVS | 삼성 1.3MP급 후속 DVS — **원문(12쪽 발표슬라이드) 확보·정독 완료(2026-08-19), paper_notes/P5 참고** |
+| 4-4 | Suh et al. 2020 (Ryu 공저) | 1280×960 4.95μm DVS | 삼성 1.3MP급 후속 DVS |
 | 4-5 | Finateu et al. 2020 | Sony/Prophesee IMX636 | 산업계 SOTA 스택형 이벤트 센서 |
 | 4-6 | Aung et al. 2011 | Adaptive Priority Toggle Arbiter | 공정한 트리 중재기 설계 |
 | 4-7 | Richter et al. 2023 | Speck (SynSense) | 2차원 비동기 판독 + 온칩 SNN |
@@ -81,7 +81,7 @@
    Mead와 Mahowald가 처음 발표한 아날로그 실리콘 망막 회로. 빛의 공간/시간적 변화에 반응하는 적응형 광수용체를 온칩 UV 플로팅게이트로 구현. **Analog 1차**의 이론적 뿌리이자 픽셀=뉴런 개념의 출발점.
 
 0-2. **Mead, C. — "Neuromorphic Electronic Systems."** *Proceedings of the IEEE*, 78(10), 1629–1636, 1990.
-   "신경형태(neuromorphic)"라는 용어를 처음 정식 제안하고, 생물학적 신경계의 아날로그·병렬·저전력 연산을 실리콘으로 구현하는 설계 철학을 제시. 대회 전체 설계 사상의 근거 문헌.
+   "신경형태(neuromorphic)"라는 용어를 처음 정식 제안하고, 생물학적 신경계의 아날로그·병렬·저전력 연산을 실리콘으로 구현하는 설계 철학을 제  시. 대회 전체 설계 사상의 근거 문헌.
 
 0-3. **Mahowald, M., Mead, C. — "The Silicon Retina."** *Scientific American*, 264(5), 76–82, 1991.
    망막의 광수용체·수평세포·양극세포 회로를 아날로그 VLSI로 구현한 대중 과학 논문. 신경형태 접근을 대중에 알린 논문.
@@ -224,10 +224,10 @@
    이벤트카메라 원리, 이벤트 표현, 모션보상, SLAM/오도메트리에서의 좌표계 처리 전반을 총망라. **2차 과제 전반의 필수 배경 문헌.**
 
 2-2. **Kim, H., Handa, A., Benosman, R., Ieng, S.-H., Davison, A. J. — "Simultaneous Mosaicing and Tracking with an Event Camera."** BMVC, 2014.
-   **고정 위치, 회전만 하는 이벤트카메라**의 스트림에서 카메라 자세(회전)를 실시간 추정하며 동시에 파노라마 그래디언트 맵(모자이크)을 구축. **2차 과제와 문제 구조가 사실상 동일 — 가장 직접적으로 참고할 논문.**
+   **고정 위치, 회전만 하는 이벤트카메라**의 스트림에서 카메라 자세(회전)를 실시간 추정하며 동시에 파노라마 그래디언트 맵(모자이크)을 구축. **2차 과제와 문제 구조가 사실상 동일 — 가장 직접적으로 참고할 논문.** 원문 전체 확보·정독 완료, 심층분석은 `paper_notes/D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md` 참고.
 
 2-3. **Guo, S., Gallego, G. — "CMax-SLAM: Event-Based Rotational-Motion Bundle Adjustment and SLAM System Using Contrast Maximization."** *IEEE T-RO*, 40, 2442–2461, 2024.
-   **순수 회전 운동 전용**의 최초 이벤트 기반 번들 조정/SLAM. Contrast Maximization으로 회전 궤적을 최적화해 파노라마 지도 생성. **문제 정의(고정 위치, 회전만)가 2차 과제와 정확히 일치하는 최신 논문.**
+   **순수 회전 운동 전용**의 최초 이벤트 기반 번들 조정/SLAM. Contrast Maximization으로 회전 궤적을 최적화해 파노라마 지도 생성. **문제 정의(고정 위치, 회전만)가 2차 과제와 정확히 일치하는 최신 논문.** 원문 전체 확보·정독 완료, 심층분석은 `paper_notes/D2_02_Guo2024_CMaxSLAM.md` 참고.
 
 2-4. **Xing, W. 외 — "EROAM: Event-Based Camera Rotational Odometry and Mapping in Real-Time."** arXiv:2411.11004, 2024.
    이벤트를 구면(unit sphere)에 투영, Event Spherical ICP로 회전 전용 카메라의 실시간 오도메트리·매핑. k-d tree 맵 관리로 고각속도에서도 강건. **회전 전용 센서의 월드 메모리 누적 문제와 가장 유사한 최신 연구.**
@@ -240,6 +240,16 @@
 
 2-7. **US Patent 9,934,557 — "Method and Apparatus of Image Representation and Processing for Dynamic Vision Sensor."** Ji, Z., Lee, K., Zhang, Q., Wang, Y. M., **Ryu, H. S.**, Ovsiannikov, I. (Samsung Electronics), 2018.
    DVS 이벤트 스트림을 프레임 형태로 표현/처리하는 방법. 서로 다른 이미지 간 좌표 대응을 위한 **변환행렬(transformation matrix)/신뢰도맵** 개념 포함. **로컬 센서 좌표 → 변환행렬 → 월드 좌표 매핑과 개념적으로 가장 밀접한 특허(지도교수 공동발명).**
+
+### 2-A. Kim 2014 + Guo·Gallego 2024를 같이 읽고 나온 전략적 결론 — "센서 커버리지와 회전추정은 결합돼 있는가"
+
+2026-09-06, 2차 착수 전 방향을 정하다가 나온 질문 — "센서 범위를 넓히는 것(AER 확장)과 회전으로 월드좌표를 만드는 것(좌표변환)이 독립적인 두 단계인가, 아니면 하나로 묶어서 설계해야 하는가"에 대해, 2-2(2014)·2-3(2024) 두 논문을 원문으로 확인한 결과:
+
+- **회전각을 직접 추정해야 하는 경우(교수님 표현 "2단계")에는 확실히 결합돼 있다.** Kim 2014의 파티클 필터는 후보 회전들을 구별하기 위해 화면 전체에서 온 이벤트가 필요하고, 시야가 좁으면 추정 자체가 불안정해진다. Guo·Gallego 2024도 국소 추정의 오차(드리프트)를 메우기 위해 전역 재조정(bundle adjustment)이 필요하다는 형태로 같은 결합이 다시 등장한다 — 2014년부터 2024년까지 이 연구 계열 전체에서 "좁은 시야 = 불안정한 회전 추정"이라는 관계가 사라진 적이 없다.
+- **회전각이 이미 주어지는 경우(교수님 표현 "1단계")에는 이 결합이 성립하지 않는다.** 두 논문 모두 "회전을 모른다"는 전제에서 출발하지만, 우리 1단계는 그 전제가 없다 — 로컬 픽셀 + 주어진 회전행렬 R → 세계좌표라는 변환 자체는 픽셀이 몇 개든(4×4든 240×180이든) 동일하게 성립한다.
+- **두 논문 다 순수 소프트웨어(부동소수점, 회로 없음)** — AER 하드웨어를 타일 단위로 어떻게 확장하고 좌표변환 회로와 어떻게 인터페이스를 맞출지는 어느 논문도 다루지 않는다. 이 갭이 우리가 채워야 할 지점.
+
+**결론**: 지금 당장(1단계) 4×4 patch로 좌표변환 메커니즘부터 증명하는 접근은 여전히 유효하다 — 이 결합은 회전을 "추정"해야 할 때만 발생하기 때문. 다만 나중에 2단계(회전각 자체를 이벤트만으로 알아내기)로 넘어가면, 그때는 센서 커버리지 확장과 회전추정 설계를 반드시 같이 가야 한다는 게 문헌으로 확인됨.
 
 ---
 
@@ -287,8 +297,8 @@
 4-3. **Son, B., Suh, Y., Kim, S., 외 (**Ryu, H.** 포함) — "A 640×480 Dynamic Vision Sensor with a 9μm Pixel and 300Meps Address-Event Representation."** ISSCC 2017, Session 4.1.
    삼성 Gen2 VGA DVS. 기존 pixel-by-pixel AER의 interface-bandwidth-induced latency를 줄이기 위해 digitally synthesized Group-AER(G-AER)를 적용하여 300 Meps 처리율을 달성. 단순 throughput 개선뿐 아니라 이후 arbitration-induced latency 및 timestamp distortion 문제를 분석하는 출발점이 된 설계. **지도교수 공저 — 대규모 어레이 AER 판독 구조의 핵심 참고 논문.** (5-A 참고)
 
-4-4. **Suh, Y., Choi, S., 외 (**Ryu, H.** 포함) — "A 1280×960 Dynamic Vision Sensor with a 4.95-μm Pixel Pitch and Motion Artifact Minimization."** IEEE ISCAS 2020. **원문(12쪽 발표슬라이드) 확보·정독 완료(2026-08-19) — paper_notes/P5 참고.**
-   1.3MP급 후속 DVS. Cu-Cu 픽셀 접합, 순차 컬럼 선택 및 글로벌 이벤트 홀딩으로 모션 아티팩트 최소화. 특히 이전 Gen2의 arbiter 기반 word-serial AER에서 나타난 event generation time–readout time mismatch 문제를 해결하기 위해 arbitrary arbitration 대신 sequential column scan을 채택한 후속 구조라는 점에서 중요. **지도교수 공저 — 대형 어레이 스캔 방식에 직접 참고.** 성능비교표 실측: 이 세대(1.3 Geps)가 arbitration 방식(Gen2, 300Meps)보다 오히려 빠른데, 그 이유는 인코딩 최적화가 아니라 **2.5Gbps 4-lane MIPI라는 압도적 인터페이스 대역폭으로 순차 스캔의 비효율 자체를 무의미하게 만들었기 때문** — 논문 전체에서 주소 오버헤드/비트 효율은 단 한 번도 언급되지 않음. (5-A 참고)
+4-4. **Suh, Y., Choi, S., 외 (**Ryu, H.** 포함) — "A 1280×960 Dynamic Vision Sensor with a 4.95-μm Pixel Pitch and Motion Artifact Minimization."** IEEE ISCAS 2020.
+   1.3MP급 후속 DVS. Cu-Cu 픽셀 접합, 순차 컬럼 선택 및 글로벌 이벤트 홀딩으로 모션 아티팩트 최소화. 특히 이전 Gen2의 arbiter 기반 word-serial AER에서 나타난 event generation time–readout time mismatch 문제를 해결하기 위해 arbitrary arbitration 대신 sequential column scan을 채택한 후속 구조라는 점에서 중요. **지도교수 공저 — 대형 어레이 스캔 방식에 직접 참고.** (5-A 참고)
 
 4-5. **Finateu, T., Niwa, A., Matolin, D., 외 — "A 1280×720 Back-Illuminated Stacked Temporal Contrast Event-Based Vision Sensor with 4.86μm Pixels, 1.066GEPS Readout, Programmable Event-Rate Controller and Compressive Data-Formatting Pipeline."** ISSCC 2020, Session 5.10. (Sony/Prophesee, IMX636)
    산업계 최고 성능급 스택형 이벤트 센서. 1.06 Geps 판독 속도, 프로그래머블 이벤트율 제어기. **효율적 AER 판독 아키텍처의 최신 SOTA 참고.**
@@ -341,7 +351,7 @@
 
 **⑦ Global Hold — scan만으로는 부족함.** Gen3는 픽셀마다 event storage를 두고 Global Hold를 적용한다. 원문(슬라이드 14): *"Global hold is implemented with an event storage in each pixel and its global control signal."* 이는 "읽는 동안에도 scene이 계속 변해서 column마다 서로 다른 시간 상태를 나타내는 문제"를 줄이기 위한 것으로, 일종의 **event-domain global shutter**에 가까운 역할이다. 즉 Gen3 설계는 *Event detection → Event storage/Global Hold → Sequential Column Read*로 볼 수 있다.
 
-**⑧ Gen4 / ISCAS 2020 — 고해상도에서도 이 철학을 유지, 그러나 "해결"의 정체가 정보이론적 최적화가 아니라 대역폭 하드웨어임이 원문으로 확인됨(2026-08-19).** 4-4/5-3의 Suh et al. 2020(1280×960, 4.95μm pixel pitch) 원문(12쪽)을 확보해 정독한 결과(paper_notes/P5), sequential column selection과 global event holding을 그대로 이용해 motion artifact를 줄인 건 맞지만(Gen2: throughput 개선 → Gen3: temporal consistency 개선 → Gen4: 고해상도로 확장이라는 계보), 두 가지가 새로 확인됨: (a) Global Hold를 실제로 오래(10ms+) 유지하려면 GIDL 누설전류로 인한 "주기적 가짜 이벤트"라는 새 아날로그 회로 문제가 따라오고, 전용 회로(GIDL-suppressed reset switch)가 별도로 필요했다 — Gen3(2019 슬라이드)엔 없던 디테일. (b) 성능비교표(슬라이드 11)에서 **이 세대(1.3 Geps)가 arbitration 방식(Gen2, 300Meps)보다 더 빠른데, 그 이유는 "2.5Gbps 4-lane MIPI"라는 압도적 인터페이스 대역폭으로 순차 스캔의 비효율 자체를 무의미하게 만들었기 때문**이다. 논문 12쪽 전체에서 "주소 오버헤드/비트 효율" 관련 단어는 단 한 번도 등장하지 않는다 — 즉 류 교수의 실제 최종·양산 해법은 **"인코딩을 정보이론적으로 최적화한다"는 축을 아예 택하지 않았고**, 대신 문제를 "주소가 덜 필요하게 만들기(sequential, 요청 자체를 없앰) + 남는 비효율은 하드웨어 대역폭으로 흡수"라는 다른 축으로 우회했다.
+**⑧ Gen4 / ISCAS 2020 — 고해상도에서도 이 철학을 유지.** 4-4/5-3의 Suh et al. 2020(1280×960, 4.95μm pixel pitch)은 이 흐름의 후속으로, sequential column selection과 global event holding을 그대로 이용해 motion artifact를 줄였다. 즉 ISSCC 2017과 ISCAS 2020을 따로 떨어진 두 논문이 아니라 **Gen2: throughput 개선 → Gen3: temporal consistency 개선 → Gen4: 고해상도로 확장**이라는 하나의 설계 계보로 묶는 것이 적절하다.
 
 ### 5-B. 류현석 연구에서 도출할 수 있는 "전통적 AER의 문제점"
 

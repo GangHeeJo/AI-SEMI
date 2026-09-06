@@ -2508,3 +2508,19 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 수정: `scripts/join_event_logger_output.py`, `scripts/join_polarity_event_logger_output.py`, `common_traces_uzh/event_logger_out/*.manifest.json`(재생성)
 
+## 103. Digital 2차(좌표변환/월드메모리) 착수 전 방향 논의 + 문헌 심층분석(2026-09-04~09-06)
+
+**배경**: 1차 제출 마감 이후 2차(n×m 센서 → N×M world memory, 센서는 회전만) 착수 전 방향을 잡기 위한 논의. 아직 RTL/스크립트 변경은 없음 — 전부 문제정의·전략 단계.
+
+**시나리오 프레이밍**: 후보 4개(PTZ 파노라마 감시카메라 / 로봇·드론 짐벌의 ego-motion cancellation / 망원경·위성 추적 마운트의 별지도 누적 / 360° 회전 검사카메라) 중 ego-motion cancellation을 추천 — 1차에서 이미 증명한 ⑥ Motion Artifact(실측 0)와 서사가 직접 이어짐. 최종 채택은 미정.
+
+**1차→2차 영향 체계**: 1차의 손실률·중재지연·처리량·polarity 무결성이 2차의 완전성·오차·병목상한·전제조건에 각각 직접 전파됨을 정리(특히 1차에서 증명한 timestamp mismatch 1cycle 하한이 "각속도×1cycle" world-position 오차 하한으로 재사용 가능하다는 연결).
+
+**핵심 설계 논쟁 — "센서 커버리지 확장(AER 타일링)"과 "회전 기반 world-coordinate 변환"이 독립적인 두 단계인가**: 처음엔 회전-변환 메커니즘을 4×4 patch로 먼저 증명하고 센서 확장은 별도/후속으로 미뤄도 된다고 제안했으나, 사용자가 "두 개가 독립적이지 않다"고 반박 — 인터페이스(tile_id/pose_version)를 나중에 끼워맞추면 재설계가 필요하고, 좁은 스케일 테스트가 실제 스케일의 문제(쓰기 충돌, world map 밀도)를 못 볼 수 있다는 지적.
+
+**문헌으로 검증**: 이 질문에 직접 답을 줄 만한 원문 두 편을 찾아 전체를 정독함(`paper_notes/D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md`, `paper_notes/D2_02_Guo2024_CMaxSLAM.md`, reference_papers.md 2-A). **결론**: 회전각을 직접 추정해야 하는 "2단계"(교수님 표현)에서는 두 논문(Kim 2014의 파티클필터, Guo·Gallego 2024의 CMax bundle adjustment) 모두 센서 커버리지와 회전추정 정확도가 실제로 결합돼 있음을 확인 — 사용자 지적이 맞음. 반면 회전각이 이미 주어지는 "1단계"에서는 이 결합이 성립하지 않음(변환 자체는 픽셀 수와 무관하게 성립) — 즉 **1단계 한정으로는 기존 "4×4로 먼저 증명" 전략이 여전히 유효**하고, 2단계로 넘어갈 때는 반드시 센서 확장과 회전추정을 같이 설계해야 함이 문헌으로 확인됨. 어느 논문도 이걸 회로/AER 하드웨어로 구현하는 문제는 다루지 않아, 그 갭이 우리 몫으로 남아있음도 확인.
+
+- 신규: `paper_notes/D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md`, `paper_notes/D2_02_Guo2024_CMaxSLAM.md`
+- 수정: `reference_papers.md`(2-2/2-3 정독 완료 표시 + 2-A 신설), `paper_notes/00_README.md`(Digital 2차 섹션 신설)
+- 다음: 시나리오 최종 확정 → 1단계(θ 주어짐) 기준 4×4 좌표변환 RTL 골격 착수
+
