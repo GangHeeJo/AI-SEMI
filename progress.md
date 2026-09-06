@@ -2522,5 +2522,19 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 신규: `paper_notes/D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md`, `paper_notes/D2_02_Guo2024_CMaxSLAM.md`
 - 수정: `reference_papers.md`(2-2/2-3 정독 완료 표시 + 2-A 신설), `paper_notes/00_README.md`(Digital 2차 섹션 신설)
-- 다음: 시나리오 최종 확정 → 1단계(θ 주어짐) 기준 4×4 좌표변환 RTL 골격 착수
+
+## 104. Digital 2차 문헌조사 확장 — 하드웨어 가속 사례 + 회전계산 회로 기법 3편 추가(2026-09-06)
+
+**배경**: §103에서 "회전각 직접 추정" 문제(2단계)는 두 논문(Kim 2014, CMax-SLAM 2024)이 답을 줬지만, 어느 논문도 "이걸 실제 회로로 어떻게 만드는가"는 안 다룬다는 공백이 남아있었음. 사용자가 "더 다양한 논문 찾아서 공부해놓으라"고 지시해서, 그 공백을 직접 메우는 문헌을 추가로 찾음.
+
+**추가로 원문 전체 확보·정독한 3편**:
+1. **Xing et al., "EROAM"**(arXiv:2411.11004, 2024) — 이벤트를 단위 구면에 투영해 Event Spherical ICP로 회전을 구하는 세 번째 다른 방식(파티클필터/contrast-maximization에 이은 기하학적 ICP). 증분 k-d tree + 영역 밀도 제어로 지도 크기를 무한정 안 키우는 실전 기법도 확인.
+2. **Wang et al., "Event Camera Meets Mobile Embodied Perception"**(arXiv:2503.22943, 2025, Tsinghua) — 2014~2025 문헌을 종합한 35쪽 서베이. **어느 논문도 안 다루던 하드웨어 가속 챕터를 직접 담고 있음**: EventBoost(Zynq SoC, 24.33% 정확도 향상·30ms 지연), BioDrone(FPGA로 프레임당 지연 20ms→2.2ms, 약 10배), Speck 신경형태칩(0.70mW), 그리고 RMCM(Reconfigurable Multiple Constant Multiplication, 65nm 593.4nJ/inference) 기법 확인. 회전 각속도가 커질수록 이벤트 발생률이 실측으로 최대 5배까지 폭증한다는 수치(DAVIS346 기준)도 확인 — 2차 처리량 요구사항 산정에 직접 쓸 수 있음.
+3. **Andraka, "A survey of CORDIC algorithms for FPGA based computers"**(FPGA'98) — 곱셈기 없이 shift+add 반복만으로 임의 각도 회전을 계산하는 CORDIC의 원조 서베이. 저번에 나눈 "행렬곱 말고 다른 방식" 논의의 실제 근거 문헌.
+
+**새로 도출된 결론(reference_papers.md 2-B)**: 회전 계산 회로화 방식은 (1)직접 행렬곱 (2)CORDIC (3)RMCM (4)소각도 증분근사 네 갈래로 정리됨. 우리 1단계(θ가 이산값 몇 개로 주어짐)에는 반복이 필요 없는 RMCM이 CORDIC보다 더 잘 맞을 가능성 — 다음 실험 후보로 남김.
+
+- 신규: `paper_notes/D2_03_Wang2025_MobileEmbodiedPerception_Survey.md`, `paper_notes/D2_04_Xing2024_EROAM.md`, `paper_notes/D2_05_Andraka1998_CORDIC_FPGA.md`
+- 수정: `reference_papers.md`(2-4 정독 표시, 2-8/2-9 신설, 2-B 신설), `paper_notes/00_README.md`
+- 다음: 시나리오 최종 확정 → 1단계(θ 주어짐) 기준 4×4 좌표변환 RTL 골격 착수(직접행렬곱 baseline 먼저, RMCM/CORDIC은 PPA 비교 후속)
 

@@ -230,7 +230,7 @@
    **순수 회전 운동 전용**의 최초 이벤트 기반 번들 조정/SLAM. Contrast Maximization으로 회전 궤적을 최적화해 파노라마 지도 생성. **문제 정의(고정 위치, 회전만)가 2차 과제와 정확히 일치하는 최신 논문.** 원문 전체 확보·정독 완료, 심층분석은 `paper_notes/D2_02_Guo2024_CMaxSLAM.md` 참고.
 
 2-4. **Xing, W. 외 — "EROAM: Event-Based Camera Rotational Odometry and Mapping in Real-Time."** arXiv:2411.11004, 2024.
-   이벤트를 구면(unit sphere)에 투영, Event Spherical ICP로 회전 전용 카메라의 실시간 오도메트리·매핑. k-d tree 맵 관리로 고각속도에서도 강건. **회전 전용 센서의 월드 메모리 누적 문제와 가장 유사한 최신 연구.**
+   이벤트를 구면(unit sphere)에 투영, Event Spherical ICP로 회전 전용 카메라의 실시간 오도메트리·매핑. k-d tree 맵 관리로 고각속도에서도 강건. **회전 전용 센서의 월드 메모리 누적 문제와 가장 유사한 최신 연구.** 원문 전체 확보·정독 완료, 심층분석은 `paper_notes/D2_04_Xing2024_EROAM.md` 참고.
 
 2-5. **Kim, H., Leutenegger, S., Davison, A. J. — "Real-Time 3D Reconstruction and 6-DoF Tracking with an Event Camera."** ECCV, 349–364, 2016.
    6자유도(회전+이동)까지 포함한 일반 사례이지만, 로컬 이벤트 좌표를 전역 참조 프레임으로 정합시키는 필터링 기법이 좌표 변환 로직 설계에 참고 가치.
@@ -241,6 +241,12 @@
 2-7. **US Patent 9,934,557 — "Method and Apparatus of Image Representation and Processing for Dynamic Vision Sensor."** Ji, Z., Lee, K., Zhang, Q., Wang, Y. M., **Ryu, H. S.**, Ovsiannikov, I. (Samsung Electronics), 2018.
    DVS 이벤트 스트림을 프레임 형태로 표현/처리하는 방법. 서로 다른 이미지 간 좌표 대응을 위한 **변환행렬(transformation matrix)/신뢰도맵** 개념 포함. **로컬 센서 좌표 → 변환행렬 → 월드 좌표 매핑과 개념적으로 가장 밀접한 특허(지도교수 공동발명).**
 
+2-8. **Wang, H., Guo, R., Ma, P., Ruan, C., Luo, X., Ding, W., Zhong, T., Xu, J., Liu, Y., Chen, X. — "Event Camera Meets Mobile Embodied Perception: Abstraction, Algorithm, Acceleration, Application."** arXiv:2503.22943, 2025 (Tsinghua Univ.).
+   2014~2025년 이벤트카메라 문헌을 abstraction/algorithm/**acceleration**/application 네 축으로 정리한 최신 서베이. **2-1~2-7 어느 논문도 안 다루는 하드웨어 가속(FPGA/ASIC/신경형태칩) 실측 사례(EventBoost, BioDrone, Speck 등)를 담고 있어, 우리 회로 설계와 가장 직접 맞닿는 문헌.** 원문 전체(35쪽) 확보·정독 완료, 심층분석은 `paper_notes/D2_03_Wang2025_MobileEmbodiedPerception_Survey.md` 참고.
+
+2-9. **Andraka, R. — "A survey of CORDIC algorithms for FPGA based computers."** FPGA'98 (ACM/SIGDA).
+   곱셈기 없이 shift+add만으로 회전을 계산하는 CORDIC 알고리즘의 FPGA 구현 정리. 회전각이 주어지는 우리 1단계 좌표변환 회로의 **직접 실무 참고 자료**. 원문 전체 확보·정독 완료, 심층분석은 `paper_notes/D2_05_Andraka1998_CORDIC_FPGA.md` 참고.
+
 ### 2-A. Kim 2014 + Guo·Gallego 2024를 같이 읽고 나온 전략적 결론 — "센서 커버리지와 회전추정은 결합돼 있는가"
 
 2026-09-06, 2차 착수 전 방향을 정하다가 나온 질문 — "센서 범위를 넓히는 것(AER 확장)과 회전으로 월드좌표를 만드는 것(좌표변환)이 독립적인 두 단계인가, 아니면 하나로 묶어서 설계해야 하는가"에 대해, 2-2(2014)·2-3(2024) 두 논문을 원문으로 확인한 결과:
@@ -250,6 +256,17 @@
 - **두 논문 다 순수 소프트웨어(부동소수점, 회로 없음)** — AER 하드웨어를 타일 단위로 어떻게 확장하고 좌표변환 회로와 어떻게 인터페이스를 맞출지는 어느 논문도 다루지 않는다. 이 갭이 우리가 채워야 할 지점.
 
 **결론**: 지금 당장(1단계) 4×4 patch로 좌표변환 메커니즘부터 증명하는 접근은 여전히 유효하다 — 이 결합은 회전을 "추정"해야 할 때만 발생하기 때문. 다만 나중에 2단계(회전각 자체를 이벤트만으로 알아내기)로 넘어가면, 그때는 센서 커버리지 확장과 회전추정 설계를 반드시 같이 가야 한다는 게 문헌으로 확인됨.
+
+### 2-B. 회전 계산을 회로로 만드는 네 가지 방식 — 어느 논문도 안 다루는 부분을 직접 조사
+
+2-1~2-8은 전부 "회전을 어떻게 추정/활용할까"를 소프트웨어(부동소수점)로 다루고, 회로 구현은 아무도 안 다룬다는 게 반복 확인됐다. 이 공백을 메우기 위해 회전 계산의 하드웨어 구현 기법 자체를 별도로 조사함:
+
+1. **직접 행렬곱**: sin/cos LUT + 곱셈기. 정확·이해 쉬움, baseline용.
+2. **CORDIC**(2-9, Andraka 1998): 곱셈기 없이 shift+add 반복만으로 임의 각도 회전 — 실제 FPGA/ASIC 회전 계산의 표준 기법.
+3. **RMCM(Reconfigurable Multiple Constant Multiplication)**: 2-8(§5.1)에서 확인, 각도 후보가 몇 가지로 제한될 때(우리 1단계와 맞음) 반복 없이 shift-add 네트워크 하나로 끝내는 기법 — 65nm 실칩에서 593.4nJ/inference 실증.
+4. **소각도 증분 근사**: Δθ가 작을 때 `x'≈x−Δθ·y, y'≈y+Δθ·x`로 근사, predictor 논의에서 나온 방식. 오차 누적으로 주기적 재보정 필요.
+
+**우리 1단계(θ가 이산값 몇 개로 주어짐) 조건에서는 RMCM이 CORDIC보다 더 잘 맞을 가능성**이 있음(반복이 필요 없어 지연이 짧음) — 실측 PPA로 ①·②·③을 비교하는 것이 다음 설계 단계의 실험 후보.
 
 ---
 

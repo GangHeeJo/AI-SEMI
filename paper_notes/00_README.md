@@ -36,10 +36,13 @@
 
 | 파일 | 저자(연도) | 한줄 요약 |
 |---|---|---|
-| [D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md](D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md) | Kim et al. (2014, BMVC) | 회전 전용 이벤트카메라로 자세 추정+파노라마 모자이크 동시 구축 — 2차 과제와 문제 구조 사실상 동일 |
+| [D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md](D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md) | Kim et al. (2014, BMVC) | 회전 전용 이벤트카메라로 자세 추정+파노라마 모자이크 동시 구축(파티클 필터) — 2차 과제와 문제 구조 사실상 동일 |
 | [D2_02_Guo2024_CMaxSLAM.md](D2_02_Guo2024_CMaxSLAM.md) | Guo & Gallego (2024, T-RO) | Contrast Maximization 기반 회전 전용 SLAM/번들조정 — 2014년 논문의 최신 SOTA 확장판, 연속시간 B-spline 궤적 |
+| [D2_03_Wang2025_MobileEmbodiedPerception_Survey.md](D2_03_Wang2025_MobileEmbodiedPerception_Survey.md) | Wang et al. (2025, arXiv, Tsinghua) | 이벤트카메라 서베이 — **하드웨어 가속(FPGA/ASIC/신경형태칩) 실측 사례를 담은 유일한 문헌**(EventBoost, BioDrone, RMCM 등) |
+| [D2_04_Xing2024_EROAM.md](D2_04_Xing2024_EROAM.md) | Xing et al. (2024, arXiv) | 구면 투영 + Event Spherical ICP로 회전 전용 실시간 오도메트리·매핑 — 세 번째 다른 방식(기하학적 ICP)의 실증 |
+| [D2_05_Andraka1998_CORDIC_FPGA.md](D2_05_Andraka1998_CORDIC_FPGA.md) | Andraka (1998, FPGA'98) | CORDIC — 곱셈기 없이 shift+add만으로 회전 계산하는 FPGA 표준 기법. 회전각이 주어지는 우리 1단계 회로의 직접 실무 참고 |
 
-**두 논문에서 나온 전략적 결론**: reference_papers.md **2-A** 참고 — "회전각을 직접 추정"해야 하는 2단계 문제에서는 센서 커버리지와 회전추정 설계가 결합돼 있지만, 회전각이 주어지는 1단계에서는 결합되지 않음(4×4 patch로 좌표변환 메커니즘부터 증명하는 접근이 유효).
+**전략적 결론 두 가지**: reference_papers.md **2-A**(센서 커버리지와 회전추정의 결합 여부 — 1단계는 자유, 2단계는 결합) / **2-B**(회전 계산 하드웨어 구현 4가지 방식 비교 — 직접행렬곱/CORDIC/RMCM/소각도근사, 우리 1단계엔 RMCM이 유력 후보).
 
 ---
 
