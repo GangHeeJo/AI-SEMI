@@ -2538,3 +2538,14 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 수정: `reference_papers.md`(2-4 정독 표시, 2-8/2-9 신설, 2-B 신설), `paper_notes/00_README.md`
 - 다음: 시나리오 최종 확정 → 1단계(θ 주어짐) 기준 4×4 좌표변환 RTL 골격 착수(직접행렬곱 baseline 먼저, RMCM/CORDIC은 PPA 비교 후속)
 
+## 105. Digital 2차 1단계 설계 기획 확정 + 소프트웨어 레퍼런스 모델(오라클) 작성(2026-09-07)
+
+**기획**: 시나리오 ②(ego-motion cancellation) 확정, 1단계(θ 주어짐)만 우선 진행하고 센서 커버리지 확장·2단계(θ 추정)·CORDIC/RMCM 최적화는 명시적으로 후속으로 미룸(문헌조사 D2_01~D2_05 결론 반영). 4×4 local(steal_buf_polarity 재사용) → 64×64 world memory, θ는 256단계 LUT 인덱스로 이산화.
+
+**모델 설계 — pan/tilt와 roll을 하나의 θ로 통합**: 시야 중심이 반지름 R=20인 원호를 따라 도는 성분(`offset(θ)=(Wc+R·cosθ, Hc+R·sinθ)`)과, 4×4 내부 좌표 자체가 도는 성분(`Rot(θ)·(x_c,y_c)`)을 같은 cos(θ)/sin(θ) 계산 한 번으로 같이 처리 — 전자가 없으면 월드맵이 좁은 영역만 채워져서 "N×M≫n×m" 근거가 약해지고, 후자가 없으면 애초에 회전행렬(CORDIC/RMCM 논의)이 필요한 이유가 사라지므로 계획을 이렇게 통합함.
+
+**`scripts/coord_transform_model.py` 작성**: Q1.14 고정소수점 cos/sin LUT(RTL ROM에 그대로 옮길 정수값, `export_lut_hex()`로 $readmemh용 덤프 가능) + `transform(xc2,yc2,theta_idx)` 정수 연산 + `build_world_mem()`. 작성 중 실제 버그 발견·수정: 중심 오프셋(WC/HC)을 반올림 *후*에 더했더니, local 오프셋이 음수일 때 반올림 방향이 절대좌표가 아니라 그 음수 오프셋의 부호를 따라가버리는 오류가 있었음(예: 실수 기준 30.5→31이어야 하는데 30이 나옴) — WC/HC를 고정소수점 총합에 먼저 접어넣고 **딱 한 번만** 반올림하도록 수정해서 해결. `demo()` self-check(θ=0/90° 경계값 + 2000회 무작위 대 부동소수점 비교, ≤1칸 오차) PASS 확인.
+
+- 신규: `scripts/coord_transform_model.py`
+- 다음: UZH shapes_rotation 원본 groundtruth pose 확보 → θ_idx 시퀀스 생성 스크립트(2단계는 아직 아님, 1단계 검증용 실트래픽 준비)
+
