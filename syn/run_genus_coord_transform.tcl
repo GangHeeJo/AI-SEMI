@@ -13,6 +13,7 @@ file mkdir $OUT_DIR
 set_db library $LIB_FILE
 set_db lp_insert_clock_gating true
 set_db hdl_search_path rtl
+set_db init_hdl_search_path .
 
 read_hdl $RTL_LIST
 elaborate $DESIGN
