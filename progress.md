@@ -2572,3 +2572,6 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 수정: `scripts/coord_transform_model.py`(`export_exhaustive_vectors()` 추가)
 - 다음: Genus PPA(서버) -- 교수 평가기준 기본선, 그 다음 시간되면 P&R
 
+**PPA 착수 전 수정**: cos/sin ROM을 `$readmemh`+`initial` 배열로 짰던 걸, Genus로 넘기기 직전에 ASIC 합성 도구가 표준 지원 안 하는 시뮬레이션 전용 관례라는 걸 확인하고 case문 기반 콤비네이셔널 함수(`rtl/coord_transform_cos_lut.vh`/`sin_lut.vh`, `export_lut_verilog_case()`로 생성)로 교체 -- 전수(4096/4096)·실트래픽(8503/8503) 재검증 통과 확인 후 진행. 이제 안 쓰는 hex 파일 2개와 `export_lut_hex()`는 삭제.
+- 신규: `rtl/coord_transform_cos_lut.vh`, `rtl/coord_transform_sin_lut.vh`, `syn/run_genus_coord_transform.tcl`
+

@@ -28,16 +28,14 @@ module coord_transform_rotate2d #(
   localparam integer DENOM     = 2 * SCALE;   // 32768 = 2^15, 나눗셈 shift량과 동일
   localparam integer HALF      = DENOM / 2;
 
-  // cos/sin ROM -- scripts/coord_transform_model.py의 export_lut_hex()가 만든 파일 그대로 로드.
-  reg signed [15:0] cos_rom [0:(1<<N_THETA_BITS)-1];
-  reg signed [15:0] sin_rom [0:(1<<N_THETA_BITS)-1];
-  initial begin
-    $readmemh("rtl/coord_transform_cos_q1_14.hex", cos_rom);
-    $readmemh("rtl/coord_transform_sin_q1_14.hex", sin_rom);
-  end
+  // cos/sin ROM -- scripts/coord_transform_model.py의 export_lut_verilog_case()가 만든
+  // case문 콤비네이셔널 함수를 그대로 include. ($readmemh+initial 배열은 시뮬레이션 전용
+  // 관례라 ASIC 합성 도구가 못 알아듣거나 무시할 위험이 있어 안 씀.)
+  `include "rtl/coord_transform_cos_lut.vh"
+  `include "rtl/coord_transform_sin_lut.vh"
 
-  wire signed [15:0] c = cos_rom[theta_idx];
-  wire signed [15:0] s = sin_rom[theta_idx];
+  wire signed [15:0] c = coord_transform_cos_lut(theta_idx);
+  wire signed [15:0] s = coord_transform_sin_lut(theta_idx);
 
   // 폭 근거: xc2/yc2 최대 3, c/s 최대 16384 -> 곱 최대 49152, local_rot 합 최대 ~98304(18bit면 충분).
   // offset=2*(R*c) 최대 ~655360(21bit), 중심(2*SCALE*WC) 최대 1048576(22bit) -- 전부 더해도

@@ -74,15 +74,22 @@ def build_world_mem(events):
     return world_mem, writes
 
 
-def export_lut_hex(path_cos, path_sin):
-    """RTL $readmemh용 16bit 2's complement hex 덤프."""
-    def to_hex16(v):
-        return format(v & 0xFFFF, "04x")
+def export_lut_verilog_case(path, func_name, lut):
+    """cos/sin LUT를 ASIC 합성에 안전한 Verilog 함수(case문 기반 콤비네이셔널 ROM)로 덤프.
+    $readmemh+initial 방식은 시뮬레이션 전용 관례라 Genus가 못 알아듣거나 무시할 위험이 있어서,
+    합성 툴이 표준적으로 지원하는 case문 룩업으로 대신 표현한다."""
+    lines = [f"function automatic signed [15:0] {func_name}(input [7:0] idx);",
+             "  begin", "    case (idx)"]
+    for i, v in enumerate(lut):
+        lines.append(f"      8'd{i}: {func_name} = 16'sh{v & 0xFFFF:04x};")
+    lines.append("      default: " + func_name + " = 16'sd0;")
+    lines.append("    endcase")
+    lines.append("  end")
+    lines.append("endfunction")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
 
-    with open(path_cos, "w") as f:
-        f.write("\n".join(to_hex16(v) for v in COS_LUT) + "\n")
-    with open(path_sin, "w") as f:
-        f.write("\n".join(to_hex16(v) for v in SIN_LUT) + "\n")
+
 
 
 def export_exhaustive_vectors(path):
