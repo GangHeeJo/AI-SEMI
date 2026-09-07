@@ -2575,3 +2575,22 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 **PPA 착수 전 수정**: cos/sin ROM을 `$readmemh`+`initial` 배열로 짰던 걸, Genus로 넘기기 직전에 ASIC 합성 도구가 표준 지원 안 하는 시뮬레이션 전용 관례라는 걸 확인하고 case문 기반 콤비네이셔널 함수(`rtl/coord_transform_cos_lut.vh`/`sin_lut.vh`, `export_lut_verilog_case()`로 생성)로 교체 -- 전수(4096/4096)·실트래픽(8503/8503) 재검증 통과 확인 후 진행. 이제 안 쓰는 hex 파일 2개와 `export_lut_hex()`는 삭제.
 - 신규: `rtl/coord_transform_cos_lut.vh`, `rtl/coord_transform_sin_lut.vh`, `syn/run_genus_coord_transform.tcl`
 
+## 108. 좌표변환 baseline Genus PPA 실측 -- 무겁다는 게 확인됨(2026-09-08)
+
+**서버 동기화 트러블(펄 진행 전 정리)**: `git pull`이 서버 로컬 미커밋 변경(progress.md 등 4개 tracked 파일 + untracked 404개)에 막힘. 버리기 전에 전부 확인: 4개 tracked 파일은 diff 내용이 지금 내 git 히스토리에 이미 존재하는 걸 grep/`git log -S`로 확인(2026-08-04~08-19 사이 세션에서 서버에 직접 SSH로 붙어 편집했지만 그 서버 checkout엔 커밋을 안 한 채 남은 것으로 추정). untracked 404개는 394개 완전 동일, 9개는 CRLF/LF 차이뿐(내용 동일, `file`/`cat -A`로 확인), `발표 자료.md` 1개는 git 쪽이 오히려 10줄 더 많은 상위호환(서버본이 그 안에 완전 포함). 팀원 폴더(`~/AI-semi`, `~/semi-ai`)와 무관한 내 개인 폴더(`~/redred-faer`)임도 재확인 — 안전하다고 판단하고서야 정리+pull 진행(fast-forward, 충돌 0). 참고로 서버에 다른 계정이 "worldmap_v1"이라는 이름으로 동시에 Genus를 돌리고 있는 걸 관찰함 — 팀원이 2차를 이미 건드리고 있을 가능성.
+
+**Genus 실행 중 트러블 1개**: `` `include``로 넣은 cos/sin LUT(.vh)를 Genus가 못 찾음(iverilog는 cwd 기준으로 잘 찾았지만 Genus는 `init_hdl_search_path`라는 별도 속성을 봄, `hdl_search_path`는 `read_hdl` 모듈 검색에만 씀) -- `set_db init_hdl_search_path .` 추가로 해결.
+
+**PPA 결과** (Genus 23.14-s090_1, GPDK045 slow_vdd1v0 0.9V/125°C, 5ns/200MHz 제약, vectorless 전력):
+
+| 항목 | 값 |
+|---|---:|
+| 면적 | 3011.105 (1449 cells) |
+| 전력 | 0.19985 mW (leakage 0.03%/internal 67.8%/switching 32.2%) |
+| 200MHz(5ns) setup slack | **+1 ps** (사실상 딱 걸쳐서 통과) |
+
+**정직한 평가**: 이 baseline은 1차 AER 설계들(수백MHz~1GHz대, 면적 200~1300 수준)과 비교하면 **훨씬 무겁고 느림** — 5ns 클럭에 slack이 겨우 1ps라 이게 사실상 이 설계의 실제 Fmax 근처라는 뜻(200MHz를 크게 못 넘을 것으로 보임). Timing 리포트로 크리티컬 패스를 직접 추적한 결과, ROM(256-way case문이 합성되면서 생긴 큰 디코드/mux 트리) → 곱셈-누산 결과의 carry-save-adder 트리 → 최종 반올림 로직까지 전부 한 사이클 안에 조합논리로 몰려있는 게 원인 — 정확히 우리가 문헌조사(2-B)에서 예상했던 "직접 행렬곱은 곱셈기+넓은 덧셈기가 무겁다"는 지점이 실측으로 확인된 것. **다음 최적화 후보(CORDIC/RMCM)의 필요성이 추측이 아니라 실측 근거로 뒷받침됨.**
+
+- 신규: `syn/reports/coord_transform_rotate2d_{area,timing,power,gates,netlist,out.sdc}` (서버, 아직 git 미반영 -- 리포트 파일 통째로 커밋할지 요약만 남길지 다음에 정할 것)
+- 다음: 이 baseline 결과를 두고 CORDIC 또는 RMCM으로 다시 만들어 PPA 비교, 또는 여기서 1단계를 일단 마무리하고 2단계/센서확장으로 넘어갈지 결정
+
