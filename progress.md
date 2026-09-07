@@ -2560,3 +2560,15 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `common_traces_uzh/uzh_shapes_rotation_groundtruth.txt`, `common_traces_uzh/uzh_shapes_rotation_patch.eventmeta_theta.tsv`, `scripts/build_uzh_pose_theta.py`
 - 다음: 좌표변환 RTL 골격(직접 행렬곱 baseline) 작성 → 3단계 검증(전수/무작위/실트래픽) → PPA
 
+## 107. 좌표변환 RTL 골격 작성 + 검증 2단계 PASS(2026-09-07)
+
+**RTL**: `rtl/coord_transform_rotate2d.v` -- `coord_transform_model.py`의 `transform()`을 그대로 회로로 옮김. cos/sin ROM은 그 스크립트의 `export_lut_hex()`가 만든 `rtl/coord_transform_cos_q1_14.hex`/`sin_q1_14.hex`를 `$readmemh`로 로드(오라클과 RTL이 같은 정수 테이블을 공유 -- 손으로 옮겨적어서 생기는 오차 원천 차단). 반올림은 오라클과 동일하게 "WC/HC를 먼저 더한 절대좌표를 딱 한 번만 반올림"하는 방식(round_div_pow2 함수)으로 구현 -- 오라클에서 겪었던 반올림 순서 버그를 RTL에서 처음부터 피함. 직접 행렬곱(곱셈기 사용) baseline -- CORDIC/RMCM은 이 PPA 실측 이후 비교 대상.
+
+**검증**: 입력 공간이 4(row)×4(col)×256(theta)=4096가지로 작아서 전수 검사가 무작위 검사를 그대로 포함함 -- 무작위 단계는 생략하고 전수+실트래픽 2단계로 진행.
+- **전수(`tb/tb_coord_transform_rotate2d_correctness.v`)**: `coord_transform_model.export_exhaustive_vectors()`가 만든 4096가지 전부를 오라클과 비트 단위 대조 -- **4096/4096 PASS**(1회 컴파일·시뮬레이션에 바로 통과, 재작업 없었음).
+- **실트래픽(`tb/tb_coord_transform_uzh_trace.v`)**: 실제 UZH 이벤트 8,503개 + 실제 groundtruth theta를 그대로 태워서 오라클과 대조 -- **8,503/8,503 PASS**, RTL 시뮬레이션이 직접 채운 world memory 커버리지(89/4096칸)도 §106에서 Python으로 계산한 값과 정확히 일치.
+
+- 신규: `rtl/coord_transform_rotate2d.v`, `rtl/coord_transform_cos_q1_14.hex`, `rtl/coord_transform_sin_q1_14.hex`, `tb/tb_coord_transform_rotate2d_correctness.v`, `tb/tb_coord_transform_uzh_trace.v`, `tb/coord_transform_exhaustive_vectors.txt`, `common_traces_uzh/uzh_shapes_rotation_patch.coord_transform_vectors.txt`
+- 수정: `scripts/coord_transform_model.py`(`export_exhaustive_vectors()` 추가)
+- 다음: Genus PPA(서버) -- 교수 평가기준 기본선, 그 다음 시간되면 P&R
+

@@ -85,6 +85,19 @@ def export_lut_hex(path_cos, path_sin):
         f.write("\n".join(to_hex16(v) for v in SIN_LUT) + "\n")
 
 
+def export_exhaustive_vectors(path):
+    """4(row) x 4(col) x 256(theta_idx) 전수(4096가지) 테스트벡터를 RTL 검증용으로 덤프.
+    한 줄 = "row col theta_idx X Y" (전부 정수, 공백 구분) -- tb가 $readmemh 대신 그냥
+    라인 단위로 읽어 구동+비교하기 쉽게 텍스트로 둠(테스트벡터가 4096줄뿐이라 부담 없음)."""
+    with open(path, "w") as f:
+        for row in range(4):
+            for col in range(4):
+                xc2, yc2 = local_xy_from_row_col(row, col)
+                for theta_idx in range(N_THETA):
+                    X, Y = transform(xc2, yc2, theta_idx)
+                    f.write(f"{row} {col} {theta_idx} {X} {Y}\n")
+
+
 def demo():
     # theta_idx=0(θ=0): cos=SCALE, sin=0 -> 중심이 (WC+R, HC) 근방, 로컬 회전 없음
     X, Y = transform(*local_xy_from_row_col(0, 0), 0)
