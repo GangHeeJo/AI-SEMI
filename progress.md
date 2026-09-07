@@ -2549,3 +2549,14 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `scripts/coord_transform_model.py`
 - 다음: UZH shapes_rotation 원본 groundtruth pose 확보 → θ_idx 시퀀스 생성 스크립트(2단계는 아직 아님, 1단계 검증용 실트래픽 준비)
 
+## 106. UZH 실제 groundtruth pose 확보 + θ 시퀀스 생성, 실트래픽으로 1차 좌표변환 결과 확인(2026-09-07)
+
+**데이터 확보**: UZH 원본 shapes_rotation 전체 데이터셋(rpg.ifi.uzh.ch, 157MB, events.txt/groundtruth.txt/calib.txt/imu.txt/images)을 새로 받아서 `groundtruth.txt`(모션캡처 실측 pose, ~200Hz, `timestamp tx ty tz qx qy qz qw` 형식, 11,883줄, t=0.02~59.81s 전체 커버)를 `common_traces_uzh/uzh_shapes_rotation_groundtruth.txt`로 저장. 우리 4×4 patch(`eventmeta.tsv`)의 이벤트 타임스탬프(t=4.10~59.42s)가 이 범위 안에 전부 들어옴을 확인.
+
+**`scripts/build_uzh_pose_theta.py` 작성**: 실제 3D 자세(quaternion)를 우리 1단계 모델의 단일 θ로 축약 — 시작 자세 대비 상대회전 quaternion을 구하고 그 각도 크기(`2*acos(|rel.w|)`)를 θ로 씀(회전축이 뭐든 "얼마나 돌았는지"만 정직하게 재는 값, V1의 "회전 1축 단순화"와 정확히 대응). 모션캡처 표본 사이는 선형보간. 8,503개 이벤트 전부에 theta_idx(0~255) 컬럼을 붙여 `eventmeta_theta.tsv`로 출력 완료.
+
+**결과 확인**: theta_idx가 4~41 범위(38개 서로 다른 값)로 실제로 변함 — 이 crop 구간(약 55ms) 동안 카메라가 최대 약 58° 정도 상대회전했다는 뜻, 억지로 만든 값이 아니라 진짜 모션캡처 데이터가 반영됨. 이 θ 시퀀스로 `coord_transform_model.build_world_mem()`을 실제로 돌려본 결과 8,503개 이벤트가 64×64 world memory 중 **89칸**(X:41~54, Y:32~50 범위)에 분산돼서 찍힘 — 회전 범위가 크지 않은 crop이라 grid 전체를 채우진 못하지만, 회전에 따라 실제로 서로 다른 칸에 흩어져 찍힌다는 걸 실데이터로 확인(정직하게: 아직 write 충돌 처리 없이 마지막 값으로 덮어쓰는 방식).
+
+- 신규: `common_traces_uzh/uzh_shapes_rotation_groundtruth.txt`, `common_traces_uzh/uzh_shapes_rotation_patch.eventmeta_theta.tsv`, `scripts/build_uzh_pose_theta.py`
+- 다음: 좌표변환 RTL 골격(직접 행렬곱 baseline) 작성 → 3단계 검증(전수/무작위/실트래픽) → PPA
+
