@@ -2611,3 +2611,22 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `rtl/coord_transform_cordic.v`, `rtl/coord_transform_cordic_z0_lut.vh`, `scripts/coord_transform_cordic_model.py`, `syn/run_genus_coord_transform_cordic.tcl`
 - 다음: RMCM으로 시도 (또는 CORDIC을 folded/iterative 구조로 다시 짜서 폭 좁힌 버전과 재비교 -- 지금 결과가 "CORDIC 자체의 한계"가 아니라 "이번 구현 방식(전개+넓은 폭)의 손해"일 수 있어서 구분 필요)
 
+## 110. RMCM(전체 입력공간 통째 룩업) 실측 -- 압승, 3자 비교 확정(2026-09-08)
+
+**설계**: `rtl/coord_transform_rmcm.v` -- RMCM을 우리 문제 규모의 논리적 극한까지 밀어붙임: xc2/yc2가 애초에 4가지 값뿐이고 theta_idx도 256가지뿐이라, 전체 입력공간(4x4x256=4096가지)을 통째로 `coord_transform_model.export_full_lut_verilog()`로 사전계산해서 case문 하나에 담음 -- 곱셈기도 덧셈기도 전혀 없이 순수 디코드 트리만 남김. baseline의 정확한 `transform()` 값을 그대로 담았으므로 CORDIC과 달리 근사오차가 전혀 없음(bit-exact). 전수(4096/4096)·실트래픽(8503/8503, world 커버리지 89칸 -- baseline과 완전 동일) 전부 통과.
+
+**Genus PPA 3자 비교** (같은 조건, 5ns/200MHz):
+
+| | baseline(직접 행렬곱) | CORDIC(6단 unroll) | **RMCM(전체 룩업)** |
+|---|---:|---:|---:|
+| 면적 | 3011.105 (1449 cells) | 12858.037 (7711 cells) | **1199.052 (795 cells)** |
+| 전력 | 0.19985 mW | 1.27828 mW | **0.041372 mW** |
+| 200MHz slack | +1ps(턱걸이) | -252ps(위반) | **+2187ps(압도적 여유)** |
+
+**RMCM이 baseline 대비 면적 2.5배 작고, 전력 4.8배 낮고, 200MHz 타이밍 여유도 훨씬 큼(더 빠른 클럭도 가능해 보임) -- CORDIC 대비로는 면적 10.7배, 전력 30.9배 차이.** 세 방식을 다 실측하고 나서 정리되는 결론: **"곱셈기를 없애는 게 항상 이득"이 아니라, 입력 후보가 몇 안 될 정도로 좁을 때는 "계산을 아예 안 하고 표로 대체"하는 게 최선**이라는 것 -- CORDIC처럼 "계산 방식을 값싸게 바꾸는" 접근은 오히려 손해였고, RMCM처럼 "계산 자체를 없애는" 접근이 이겼음. 이건 우리 문제(로컬좌표 4개, 각도후보 256개로 국한된 1단계 시나리오)에 한정된 결론이라는 점도 명시 -- 2단계(각도가 연속적으로 추정되는 경우)나 센서확장(더 많은 로컬좌표) 단계에서는 입력공간이 커져서 이 결론이 안 바뀐다는 보장이 없음(다음에 그 단계로 갈 때 재검증 필요).
+
+**1단계 좌표변환 최종 채택안: RMCM(전체 룩업) 버전.**
+
+- 신규: `rtl/coord_transform_rmcm.v`, `rtl/coord_transform_rmcm_lut.vh`, `syn/run_genus_coord_transform_rmcm.tcl`
+- 다음: P&R(시간 되면), 또는 여기서 1단계 RTL/PPA를 마무리하고 파이프라인 통합(steal_buf+변환+world memory+arbiter)이나 팀 상황 확인으로 이동
+
