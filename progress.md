@@ -2594,3 +2594,20 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `syn/reports/coord_transform_rotate2d_{area,timing,power,gates,netlist,out.sdc}` (서버, 아직 git 미반영 -- 리포트 파일 통째로 커밋할지 요약만 남길지 다음에 정할 것)
 - 다음: 이 baseline 결과를 두고 CORDIC 또는 RMCM으로 다시 만들어 PPA 비교, 또는 여기서 1단계를 일단 마무리하고 2단계/센서확장으로 넘어갈지 결정
 
+## 109. CORDIC 버전 실측 -- 예상과 반대로 baseline보다 더 나쁨(2026-09-08)
+
+**설계**: `rtl/coord_transform_cordic.v` -- 象限 折疊(상위 2bit로 90도 단위 사전회전, swap/negate만) + 6단 회전모드 CORDIC(전개/unroll, shift+add만). 대수적 단순화(회전의 선형성)로 `world = (Wc,Hc) + Rot(theta)*(xc+R,yc)`로 두 항을 한 번에 회전 처리. 소프트웨어 오라클(`coord_transform_cordic_model.py`)로 N_ITER를 3~12까지 전수(4096가지) 스윕해서 baseline 대비 오차 ≤1칸을 만족하는 최소값(6회, 5회는 80/4096 실패)을 먼저 확정한 뒤 RTL 작성. 전수(4096/4096)·실트래픽(8503/8503, world 커버리지 86칸 -- baseline 89칸과 근사오차만큼 차이) 전부 자체 오라클과 비트 단위 일치.
+
+**Genus PPA 비교** (같은 조건, 5ns/200MHz):
+
+| | baseline(직접 행렬곱) | CORDIC(6단 unroll) |
+|---|---:|---:|
+| 면적 | 3011.105 (1449 cells) | **12858.037 (7711 cells)** |
+| 전력 | 0.19985 mW | **1.27828 mW** |
+| 200MHz timing | +1ps(턱걸이 통과) | **-252ps(위반, 200MHz 못 맞춤)** |
+
+**CORDIC이 면적 4.3배, 전력 6.4배 더 나쁘고 200MHz도 못 맞춤 -- 예상(곱셈기 없애면 더 쌀 것)과 정반대.** 원인 분석: (1) 6단을 전부 펼쳐(unroll)놓고 매 단마다 24bit 폭을 그대로 유지해서, 좁은 폭(4bit x 16bit)이었던 baseline의 곱셈보다 오히려 넓은 덧셈기를 6단이나 쌓은 셈이 됨. (2) `dir ? (a+b) : (a-b)` 식으로 조건부 가감을 짠 게, 진짜 "덧셈/뺄셈 겸용 가산기"(피연산자 부호 반전+carry-in 하나로 구현하는 표준 기법) 하나로 합성되지 않고 **덧셈기와 뺄셈기를 따로 만들어 mux로 고르는 형태**로 합성됐을 가능성이 높음(스테이지당 산술 유닛이 사실상 2배). 즉 "CORDIC은 항상 더 싸다"가 아니라 **입력 폭이 이미 좁고(4bit 로컬좌표), 각도 후보가 몇 안 되는(256개) 우리 상황에서는 곱셈 자체가 이미 싸서, 굳이 여러 단을 펼친 CORDIC이 오히려 손해**라는 게 실측으로 확인됨 -- 문헌조사(2-B)에서 세웠던 "우리 상황엔 RMCM이 CORDIC보다 유리할 수 있다"는 가설과 방향이 일치하는 결과.
+
+- 신규: `rtl/coord_transform_cordic.v`, `rtl/coord_transform_cordic_z0_lut.vh`, `scripts/coord_transform_cordic_model.py`, `syn/run_genus_coord_transform_cordic.tcl`
+- 다음: RMCM으로 시도 (또는 CORDIC을 folded/iterative 구조로 다시 짜서 폭 좁힌 버전과 재비교 -- 지금 결과가 "CORDIC 자체의 한계"가 아니라 "이번 구현 방식(전개+넓은 폭)의 손해"일 수 있어서 구분 필요)
+
