@@ -92,6 +92,31 @@ def export_lut_verilog_case(path, func_name, lut):
 
 
 
+def export_full_lut_verilog(path, func_name):
+    """RMCM을 우리 문제에 적용한 극한형: 로컬좌표(4x4)+theta_idx(256) 전체 입력공간(4096가지,
+    xc2/yc2 값이 딱 4개뿐이라 애초에 "곱셈"이 아니라 "표 찾기"로 대체 가능하다는 점을 그대로 씀)를
+    RTL 합성 안전한 case문 콤비네이셔널 함수 하나로 통째로 사전계산해서 담는다. 곱셈기/덧셈기 자체가
+    아예 없어짐 -- CORDIC이 baseline보다 더 무거웠던 것과 비교하기 위한 세 번째 구현."""
+    lines = [f"function automatic [11:0] {func_name}(input [1:0] row, input [1:0] col, input [7:0] theta_idx);",
+             "  reg [11:0] key;",
+             "  begin",
+             "    key = {row, col, theta_idx};",
+             "    case (key)"]
+    for row in range(4):
+        for col in range(4):
+            xc2, yc2 = local_xy_from_row_col(row, col)
+            for theta_idx in range(N_THETA):
+                X, Y = transform(xc2, yc2, theta_idx)
+                key = (row << 10) | (col << 8) | theta_idx
+                lines.append(f"      12'd{key}: {func_name} = {{6'd{X}, 6'd{Y}}};")
+    lines.append(f"      default: {func_name} = 12'd0;")
+    lines.append("    endcase")
+    lines.append("  end")
+    lines.append("endfunction")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def export_exhaustive_vectors(path):
     """4(row) x 4(col) x 256(theta_idx) 전수(4096가지) 테스트벡터를 RTL 검증용으로 덤프.
     한 줄 = "row col theta_idx X Y" (전부 정수, 공백 구분) -- tb가 $readmemh 대신 그냥
