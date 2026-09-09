@@ -2630,3 +2630,27 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `rtl/coord_transform_rmcm.v`, `rtl/coord_transform_rmcm_lut.vh`, `syn/run_genus_coord_transform_rmcm.tcl`
 - 다음: P&R(시간 되면), 또는 여기서 1단계 RTL/PPA를 마무리하고 파이프라인 통합(steal_buf+변환+world memory+arbiter)이나 팀 상황 확인으로 이동
 
+## 111. 파이프라인 통합(steal_buf_polarity + coord_transform_rmcm x8 + world_mem_writer) -- 실트래픽/스트레스 둘 다 bit-exact PASS(2026-09-09)
+
+**팀 상황 재확인**: `TEAM_PROGRESS.md`를 다시 훑어봄 -- 서버에서 목격했던 다른 계정 번호(`aiasic26936`/`aiasic26937`)의 `aer`/`worldmap_v1` 프로세스는, 문서에 "서버 계정은 3명 공용(`aiasic26911`)"이라고 명시돼 있는 걸 근거로 팀원이 아니라 이 서버를 같이 쓰는 **다른 팀/학생의 것**으로 정정. 894줄 전체에서 "2차"가 언급된 곳은 1군데뿐이고 그마저도 "이건 2차 범위라 여기선 안 함"이라는 스코프 언급뿐 -- 준영/현수 둘 다 2차 작업 없음, 1차(Dir9-12/col-vartier, CAV bridge 감사)에만 집중돼 있었음. 액션 아이템으로 남아있던 "(강희) polarity 확장형 P&R 리포트 미커밋"은 이미 `9b0d951`로 해결된 상태(문서가 갱신 안 된 stale 항목)임을 커밋 로그로 확인.
+
+**설계**: 1단계 좌표변환(§105~110)을 실제 1차 송신부(`rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v`, 사이클당 최대 8 events)와 실제로 이어붙임.
+
+- `rtl/world_mem_writer.v`(신규): coord_transform_rmcm 8레인 결과(X,Y,pol)를 64x64 world memory(레지스터 배열, 4096칸)에 씀. 충돌 정책: "레인 인덱스가 큰 쪽이 이긴다" -- 별도 arbiter 없이, 같은 always 블록 안에서 순서대로 조건부 대입하면 Verilog 비블로킹 대입 규칙상 자동으로 이 정책이 됨(마지막 대입이 이김). 이 정책을 지향성 테스트로 직접 확인(lane0=pol0, lane7=pol1이 같은 주소를 겨냥 -> lane7이 이김, 기대대로).
+- `rtl/aer_tx16_coord_transform_v1.v`(신규, top): steal_buf_polarity 출력(valid0/row0/col_mask0/pol_mask0, lane1도 동일)을 최대 8개 로컬(row,col,pol) 후보로 디코드 -> coord_transform_rmcm 8개 인스턴스(레인별 병렬, 직렬화/버퍼링 없이 steal_buf가 이미 병렬로 뽑은 걸 같은 사이클에 그대로 처리) -> world_mem_writer. theta_idx는 "지금 이 순간 살아있는" 외부 입력(1단계 정의: 회전각이 주어짐) -- steal_buf의 버퍼링(최대 2-deep) 때문에 이벤트가 원래 발화 사이클보다 늦게 배출될 수 있는데, 이 설계는 **배출되는 바로 그 순간에 살아있는 theta**를 쓴다(원래 발화 시점의 theta가 아님). 명시적으로 드러내는 1단계 단순화 -- 회전이 아주 빠르면 오차 원인이 될 수 있지만, 버퍼 깊이가 얕아 지연도 짧고, 실측(아래)으로는 문제 안 됨.
+- `scripts/build_uzh_pose_theta.py`에 `export_cycle_theta()` 추가 -- 실제 pose로부터 "사이클마다 살아있는 theta_idx" 스트림(0~60000cyc)을 만듦(기존 `augment_eventmeta`는 이벤트 자체의 발화 시점 theta만 기록했어서, 배출 시점 theta가 필요한 통합 검증엔 안 맞음). `common_traces_uzh/uzh_shapes_rotation_patch.cycle_theta.txt`로 생성.
+
+**검증 1 -- 실트래픽**(`tb/tb_aer_tx16_coord_transform_v1_uzh_trace.v`, 신규): 실제 UZH 이벤트 8,503개 + 실제 pose 기반 cycle_theta를 그대로 태움. steal_buf의 배출을 계층참조(`dut.u_tx.valid0` 등)로 관찰해서, `coord_transform_rmcm_lut`(이미 4096가지 전수검증됨)로 기대값을 그 자리에서 계산하는 shadow world_mem을 만들고, 시뮬레이션 끝에 RTL의 read 포트로 4096칸 전부 읽어 대조. **8503/8503 이벤트, 87/4096칸, mismatches=0, PASS.**
+
+**버그 발견+수정 1 (검증 스크립트 자체의 버그, RTL 아님)**: 첫 시도에서 3칸 불일치(주로 극성) 발생. 원인: `coord_transform_rmcm`이 등록형(registered)이라 실제로 latch하는 theta는 "이벤트가 보이는 그 사이클의 theta"가 아니라 **그 다음 edge 시점의 theta**(테스트벤치가 매 edge 직후 theta_idx를 곧바로 다음 값으로 갱신해버려서, 실제 캡처 시점엔 이미 다음 값으로 바뀌어 있음) -- shadow 모델이 `theta_by_cyc[cyc]`를 썼던 걸 `theta_by_cyc[cyc+1]`로 고쳐서 해결(0 mismatch).
+
+**검증 2 -- 무작위 스트레스**(`tb/tb_aer_tx16_coord_transform_v1_correctness.v`, 신규, 20000cycle, 20%/source 도착률, 매 사이클 무작위 theta): 실트래픽만으로는 world_mem_writer의 "같은 사이클 레인 충돌" 정책이 거의 안 걸림(87/4096칸, 충돌 희소) -- 오라클로 "서로 다른 (row,col)이 같은 theta에서 같은 world 칸으로 겹치는 경우"가 실제로 존재함(256개 theta 중 284건 발생, world grid 반올림 때문에 인접 로컬좌표가 앨리어싱)을 먼저 확인한 뒤, 높은 도착률+매 사이클 변하는 theta로 그 충돌 경로를 반복 자극.
+
+**버그 발견+수정 2 (다시 검증 스크립트 자체의 버그)**: 첫 시도 262/528칸 불일치(전부 극성, 주소는 항상 일치). 원인: 검증1에서 고친 "theta는 다음 edge 시점 값" 교훈을 이 새 테스트벤치에 옮기면서 실수로 원복 -- `next_theta`(이번 사이클에 이미 драйv된 현재 theta)를 shadow에 바로 넘겨버림. `th_pending`으로 한 박자 미리 큐잉(다음 edge에서 실제로 latch될 값을 edge 직후 새로 뽑아서 그걸 shadow에 넘김)해서 해결 -- 3000cycle 축소판으로 먼저 확인(0 mismatch) 후 20000cycle 전체 재실행, **filled=528/4096, mismatches=0, PASS**.
+
+**교훈**: 등록형(registered) 조합 파이프라인을 검증할 때, 테스트벤치 스스로가 "다음 사이클 값을 미리 세팅"하는 방식으로 입력을 몰아넣으면(예: `$random`을 매 반복 즉시 갱신) 실제 DUT가 캡처하는 시점과 검증 스크립트가 "지금 값"이라고 믿는 시점이 한 edge씩 어긋나기 쉽다 -- 사람이 손으로 미리 계산해둔 배열(cycle_theta.txt)을 쓸 때보다, `$random`을 즉석에서 매번 뽑아 쓰는 무작위 테스트에서 이 실수가 훨씬 더 잘 드러난다는 것도 확인(느리게 변하는 실트래픽 theta는 어긋나도 값이 거의 안 바뀌어서 우연히 안 걸렸을 뿐).
+
+- 신규: `rtl/world_mem_writer.v`, `rtl/aer_tx16_coord_transform_v1.v`, `tb/tb_aer_tx16_coord_transform_v1_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_correctness.v`, `common_traces_uzh/uzh_shapes_rotation_patch.cycle_theta.txt`
+- 수정: `scripts/build_uzh_pose_theta.py`(`export_cycle_theta()` 추가)
+- 다음: 통합판 Genus PPA(8레인 병렬 replication 비용이 실제로 얼마나 드는지 실측 -- coord_transform_rmcm 8배 복제가 예상되는 주 비용), 또는 P&R
+

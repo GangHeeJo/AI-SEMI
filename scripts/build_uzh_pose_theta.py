@@ -84,6 +84,22 @@ def theta_to_idx(theta_rad):
     return idx % N_THETA
 
 
+def export_cycle_theta(groundtruth_path, out_path, max_cyc, bin_s=0.001):
+    """통합 파이프라인 검증용: convert_uzh_to_cyclemask.py와 같은 cyc<->시간 매핑(1cyc=1ms)으로
+    사이클 0~max_cyc마다 살아있는 theta_idx 한 줄씩 덤프("cyc theta_idx"). steal_buf_polarity의
+    버퍼링 때문에 이벤트가 발생 사이클보다 늦게 배출될 수 있어서, 통합 TB는 "배출되는 그 사이클의
+    살아있는 theta"를 쓴다(이벤트 자체의 theta_idx 컬럼이 아니라) -- 이게 1단계 설계의 실제 동작."""
+    gt_ts_ns, gt_quats = load_groundtruth(groundtruth_path)
+    theta_lookup = build_theta_lookup(gt_ts_ns, gt_quats)
+    ts_only = [t for t, _ in theta_lookup]
+    with open(out_path, "w") as out:
+        for cyc in range(max_cyc + 1):
+            query_ns = round(cyc * bin_s * 1e9)
+            theta = theta_at(theta_lookup, ts_only, query_ns)
+            out.write(f"{cyc} {theta_to_idx(theta)}\n")
+    print(f"cycle theta exported: 0..{max_cyc} -> {out_path}")
+
+
 def augment_eventmeta(eventmeta_path, groundtruth_path, out_path):
     gt_ts_ns, gt_quats = load_groundtruth(groundtruth_path)
     theta_lookup = build_theta_lookup(gt_ts_ns, gt_quats)
