@@ -2612,3 +2612,35 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규 검증: `tb/tb_world_time_surface_sram_writer.v`, `tb/tb_aer_tx64_pose_sram_surface.v`, `tb/tb_stage2_k1_k8_uzh_trace.v`
 - 수정: pose guard/guard TB, synthesis-facing RTL parameter checks, geometry/integration 문서, Genus script, regression runner
 
+## 108. K=2/K=4 banked transform — 실제 trace로 중간 Pareto 점 확보(2026-09-10)
+
+**구조**: 4x4 AER의 최대 8개 adapter lane을 `lane index mod K`로 K개 bank에 정적으로 균등 분배하고, bank마다 기존 검증된 `event_batch_fifo` 하나, pose-history read port 하나, ready/valid affine transform 하나를 둔 `aer_tx16_pose_affine2d_banked`를 추가했다. K=1/2/4/8을 elaboration할 수 있으며 이번 측정은 K=2/4에 집중했다. 각 bank 내부 순서는 보존하지만 독립 backpressure를 받는 bank 사이에는 하나의 total retire order를 약속하지 않고 occurrence timestamp를 map 충돌의 기준으로 유지한다. FIFO overflow 8비트는 원래 adapter lane에 대응하고, pose guard는 `16 accepted source - 8 overflow terminal - K transform capture`를 정확히 계수한다.
+
+**독립 random backpressure**: K=2와 K=4 각각 4,000-cycle source/FIFO/transform scoreboard를 돌렸다. K=2는 `generated=13258 = AER drop 258 + FIFO drop 8729 + delivered 4271`, K=4는 `13329 = 281 + 4531 + 8517`; 모든 bank에 독립 stall을 넣고 stall 중 sensor/world coordinate, polarity, pose, timestamp, mapped/found/range를 고정 확인했다. lane-mod-K routing, source/bank order, phantom/duplicate, pre-edge FIFO free-space, mixed identity/translation pose, guard drain과 최종 pose rewrite가 모두 PASS했다. 이 숫자는 FIFO_DEPTH=8과 높은 random 부하/정지를 사용한 포화 시험이라 응용 손실률이 아니다.
+
+**UZH exact-cycle lane/depth sweep**:
+
+| K | bank당 depth | 총 FIFO slot | FIFO drop | delivered | latency p50/p99/max |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 1 | 2 | 3,416 | 5,087 | 4/5/6 |
+| 2 | 2 | 4 | 2,589 | 5,914 | 5/6/7 |
+| 2 | 4 | 8 | 1,788 | 6,715 | 6/8/9 |
+| 2 | 8 | 16 | 605 | 7,898 | 7/12/13 |
+| 2 | 16 | 32 | 37 | 8,466 | 8/18/20 |
+| 2 | 32 | 64 | 0 | 8,503 | 8/21/29 |
+| 4 | 1 | 4 | 1,917 | 6,586 | 4/5/6 |
+| 4 | 2 | 8 | 775 | 7,728 | 4/6/7 |
+| 4 | 4 | 16 | 63 | 8,440 | 5/8/9 |
+| 4 | 8 | 32 | 0 | 8,503 | 5/8/10 |
+
+모든 점에서 AER accepted=8,503, AER overrun=0이고 metadata/좌표/보존식/guard drain이 PASS했다. 같은 trace의 무손실점을 비교하면 K=1-d128은 총 FIFO 128칸과 p99/max `74/94`, K=2-d32는 64칸과 `21/29`, K=4-d8은 32칸과 `8/10`, 직접 K=8은 FIFO 없이 `4/5`다. 따라서 기능 지표만 보면 K=4-d8이 현재 가장 균형적인 후보지만, multiplier 네 개의 면적·전력이 포함되므로 **45nm PPA 전에는 최종 선정하지 않는다**.
+
+**PPA/guard 준비**: UZH 무손실 네 점 K=1-d128, K=2-d32, K=4-d8, K=8을 같은 5 ns/45 nm 조건으로 실행할 Genus entry를 준비했다. pose guard 기본 width도 `AER 최대 outstanding + 전체 FIFO capacity`에서 자동 계산되게 바꿨고, 계산이 틀리거나 protocol violation이 생기더라도 §107의 poison fail-safe가 남는다. 로컬에는 Genus가 없어 area/timing/vectorless power는 아직 미측정이다.
+
+**전체 재현 회귀**: 기본 20개와 `--extended --trace-sweep --lane-sweep`을 한 번에 실행해 **38/38 PASS**했다. 추가로 synthesis-facing Verilog-2005 elaboration을 K=8 direct, K=1-d32/d128, K=2-d32, K=4-d8, 8x8-K1 여섯 top에 각각 수행해 6/6 clean이었다. 이는 HDL elaboration 확인이지 Genus 합성/PPA 완료를 뜻하지 않는다.
+
+- 신규 RTL: `rtl/aer_tx16_pose_affine2d_banked.v`
+- 신규 검증: `tb/tb_stage2_k2_k4_uzh_trace.v`, `tb/tb_aer_tx16_pose_affine2d_banked_backpressure.v`
+- 신규 합성 entry: `syn/run_genus_stage2_tx16_serial_d128.tcl`, `syn/run_genus_stage2_tx16_banked_k2_d32.tcl`, `syn/run_genus_stage2_tx16_banked_k4_d8.tcl`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`, `STAGE2_RTL.md`, guard-width defaults
+

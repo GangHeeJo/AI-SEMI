@@ -351,6 +351,42 @@ def regular_tests() -> tuple[HDLTest, ...]:
             "STAGE2_K1_K8_COMPARISON_PASS",
         ),
         HDLTest(
+            "banked_k2_backpressure",
+            "tb_aer_tx16_pose_affine2d_banked_backpressure",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx16_pose_affine2d_banked.v",
+            ),
+            "tb/tb_aer_tx16_pose_affine2d_banked_backpressure.v",
+            "AER_TX16_POSE_AFFINE2D_BANKED_BACKPRESSURE_PASS",
+            ("-Ptb_aer_tx16_pose_affine2d_banked_backpressure.K=2",),
+        ),
+        HDLTest(
+            "banked_k4_backpressure",
+            "tb_aer_tx16_pose_affine2d_banked_backpressure",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx16_pose_affine2d_banked.v",
+            ),
+            "tb/tb_aer_tx16_pose_affine2d_banked_backpressure.v",
+            "AER_TX16_POSE_AFFINE2D_BANKED_BACKPRESSURE_PASS",
+            ("-Ptb_aer_tx16_pose_affine2d_banked_backpressure.K=4",),
+        ),
+        HDLTest(
             "event_batch_fifo",
             "tb_event_batch_fifo",
             ("rtl/event_batch_fifo.v",),
@@ -512,6 +548,40 @@ def trace_sweep_tests() -> tuple[HDLTest, ...]:
     )
 
 
+def lane_sweep_tests() -> tuple[HDLTest, ...]:
+    trace = "common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt"
+    dependencies = (
+        "rtl/arbiter2.v",
+        "rtl/arbiter4_tree.v",
+        "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+        "rtl/aer_bitmap_to_event8_pose.v",
+        "rtl/event_batch_fifo.v",
+        "rtl/pose_inflight_guard8.v",
+        "rtl/pose_history_affine8.v",
+        "rtl/coord_transform_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d_banked.v",
+    )
+    configurations = (
+        (2, 1), (2, 2), (2, 4), (2, 8), (2, 16), (2, 32),
+        (4, 1), (4, 2), (4, 4), (4, 8),
+    )
+    return tuple(
+        HDLTest(
+            f"uzh_k{k}_depth_{depth}",
+            "tb_stage2_k2_k4_uzh_trace",
+            dependencies,
+            "tb/tb_stage2_k2_k4_uzh_trace.v",
+            "STAGE2_BANKED_UZH_TRACE_PASS",
+            (
+                f"-Ptb_stage2_k2_k4_uzh_trace.K={k}",
+                f"-Ptb_stage2_k2_k4_uzh_trace.FIFO_DEPTH={depth}",
+            ),
+            (f"+TRACE_FILE={trace}",),
+        )
+        for k, depth in configurations
+    )
+
+
 def print_result(result: Result) -> None:
     label = "PASS" if result.passed else "FAIL"
     print(f"[{label}] {result.name} ({result.seconds:.2f}s) - {result.detail}")
@@ -532,6 +602,11 @@ def parse_args() -> argparse.Namespace:
         "--trace-sweep",
         action="store_true",
         help="also compare K=1 FIFO depths 8..128 against K=8 on UZH timing",
+    )
+    parser.add_argument(
+        "--lane-sweep",
+        action="store_true",
+        help="also sweep K=2/K=4 bank depths on exact-cycle UZH timing",
     )
     return parser.parse_args()
 
@@ -587,6 +662,12 @@ def main() -> int:
 
         if args.trace_sweep:
             for test in trace_sweep_tests():
+                result = run_hdl_test(test, root, temp_root, iverilog, vvp)
+                results.append(result)
+                print_result(result)
+
+        if args.lane_sweep:
+            for test in lane_sweep_tests():
                 result = run_hdl_test(test, root, temp_root, iverilog, vvp)
                 results.append(result)
                 print_result(result)

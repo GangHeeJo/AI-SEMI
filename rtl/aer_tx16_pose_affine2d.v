@@ -14,7 +14,7 @@ module aer_tx16_pose_affine2d #(
   parameter OFFSET_W = 24,
   parameter FRAC_W   = 14,
   parameter TIMESTAMP_W = 32,
-  parameter POSE_COUNT_W = 8,
+  parameter integer POSE_COUNT_W = $clog2(33),
   parameter integer X_MIN = 0,
   parameter integer X_MAX = 255,
   parameter integer Y_MIN = 0,

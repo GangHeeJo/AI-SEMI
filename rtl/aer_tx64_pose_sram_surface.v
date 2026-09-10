@@ -10,7 +10,7 @@ module aer_tx64_pose_sram_surface #(
   parameter integer FRAC_W = 14,
   parameter integer TIMESTAMP_W = 32,
   parameter integer FIFO_DEPTH = 32,
-  parameter integer GUARD_COUNT_W = 10,
+  parameter integer GUARD_COUNT_W = $clog2(129 + 4*FIFO_DEPTH),
   parameter integer GRID_W = 256,
   parameter integer GRID_H = 256,
   parameter integer ADDR_W = ((GRID_W * GRID_H) <= 1)

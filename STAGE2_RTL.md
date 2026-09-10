@@ -10,6 +10,7 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 |---|---:|---:|---|---|
 | `aer_tx16_pose_affine2d` | 4x4 | 8 | eight always-draining event slots | correctness/PPA upper endpoint |
 | `aer_tx16_pose_affine2d_serial` | 4x4 | 1 | one ready/valid event | K=1 throughput/PPA endpoint |
+| `aer_tx16_pose_affine2d_banked` | 4x4 | parameterized 1/2/4/8 | K independent ready/valid events | measured intermediate K endpoints |
 | `aer_tx64_pose_affine2d_serial` | 8x8 (four leaves) | 1 shared | one ready/valid event | tile hierarchy and upper-merge proof |
 | `aer_tx64_pose_time_surface` | 8x8 (four leaves) | 1 shared | internal always-ready map writer plus read port | closed sensor-to-map proof |
 | `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
@@ -89,6 +90,14 @@ Sweep the K=1 FIFO against K=8 while preserving every cycle in the checked-in UZ
 python scripts/run_stage2_regression.py --trace-sweep
 ```
 
+Sweep the banked K=2/K=4 endpoints on the same timing:
+
+```text
+python scripts/run_stage2_regression.py --lane-sweep
+```
+
+The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution.
+
 On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails.
 
 The default suite includes a same-stimulus K=1/K=8 comparison. Its light profile must be lossless for both endpoints; its deliberately overloaded profile reports the finite K=1 FIFO loss and latency instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random stress is part of `--extended` because it is substantially slower under Icarus.
@@ -100,9 +109,12 @@ Use the same 5 ns constraint and 45 nm library as Stage 1:
 ```text
 genus -batch -files syn/run_genus_stage2_tx16_parallel.tcl
 genus -batch -files syn/run_genus_stage2_tx16_serial.tcl
+genus -batch -files syn/run_genus_stage2_tx16_serial_d128.tcl
+genus -batch -files syn/run_genus_stage2_tx16_banked_k2_d32.tcl
+genus -batch -files syn/run_genus_stage2_tx16_banked_k4_d8.tcl
 genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
 ```
 
 Map storage is deliberately excluded from the three logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation.
 
-The three scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM.
+These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM.

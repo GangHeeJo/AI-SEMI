@@ -17,7 +17,7 @@ module aer_tx16_pose_affine2d_serial #(
   parameter integer FRAC_W = 14,
   parameter integer TIMESTAMP_W = 32,
   parameter integer FIFO_DEPTH = 32,
-  parameter integer GUARD_COUNT_W = 8,
+  parameter integer GUARD_COUNT_W = $clog2(33 + FIFO_DEPTH),
   parameter integer X_MIN = 0,
   parameter integer X_MAX = 255,
   parameter integer Y_MIN = 0,
