@@ -2996,3 +2996,24 @@ N=4는 정확히 재현됨(17.0°, 검증 성공)이지만 **N=6/8/12/16은 중�
 
 - 다음(사용자 지시): codex/ai-semi-stage2 브랜치가 로컬에 Genus가 없어 못 돌린 합성 스크립트들을 서버에서 대신 실행
 
+## 129. codex/ai-semi-stage2 브랜치 Genus 합성 대행 -- 사용자 요청으로 서버에서 실행(2026-09-10, 진행 중)
+
+**배경**: codex/ai-semi-stage2 브랜치(§123/§104~108 참고)는 로컬에 Genus가 없어서 6개 합성 스크립트(`syn/run_genus_stage2_*.tcl`)를 준비만 해두고 실측을 못 한 상태였음. 사용자 요청으로 이 세션이 서버에서 대신 실행.
+
+**준비**: 서버에 별도 체크아웃 `~/redred-faer-codex`(codex/ai-semi-stage2 브랜치, `main`인 `~/redred-faer`와는 완전히 분리)을 새로 clone. **버그 발견+임시 수정**: 첫 실행에서 `pose_inflight_guard8.v`가 SystemVerilog 문법(generate 스코프 안의 localparam 선언)을 쓰는데 각 tcl 스크립트의 `read_hdl $RTL_LIST`에 `-sv` 플래그가 없어서 전부 실패(`Error: SystemVerilog feature... must be read in with 'read_hdl -sv'`). **`~/redred-faer-codex`의 서버 로컬 사본에만** `read_hdl -sv $RTL_LIST`로 6개 스크립트 전부 패치(어느 git 브랜치에도 커밋 안 함) -- **codex 세션에 이 수정을 알려서 그쪽이 직접 커밋하는 게 좋음**(사용자에게 전달 필요).
+
+**결과**(5/6 완료, 6번째(tx64_serial, 8×8) 진행 중):
+
+| 설계 | 면적(um²) | 셀 수 | 전력(vectorless, mW) |
+|---|---:|---:|---:|
+| tx16 parallel(K=8) | 102574.333 | 45373 | 0.886 |
+| tx16 serial(K=1) | 76750.255 | 28384 | 0.818 |
+| tx16 serial_d128(K=1, FIFO깊이128) | 177569.239 | 66504 | 0.841 |
+| tx16 banked K=2, d32 | 103628.326 | 36451 | 0.841 |
+| tx16 banked K=4, d8 | 83576.848 | 31689 | 0.916 |
+| tx64 serial(8×8, K=1) | (진행 중) | - | - |
+
+**참고**: 이 수치들은 우리 프로젝트(`main`)의 RMCM 기반 좌표변환(35110.746 um², §115)과는 직접 비교 대상이 아님 -- codex 쪽은 범용 affine 변환(2x2 행렬+이동, 실제 곱셈기 사용)이라 우리의 "이산 후보 몇 개뿐이라 룩업테이블로 대체" 전략보다 태생적으로 비쌀 수밖에 없는 서로 다른 설계 철학. K=1(직렬)이 K=8(병렬)보다 약 25% 작지만 극적인 차이는 아님(공유 인프라 비중이 큼).
+
+- 다음: tx64_serial 완료 대기, 전체 6개 표 완성 후 codex 세션에 -sv 수정 필요성 전달
+
