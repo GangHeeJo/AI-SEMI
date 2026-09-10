@@ -1,12 +1,15 @@
-# Digital 2차 통합판(steal_buf_polarity + coord_transform_rmcm x8 + world_mem_writer) Genus 합성.
-# coord_transform_rmcm 8레인 병렬 복제 비용이 실제로 얼마나 드는지 실측하기 위함
-# (단독 RMCM 1개 PPA: area 1199.052/795 cells, power 0.041372mW, §110).
+# Digital 2차 통합판 v3(pose_fifo 추가 TX + FIFO/arbiter8 직렬화 + SRAM 스타일 단일 포트,
+# progress.md §113/§114) Genus 합성. 저장소(world memory 4096칸)는 이제 이 RTL 밖에 있어서
+# (world_we/world_addr/world_pol 인터페이스만 노출) 합성 PPA에 안 잡힘 -- v1(레지스터 배열
+# 직접 합성)이 면적 98%를 먹었던 문제(§112)의 근본 해결.
 #   genus -batch -files syn/run_genus_aer_tx16_coord_transform_v1.tcl
 
 set DESIGN   aer_tx16_coord_transform_v1
 set RTL_LIST {
   rtl/arbiter4_tree.v
-  rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity.v
+  rtl/arbiter8.v
+  rtl/small_fifo.v
+  rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v
   rtl/coord_transform_rmcm.v
   rtl/world_mem_writer.v
   rtl/aer_tx16_coord_transform_v1.v

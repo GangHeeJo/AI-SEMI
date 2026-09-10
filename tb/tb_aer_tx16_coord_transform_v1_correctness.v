@@ -1,13 +1,13 @@
 `timescale 1ns/1ps
-// aer_tx16_coord_transform_v1 무작위 스트레스 검증 -- 실트래픽(UZH)만으로는 world_mem_writer의
-// 같은 사이클 레인 충돌 정책(§world_mem_writer.v)이 거의 안 걸린다(실측 87/4096칸, 충돌 희소).
-// 로컬(row,col)+theta_idx 조합 중 실제로 서로 다른(row,col)이 같은 world (X,Y)로 겹치는
-// 경우가 존재함을 오라클로 확인했으므로(scripts/coord_transform_model.py, 284/256 theta에서
-// 발생), 여기서는 높은 도착률(20%/source) + 매 사이클 무작위 theta로 그 충돌 경로를 실제로
-// 반복 자극해서 world_mem_writer의 "레인 인덱스 큰 쪽이 이긴다" 정책이 shadow와 항상
-// 일치하는지 본다. 검증 방법은 tb_aer_tx16_coord_transform_v1_uzh_trace.v와 완전히 동일
-// (계층참조로 steal_buf 배출 관찰 -> coord_transform_rmcm_lut로 기대값 계산 -> 최종 rd 포트
-// 전수 비교).
+// aer_tx16_coord_transform_v1 무작위 스트레스 검증(v3, progress.md §113/§114) -- 20%/source
+// 도착률(사이클당 평균 0.14개인 실트래픽보다 훨씬 높음)로 world_mem_writer의 FIFO+arbiter8이
+// 높은 부하에서 어떻게 견디는지 본다(무손실/overrun 실측이 핵심 -- 이 스트레스 부하에선
+// overrun>0이 나올 수 있음, FAIL 기준 아니라 깊이의 실측 한계로 보고만 함).
+//
+// 검증 방법은 tb_aer_tx16_coord_transform_v1_uzh_trace.v와 동일: 도착 시점에 관찰한
+// (row,col,pose)로 coord_transform_rmcm_lut가 계산한 기대값이 1클럭 뒤 world_mem_writer
+// push 입력과 일치하는지(content), push=pop+overrun(무손실), world_we 관찰로 만든 최종
+// world memory 모델(저장소가 RTL 밖에 있음).
 module tb_aer_tx16_coord_transform_v1_correctness;
   `include "rtl/coord_transform_rmcm_lut.vh"
 
@@ -16,47 +16,72 @@ module tb_aer_tx16_coord_transform_v1_correctness;
   reg [15:0] arrival, polarity_in;
   reg [7:0]  theta_idx;
   wire [15:0] overrun;
-  reg         rd_en;
-  reg  [5:0]  rd_x, rd_y;
-  wire        rd_written, rd_pol;
+  wire [7:0]  wmem_overrun;
+  wire        world_we;
+  wire [11:0] world_addr;
+  wire        world_pol;
 
   aer_tx16_coord_transform_v1 dut (
     .clk(clk), .rst(rst),
     .arrival(arrival), .polarity_in(polarity_in), .theta_idx(theta_idx),
-    .overrun(overrun),
-    .rd_en(rd_en), .rd_x(rd_x), .rd_y(rd_y),
-    .rd_written(rd_written), .rd_pol(rd_pol)
+    .overrun(overrun), .wmem_overrun(wmem_overrun),
+    .world_we(world_we), .world_addr(world_addr), .world_pol(world_pol)
   );
 
   always #5 clk = ~clk;
 
-  reg shadow_written [0:4095];
-  reg shadow_pol     [0:4095];
+  reg mem_written [0:4095];
+  reg mem_pol     [0:4095];
+  integer push_total, pop_total, overrun_total, content_checks, content_mismatches;
 
-  task automatic shadow_write(input [1:0] row, input [1:0] col, input pol, input [7:0] th);
+  reg        pend_valid [0:7];
+  reg [5:0]  pend_x [0:7];
+  reg [5:0]  pend_y [0:7];
+  reg        pend_pol [0:7];
+
+  task automatic check_and_advance;
+    integer c, g;
     reg [11:0] xy;
-    reg [5:0] X, Y;
-    integer addr;
     begin
-      xy  = coord_transform_rmcm_lut(row, col, th);
-      X = xy[11:6]; Y = xy[5:0];
-      addr = Y*64 + X;
-      shadow_written[addr] = 1'b1;
-      shadow_pol[addr] = pol;
-    end
-  endtask
+      for (g = 0; g < 8; g = g + 1) begin
+        if (pend_valid[g]) begin
+          content_checks = content_checks + 1;
+          if (!dut.u_wmem.wr_valid[g] ||
+              dut.u_wmem.wr_x[g*6 +: 6] !== pend_x[g] ||
+              dut.u_wmem.wr_y[g*6 +: 6] !== pend_y[g] ||
+              dut.u_wmem.wr_pol[g]      !== pend_pol[g]) begin
+            content_mismatches = content_mismatches + 1;
+            if (content_mismatches <= 10)
+              $display("CONTENT_MISMATCH lane=%0d expected=(%0d,%0d,%b) got_valid=%b got=(%0d,%0d,%b)",
+                        g, pend_x[g], pend_y[g], pend_pol[g], dut.u_wmem.wr_valid[g],
+                        dut.u_wmem.wr_x[g*6 +: 6], dut.u_wmem.wr_y[g*6 +: 6], dut.u_wmem.wr_pol[g]);
+          end
+        end
+      end
 
-  // coord_transform_rmcm이 등록형이라 실제 latch되는 theta는 "다음" edge 시점 값이다
-  // (tb_aer_tx16_coord_transform_v1_uzh_trace.v와 동일한 이유) -- theta_next를 인자로 받는다.
-  task automatic shadow_check_cycle(input [7:0] theta_next);
-    integer c;
-    begin
+      for (g = 0; g < 8; g = g + 1) pend_valid[g] = 1'b0;
       if (dut.u_tx.valid0)
         for (c = 0; c < 4; c = c + 1)
-          if (dut.u_tx.col_mask0[c]) shadow_write(dut.u_tx.row0, c[1:0], dut.u_tx.pol_mask0[c], theta_next);
+          if (dut.u_tx.col_mask0[c]) begin
+            xy = coord_transform_rmcm_lut(dut.u_tx.row0, c[1:0], dut.u_tx.pose_mask0[c*8 +: 8]);
+            pend_valid[c] = 1'b1; pend_x[c] = xy[11:6]; pend_y[c] = xy[5:0]; pend_pol[c] = dut.u_tx.pol_mask0[c];
+          end
       if (dut.u_tx.valid1)
         for (c = 0; c < 4; c = c + 1)
-          if (dut.u_tx.col_mask1[c]) shadow_write(dut.u_tx.row1, c[1:0], dut.u_tx.pol_mask1[c], theta_next);
+          if (dut.u_tx.col_mask1[c]) begin
+            xy = coord_transform_rmcm_lut(dut.u_tx.row1, c[1:0], dut.u_tx.pose_mask1[c*8 +: 8]);
+            pend_valid[4+c] = 1'b1; pend_x[4+c] = xy[11:6]; pend_y[4+c] = xy[5:0]; pend_pol[4+c] = dut.u_tx.pol_mask1[c];
+          end
+
+      for (g = 0; g < 8; g = g + 1) begin
+        if (dut.u_wmem.wr_valid[g])   push_total    = push_total + 1;
+        if (dut.u_wmem.wr_overrun[g]) overrun_total = overrun_total + 1;
+      end
+      if (world_we) begin
+        pop_total = pop_total + 1;
+        mem_written[world_addr] = 1'b1;
+        mem_pol[world_addr] = world_pol;
+      end
     end
   endtask
 
@@ -67,15 +92,12 @@ module tb_aer_tx16_coord_transform_v1_correctness;
   initial begin
     N_CYCLES = 20000;
     rst = 1; arrival = 16'd0; polarity_in = 16'd0; theta_idx = 8'd0;
-    rd_en = 0; rd_x = 0; rd_y = 0;
-    for (i = 0; i < 4096; i = i + 1) begin shadow_written[i] = 1'b0; shadow_pol[i] = 1'b0; end
+    push_total = 0; pop_total = 0; overrun_total = 0; content_checks = 0; content_mismatches = 0;
+    for (i = 0; i < 4096; i = i + 1) begin mem_written[i] = 1'b0; mem_pol[i] = 1'b0; end
+    for (i = 0; i < 8; i = i + 1) pend_valid[i] = 1'b0;
 
     @(posedge clk); #1; rst = 0;
 
-    // theta_idx는 매 edge 직후(#1 뒤) 곧바로 다음 값으로 갱신되므로, coord_transform_rmcm이
-    // "이번에 보이는 col_mask0"와 함께 실제로 latch하는 theta는 이번 반복에서 미리 정한 값이
-    // 아니라 "edge 직후 새로 뽑는" 값이다(tb_..._uzh_trace.v의 theta_by_cyc[cyc+1]과 같은
-    // 이유) -- th_pending으로 한 박자 미리 큐잉해서 순서를 맞춘다.
     th_pending = $random;
     for (cyc = 0; cyc < N_CYCLES; cyc = cyc + 1) begin
       arrival = 16'd0; polarity_in = $random;
@@ -84,40 +106,25 @@ module tb_aer_tx16_coord_transform_v1_correctness;
       theta_idx = th_pending;
       @(posedge clk); #1;
       th_pending = $random;
-      shadow_check_cycle(th_pending);
+      check_and_advance;
     end
 
-    // drain -- pending_cnt가 최대 2-deep이라 짧은 마무리로 충분
+    // 드레인 -- FIFO 최대 잔량(8레인 x 깊이32=256) + steal_buf 자체 drain 몫 대비 넉넉하게.
     arrival = 16'd0; polarity_in = 16'd0;
-    for (i = 0; i < 10; i = i + 1) begin
+    for (i = 0; i < 400; i = i + 1) begin
       theta_idx = th_pending;
       @(posedge clk); #1;
       th_pending = $random;
-      shadow_check_cycle(th_pending);
+      check_and_advance;
     end
 
-    begin : COMPARE
-      integer x, y, addr, mismatches, filled_rtl, filled_shadow;
-      mismatches = 0; filled_rtl = 0; filled_shadow = 0;
-      for (y = 0; y < 64; y = y + 1) begin
-        for (x = 0; x < 64; x = x + 1) begin
-          rd_en = 1; rd_x = x[5:0]; rd_y = y[5:0];
-          @(posedge clk); #1;
-          addr = y*64 + x;
-          if (shadow_written[addr]) filled_shadow = filled_shadow + 1;
-          if (rd_written) filled_rtl = filled_rtl + 1;
-          if (rd_written !== shadow_written[addr] ||
-              (shadow_written[addr] && rd_pol !== shadow_pol[addr])) begin
-            mismatches = mismatches + 1;
-            if (mismatches <= 10)
-              $display("MISMATCH x=%0d y=%0d rtl(written=%b pol=%b) shadow(written=%b pol=%b)",
-                        x, y, rd_written, rd_pol, shadow_written[addr], shadow_pol[addr]);
-          end
-        end
-      end
-      $display("N_CYCLES=%0d filled_rtl=%0d/4096 filled_shadow=%0d/4096 mismatches=%0d",
-                N_CYCLES, filled_rtl, filled_shadow, mismatches);
-      if (mismatches == 0)
+    begin : REPORT
+      integer filled;
+      filled = 0;
+      for (i = 0; i < 4096; i = i + 1) if (mem_written[i]) filled = filled + 1;
+      $display("N_CYCLES=%0d push=%0d pop=%0d overrun=%0d content_checks=%0d content_mismatches=%0d world_filled=%0d/4096",
+                N_CYCLES, push_total, pop_total, overrun_total, content_checks, content_mismatches, filled);
+      if (push_total == pop_total + overrun_total && content_mismatches == 0)
         $display("AER_TX16_COORD_TRANSFORM_V1_CORRECTNESS_PASS");
       else
         $display("AER_TX16_COORD_TRANSFORM_V1_CORRECTNESS_FAIL");

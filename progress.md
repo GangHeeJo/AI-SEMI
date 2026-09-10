@@ -2676,3 +2676,28 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `syn/run_genus_aer_tx16_coord_transform_v1.tcl`
 - 다음: world_mem_writer 재설계(arbiter 기반 포트 축소 또는 직렬화) 결정 후 재합성, 그 다음에 1단계를 최종 마무리하고 2단계로 이동
 
+## 113~114. 사용자가 공유한 병렬 세션 분석 반영 -- pose_fifo 추가 + world_mem_writer를 SRAM 인터페이스로 전환(2026-09-10)
+
+**출처 검증**: 사용자가 대화 중간에 다른 창(병렬 Claude Code 세션으로 추정, 타임스탬프 포맷이 그렇게 보임)에서 나온 것으로 보이는 긴 분석을 붙여넣음 -- "1차 AER을 2차에 어떻게 쓸지 처음부터 생각해보라"는 지시와 함께였는데, 형식이 특이해서(이미 완성된 답변이 타임스탬프와 함께 붙어있음) 그대로 믿지 않고 먼저 구체적 수치를 실제 파일과 대조: steal_buf_polarity qualified Fmax "285.7~333.3MHz" 주장이 `progress.md` 2407행과 정확히 일치, tree4가 "이름과 달리 상위 arbiter 없음"이라는 주장도 `aer_tx64_cluster2_tree4.v`의 실제 주석과 정확히 일치 -- 조작된 내용이 아니라 이 프로젝트에 실제 접근 가능한 다른 세션의 진짜 분석으로 판단, 검증 후 반영.
+
+**핵심 지적 두 가지, 둘 다 채택**:
+1. **world_mem_writer가 4096칸을 RTL 레지스터 배열로 "합성"한 것 자체가 잘못된 접근**이었음(§112의 98% 면적 문제) -- 실제 ASIC/FPGA라면 이 정도 저장소는 SRAM 매크로/BRAM으로 만드는 게 표준. §111~112에서 하던 "포트 수를 8→1로 줄이는" 작업(FIFO+arbiter8)은 방향은 맞지만, 포트를 줄여도 저장소 자체(플립플롭 4096개)가 여전히 비싸서 근본 해결이 아니었음.
+2. **배출 시점 theta 사용은 "나중에 문제되면 고치자"가 아니라 지금 고쳐야 함** -- 이벤트가 pol_fifo0/pol_fifo1에 최대 2-deep 대기하는 동안 카메라가 돌면, 배출 시점의 살아있는 theta는 그 이벤트의 실제 발생 시점 theta가 아님(v1부터 명시했던 캐베앗, 지금 실제로 고침).
+
+**구현**:
+- `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`(신규, 1차 제출본은 절대 수정하지 않고 2차 전용 포크) -- `pol_fifo0/pol_fifo1`(소스당 2-deep, 극성 1비트)과 완전히 같은 구조로 `pose_fifo0/pose_fifo1`(소스당 2-deep, theta_idx 8비트)을 나란히 둠. `theta_idx_in[127:0]`(소스별 8비트, 실제로는 전부 같은 살아있는 theta를 브로드캐스트)을 입력받아 극성과 정확히 같은 push/pop 타이밍으로 저장, `pose_mask0/1`(4열×8비트)로 배출.
+- `rtl/small_fifo.v`(신규) -- 깊이 파라미터화된 최소 동기 FIFO, world_mem_writer 레인별 버퍼용.
+- `rtl/world_mem_writer.v`(v3로 재작성) -- 내부 레지스터 배열(`written[]`/`cell_pol[]`)과 read 포트를 완전히 제거. 대신 8레인을 각자 FIFO(`small_fifo.v`)로 버퍼링하고 `arbiter8`(이미 검증된 모듈)로 매 사이클 1개만 골라 **SRAM 스타일 단일 쓰기 포트**(`world_we`/`world_addr`/`world_pol`)로 내보냄 -- 실제 저장소는 이 인터페이스 바깥(시뮬레이션 테스트벤치 메모리 모델/FPGA BRAM/ASIC SRAM 매크로)에 붙는다는 전제라 이 파일 자체는 합성 PPA에 저장소 비용이 안 잡힘.
+- `rtl/aer_tx16_coord_transform_v1.v`(재작성) -- TX를 pose 버전으로 교체, `theta_idx`(살아있는 현재값)를 TX의 `theta_idx_in`으로 브로드캐스트(도착 시점에 캡처되도록), coord_transform_rmcm 8개는 이제 배출된 `pose_mask0/1`(발생 시점 theta)을 씀 -- 더 이상 "다음 edge 시점 theta를 추측"할 필요가 없어져서 v1/v2에서 두 번이나 버그를 낸 바로 그 취약점이 구조적으로 사라짐.
+- `tb/tb_aer_tx16_coord_transform_v1_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_correctness.v`(재작성) -- 검증 방식이 두 부분으로 명확히 나뉨: (1) **커밋 내용 정확성** -- 도착 시점에 관찰한 실제 (row,col,pose)로 `coord_transform_rmcm_lut`가 계산한 기대값이 1클럭 뒤 world_mem_writer의 push 입력과 정확히 일치하는지(레인별 파이프라인), (2) **무손실** -- push(레인이 쓰기 요청한 횟수) = pop(`world_we` 커밋 횟수) + overrun(FIFO 꽉 차서 버려진 횟수).
+
+**FIFO 깊이 실측 튜닝**(실트래픽 8503 events 기준): 깊이 4 -> overrun 1128/8503(13.3%), 깊이 16 -> overrun 1/8503(0.01%), **깊이 32 -> overrun 0/8503(0%)**. 채택: FIFO_DEPTH=32(기본값). 실트래픽은 사이클당 평균 0.14개지만 실제로는 버스트성이라, 평균만 보고 깊이 4로 충분하다고 판단했던 §111의 ponytail 캐베앗은 틀렸음이 실측으로 확인됨.
+
+**검증 결과**:
+- 실트래픽(UZH 8503 events): `push=8503 pop=8503 overrun=0 content_checks=8503 content_mismatches=0 world_filled=90/4096` -- **PASS**(커버리지가 87→90칸으로 늘어난 건 발생시점 theta로 고쳐서 생긴 정확한 변화, 예상대로).
+- 무작위 스트레스(20000cycle, 20%/source, 사이클당 평균 7.3개 -- 의도적으로 극단적인 과부하): `push=146470 pop=20256 overrun=126214 content_mismatches=0` -- **PASS**(무손실 보존식은 항상 성립, overrun 86%는 설계점을 훨씬 벗어난 부하에서 나온 정직한 실측치일 뿐 실패 기준 아님). 드레인 기간을 200→400사이클로 늘려야 했음(깊이 32로 늘면서 최대 잔량이 8×32=256이 됐는데 처음엔 옛 200사이클을 그대로 씀 -- 테스트벤치 자체의 계산 실수, RTL 버그 아님).
+
+- 신규: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`, `rtl/small_fifo.v`
+- 수정: `rtl/world_mem_writer.v`, `rtl/aer_tx16_coord_transform_v1.v`, `tb/tb_aer_tx16_coord_transform_v1_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_correctness.v`, `syn/run_genus_aer_tx16_coord_transform_v1.tcl`
+- 다음: 새 구조로 Genus 재합성 -- 저장소가 이제 RTL에 없으니 §112의 98% 면적 문제가 실제로 사라지는지 실측 확인
+
