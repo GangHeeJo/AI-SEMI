@@ -2577,3 +2577,20 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `rtl/aer_tx64_pose_affine2d_serial.v`, `tb/tb_aer_tx64_pose_affine2d_serial.v`, `tb/tb_world_time_surface_random.v`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`, `STAGE2_GEOMETRY_SPEC.md`
 
+## 106. K=1 4x4 endpoint + 8x8 sensor-to-map 폐루프(2026-09-10)
+
+**4x4 K=1 직렬 endpoint**: 기존 K=8 병렬 top과 같은 4x4 occurrence-aware AER 뒤에 8-lane batch FIFO와 하나의 pose-history read/affine lane을 연결했다. world 출력은 1-lane ready/valid이고 stall 동안 source/world coordinate, polarity, pose version, occurrence timestamp, status를 모두 고정한다. AER overrun과 FIFO overflow를 분리하고 pose guard retire는 `8 FIFO terminal drop + 1 transform capture`로 구성했다. directed/scoreboard 결과 `generated=406`, `AER accepted=230`, `AER drop=176`, `FIFO drop=191`, `delivered=39`; stall 고정 31회, busy pose rewrite reject 1회, transform capture 뒤 stalled output 중 동일 ID rewrite commit 1회, missing pose와 mixed pose/time을 모두 확인했고 보존식 및 guard drain 오류는 0이다. 이 포화 수치는 K=1의 처리량 한계를 의도적으로 드러내는 stress 결과이지 정상 workload의 예상 손실률이 아니다.
+
+**8x8에서 실제 memory까지 연결**: 네 4x4 leaf→tile FIFO→round-robin→K=1 affine stream을 `world_time_surface`에 직접 연결한 `aer_tx64_pose_time_surface` wrapper를 만들었다. newer timestamp 200이 같은 cell에 먼저 기록된 뒤 FIFO에서 늦게 나온 timestamp 100이 retire하는 순서를 구성해, 오래된 이벤트가 `stale_ignored` 되고 cell을 되돌리지 않는 것을 end-to-end로 확인했다. 같은 timestamp의 ON/OFF는 입력 순서 두 경우 모두 `2'b11`로 merge되고, missing pose와 transform out-of-range는 관측 가능한 stream event지만 memory는 바꾸지 않는다. 결과는 `generated=1560 = AER drop 704 + FIFO drop 679 + consumed 177`, mapped/nonmapped=`175/2`, surface update/equal/stale/range=`174/2/1/0`, pose guard 최종 0이다. 256-cell 전체 readback도 독립 모델과 일치했다.
+
+**8x8 장시간 random 독립검증**: 정확히 10,000 random cycle에서 sparse 8,058 cycle, burst 455 cycle, world ready/stall=`5706/4294`를 섞었다. `generated=58408`, `accepted=58233`, `AER drop=175`, `FIFO drop=52398`, `delivered=5835`, 최종 pending 0이며 보존식 `58408=175+52398+5835`가 맞았다. stall 고정 4,291회, source/tile 순서, polarity/pose/random timestamp, identity world coordinate, phantom/duplicate, FIFO pop-space reuse와 pose outstanding을 매 cycle oracle로 대조했다. 처음 실행에서 testbench task가 바깥 loop와 같은 전역 변수를 덮어써 10,000회를 초과 실행하며 record table을 넘기는 **검증 코드 버그**를 발견했고, task-local counter로 분리한 뒤 정확한 cycle 수로 재실행해 PASS했다. 이 stress에서 큰 FIFO drop은 네 tile의 burst를 한 개 transform lane으로 보내는 의도적 과부하 결과이며 숨기지 않는다.
+
+**동일 자극 K=1/K=8 비교**: 4x4 두 endpoint에 같은 event와 pose를 넣어 front-end 차이가 아닌 transform lane 수의 영향을 분리했다. light profile은 둘 다 `generated=accepted=delivered=48`, drop 0이었고 latency p50/p99/max는 K=8이 `3/3/3 cycle`, K=1이 `4/4/4 cycle`이었다. 의도적 burst는 둘 다 `generated=640`, AER accepted/drop=`336/304`; K=8은 추가 drop 없이 336개 전부 전달하고 latency `5/5/5`, K=1은 FIFO에서 296개를 명시적으로 버려 40개를 전달하고 latency `27/33/33`이었다. 이는 K=1이 틀렸다는 뜻이 아니라 **입력 부하 envelope가 평균 1 event/cycle을 넘으면 유한 FIFO만으로 해결되지 않는다**는 설계 선택 근거다. 실제 차량 trace로 정상 envelope를 정하기 전에는 K=1 또는 K=8 어느 쪽도 최종 선택하지 않는다.
+
+**재현/PPA 준비**: 기본 회귀에는 4x4 K=1과 8x8 sensor-to-map 통합을 추가했고, 약 96초가 필요한 8x8 10k random stress는 `--extended`에 넣었다. 4x4 K=8, 4x4 K=1, 8x8 K=1을 같은 5 ns/45 nm 조건으로 합성하는 Genus script 세 개를 준비했다. 로컬에는 Genus가 없어 수치를 만들지 않았으며 서버 실행 전까지 area/power/timing은 미측정으로 남긴다. time-surface의 resettable register array도 기능 reference일 뿐, 큰 world map은 SRAM/BRAM macro와 writer를 분리해야 한다.
+
+- 신규 RTL: `rtl/aer_tx16_pose_affine2d_serial.v`, `rtl/aer_tx64_pose_time_surface.v`
+- 신규 검증: `tb/tb_aer_tx16_pose_affine2d_serial.v`, `tb/tb_stage2_k1_k8_comparison.v`, `tb/tb_aer_tx64_pose_affine2d_serial_random.v`, `tb/tb_aer_tx64_pose_time_surface.v`
+- 신규 실행 문서/PPA script: `STAGE2_RTL.md`, `syn/run_genus_stage2_tx16_parallel.tcl`, `syn/run_genus_stage2_tx16_serial.tcl`, `syn/run_genus_stage2_tx64_serial.tcl`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`
+

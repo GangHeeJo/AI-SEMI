@@ -314,14 +314,13 @@ M0~M7 완료 뒤에만 진행한다.
 - M1: supplied-pose 2D affine fixed-point contract, vector generator, 122-vector bit-exact RTL 완료
 - M3: column별 pose/timestamp를 보존하는 4x4 AER와 pose overwrite guard 완료
 - M4: 8-parallel transform 4x4 top 및 ready/valid coordinate stream 완료
-- M5 일부: 8-to-1 batch FIFO와 stall-safe 4-way RR, 8x8/K=1 serial top 완료
-- M6 일부: occurrence timestamp 우선의 작은 reference time-surface 완료; macro interface/PPA는 미완료
+- M5 기능 endpoint: 4x4 K=1/K=8과 8x8 K=1 top, light/burst 동일 workload 비교 완료; 실제 trace envelope와 PPA는 진행 중
+- M6 기능 prototype: occurrence timestamp 우선의 작은 reference time-surface와 8x8 sensor-to-map 폐루프 완료; macro interface/PPA는 미완료
 - M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge, single transform 통합 완료
 
 다음 순서는 다음과 같다.
 
-1. 4x4에서 K=1과 K=8 endpoint를 같은 workload로 비교하고 transform FIFO overflow/latency를 측정한다.
-2. 8x8 serial stream을 time-surface에 연결해 stale occurrence와 동일-cell 충돌까지 end-to-end 검증한다.
-3. 실제 차량/회전 trace로 application metric과 정상 부하 envelope를 정한다.
-4. 서버에서 4x4 K=1/K=8 및 8x8 K=1의 Genus PPA를 얻는다.
-5. 측정 결과가 필요성을 보일 때만 K=2/4 또는 SRAM/BRAM writer를 추가한다.
+1. 실제 차량/회전 trace로 application metric과 정상 부하 envelope를 정한다.
+2. 같은 trace에서 K=1의 FIFO depth sweep과 K=8을 비교한다.
+3. 서버에서 4x4 K=1/K=8 및 8x8 K=1의 Genus PPA를 얻는다.
+4. 측정 결과가 필요성을 보일 때만 K=2/4 또는 SRAM/BRAM writer를 추가한다.
