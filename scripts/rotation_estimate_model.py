@@ -82,19 +82,69 @@ def run_window_size(events, table, window):
     return errors
 
 
+def run_tracking(events, table, window, radius):
+    """개선판 -- 매 윈도우마다 256개 후보 전부를 다시 찾는 대신, 직전 추정치 근방
+    [-radius,+radius] 안에서만 찾는다("회전은 갑자기 안 튄다"는 물리적 연속성 가정,
+    실제 추적 시스템에서 흔한 기법). 전수 탐색이 국소적으로 비슷해 보이는(aliasing) 먼
+    후보로 튀는 걸 막아서 안정성이 나아지는지 확인하는 게 목적."""
+    world_mem = {}
+    errors = []
+    current = 0
+    n = len(events)
+    for start in range(0, n, window):
+        chunk = events[start:start + window]
+        candidates = range(N_THETA) if not world_mem else [
+            (current + d) % N_THETA for d in range(-radius, radius + 1)
+        ]
+        best_theta, best_score = None, None
+        for theta_idx in candidates:
+            score = 0
+            for row, col, pol, _gt in chunk:
+                X, Y = table[(row, col, theta_idx)]
+                cell = world_mem.get((X, Y))
+                if cell is not None:
+                    score += 1 if cell == pol else -1
+            if best_score is None or score > best_score:
+                best_score, best_theta = score, theta_idx
+
+        if not world_mem:
+            best_theta = 0  # 부트스트랩(run_window_size와 동일 이유)
+
+        current = best_theta
+        for row, col, pol, _gt in chunk:
+            X, Y = table[(row, col, best_theta)]
+            world_mem[(X, Y)] = pol
+
+        gt_repr = chunk[len(chunk) // 2][3]
+        errors.append(circular_diff(best_theta, gt_repr))
+    return errors
+
+
 def demo():
     events = load_events(EVENTMETA_PATH)
     table = build_transform_table()
     print(f"loaded {len(events)} real UZH events, theta 후보 {N_THETA}개, 사전계산 테이블 {len(table)}칸")
 
+    deg_per_idx = 360.0 / N_THETA
+
+    print("-- v1: 매 윈도우 256개 후보 전수탐색 --")
     for window in (8, 16, 32, 64):
         errors = run_window_size(events, table, window)
         mean_err = sum(errors) / len(errors)
         max_err = max(errors)
-        deg_per_idx = 360.0 / N_THETA
         print(f"W={window:3d}: windows={len(errors):4d} "
               f"mean_err={mean_err:5.2f}idx({mean_err*deg_per_idx:5.1f}deg) "
               f"max_err={max_err:3d}idx({max_err*deg_per_idx:5.1f}deg)")
+
+    print("-- v2: 직전 추정치 근방(radius)만 탐색(tracking) --")
+    for window in (4, 8, 16):
+        for radius in (4, 8, 16, 32):
+            errors = run_tracking(events, table, window, radius)
+            mean_err = sum(errors) / len(errors)
+            max_err = max(errors)
+            print(f"W={window:3d} radius={radius:3d}: windows={len(errors):4d} "
+                  f"mean_err={mean_err:5.2f}idx({mean_err*deg_per_idx:5.1f}deg) "
+                  f"max_err={max_err:3d}idx({max_err*deg_per_idx:5.1f}deg)")
 
 
 if __name__ == "__main__":
