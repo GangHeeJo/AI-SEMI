@@ -123,6 +123,7 @@ module tb_world_time_surface_sram_writer;
   integer random_value;
   integer send_done;
   integer drain_count;
+  integer baseline_stale;
 
   reg held_event;
   reg held_mapped_valid;
@@ -237,6 +238,7 @@ module tb_world_time_surface_sram_writer;
 
   task automatic sample_before_edge;
     reg [1:0] incoming_polarity;
+    reg [TIMESTAMP_W-1:0] timestamp_delta;
     begin
       check_stability;
       check_phase_outputs;
@@ -282,8 +284,11 @@ module tb_world_time_surface_sram_writer;
                 mem_rd_rsp_polarity_seen !== oracle_polarity[pending_addr])
               fail("read response differs from the software memory oracle");
             incoming_polarity = pending_polarity ? 2'b10 : 2'b01;
+            timestamp_delta = pending_timestamp -
+                              oracle_timestamp[pending_addr];
             if (!oracle_valid[pending_addr] ||
-                pending_timestamp > oracle_timestamp[pending_addr]) begin
+                ((timestamp_delta != {TIMESTAMP_W{1'b0}}) &&
+                 !timestamp_delta[TIMESTAMP_W-1])) begin
               expected_write_addr = pending_addr;
               expected_write_timestamp = pending_timestamp;
               expected_write_polarity = incoming_polarity;
@@ -403,6 +408,20 @@ module tb_world_time_surface_sram_writer;
     end
   endtask
 
+  task automatic wait_for_idle;
+    integer wait_limit;
+    begin
+      wait_limit = 0;
+      while ((model_phase != IDLE || response_pending || mem_rd_rsp_valid) &&
+             wait_limit < 100) begin
+        tick;
+        wait_limit = wait_limit + 1;
+      end
+      if (model_phase != IDLE || response_pending || mem_rd_rsp_valid)
+        fail("directed SRAM transaction did not drain");
+    end
+  endtask
+
   initial begin
     rst = 1'b1;
     event_valid = 0;
@@ -486,6 +505,28 @@ module tb_world_time_surface_sram_writer;
     send_event(1, GRID_W, 3, 1, 302);
     send_event(1, 2, -2, 0, 303);
     send_event(1, 2, GRID_H, 1, 304);
+
+    // The stored timestamp must advance correctly across counter wrap.
+    address = 4*GRID_W + 5;
+    send_event(1, 5, 4, 0, 12'hffe);
+    wait_for_idle;
+    if (!memory_valid[address] || memory_timestamp[address] != 12'hffe ||
+        memory_polarity[address] != 2'b01)
+      fail("wrap setup did not initialize the selected cell");
+    send_event(1, 5, 4, 1, 12'h002);
+    wait_for_idle;
+    if (memory_timestamp[address] != 12'h002 ||
+        memory_polarity[address] != 2'b10)
+      fail("post-wrap timestamp was not treated as newer");
+    baseline_stale = stale_count;
+    send_event(1, 5, 4, 0, 12'hffd);
+    wait_for_idle;
+    send_event(1, 5, 4, 0, 12'h802);
+    wait_for_idle;
+    if (stale_count != baseline_stale + 2 ||
+        memory_timestamp[address] != 12'h002 ||
+        memory_polarity[address] != 2'b10)
+      fail("pre-wrap or half-range timestamp was not held stale");
 
     for (event_index = 0; event_index < RANDOM_EVENTS;
          event_index = event_index + 1) begin

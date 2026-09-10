@@ -2644,3 +2644,11 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규 합성 entry: `syn/run_genus_stage2_tx16_serial_d128.tcl`, `syn/run_genus_stage2_tx16_banked_k2_d32.tcl`, `syn/run_genus_stage2_tx16_banked_k4_d8.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`, `STAGE2_RTL.md`, guard-width defaults
 
+## 109. Timestamp counter wrap 경계 제거 — FF/SRAM map의 모듈러 순서화(2026-09-10)
+
+**발견**: 두 time-surface 구현이 timestamp를 단순 unsigned `>`로 비교해, 예를 들어 16-bit counter의 `0xfffe` 다음에 발생한 `0x0002`를 오래된 event로 버리는 제한이 있었다. 문서에는 map epoch 안에서 wrap이 없어야 한다고 적혀 있었지만, 장시간 동작 센서에서는 map을 counter wrap마다 비우는 것이 실제 사용 경계로 남는다.
+
+**수정**: FF reference와 외부 SRAM writer 모두 `candidate-reference`의 최상위 비트로 모듈러 순서를 판정한다. 차이가 0이면 equal merge, `(0, 2^(W-1))`이면 newer, 나머지는 stale이다. 정확히 반 바퀴 차이는 순서를 유일하게 정할 수 없으므로 보수적으로 stale 처리한다. 따라서 같은 cell에서 비교되는 event의 최대 발생시각 차이가 timestamp 범위의 절반 미만이어야 하며, timestamp source 자체가 reset되면 map도 reset해야 한다.
+
+**검증 추가**: 두 memory 경로에 wrap 직전 `0xffe/0xfffe`에서 wrap 직후 `0x002/0x0002`로의 정상 갱신, wrap 이전 지연 event의 stale 처리, 정확히 half-range 차이의 보수적 stale 처리를 추가했다. SRAM 경로는 최종 cell 값과 stale pulse 두 번을 상수로 직접 검사해 RTL과 oracle의 동형 오류도 방지했다. 첫 상수검사는 event input handshake 직후 아직 SRAM transaction이 끝나기 전에 memory를 읽어 3건 실패했고, transaction drain 뒤 검사하도록 고쳐 통과했다. random SRAM oracle도 같은 모듈러 규칙으로 바꿔 wrap을 반복 통과하도록 유지했다. 기본 20/20과 UZH/full50/K1·K2·K4·K8 sweep을 포함한 전체 회귀 **38/38 PASS**.
+

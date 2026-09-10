@@ -1,10 +1,12 @@
 // One-event-per-cycle reference-grid time surface.
 //
-// A cell stores the greatest occurrence timestamp seen for that coordinate and
+// A cell stores the newest occurrence timestamp seen for that coordinate and
 // two polarity bits for events tied at that timestamp.  OR-merging equal-time
 // polarity makes same-cell collisions deterministic even if AER arbitration
-// changes their retirement order.  Timestamp comparison is ordinary unsigned
-// comparison; the producer must reset/start a new map epoch before wrap.
+// changes their retirement order. Timestamp ordering uses modulo arithmetic,
+// so a counter wrap is safe when all events compared for one cell differ by
+// less than half the timestamp range. An exact half-range difference is
+// intentionally treated as stale because its ordering is ambiguous.
 //
 // This small synthesizable array is a functional reference.  Large maps should
 // replace the storage with an SRAM/BRAM macro while keeping this update rule.
@@ -52,13 +54,18 @@ module world_time_surface #(
     $unsigned(world_y) * GRID_W + $unsigned(world_x);
   wire [$clog2(CELLS)-1:0] read_addr = read_y * GRID_W + read_x;
   wire read_coordinate_in_range = (read_x < GRID_W) && (read_y < GRID_H);
+  wire [TIMESTAMP_W-1:0] timestamp_delta =
+    occurrence_timestamp - timestamp_mem[write_addr];
+  wire timestamp_is_newer =
+    (timestamp_delta != {TIMESTAMP_W{1'b0}}) &&
+    !timestamp_delta[TIMESTAMP_W-1];
   assign event_ready = ~rst;
   assign read_valid = read_coordinate_in_range ? valid_mem[read_addr] : 1'b0;
   assign read_timestamp = read_valid
                         ? timestamp_mem[read_addr] : {TIMESTAMP_W{1'b0}};
   assign read_polarity_seen = read_valid ? polarity_mem[read_addr] : 2'b00;
 
-  // Contract: GRID_W/H and COORD_W are at least 2; TIMESTAMP_W is positive.
+  // Contract: GRID_W/H, COORD_W, and TIMESTAMP_W are at least 2.
   always @(posedge clk) begin
     if (rst) begin
       update_applied <= 1'b0;
@@ -80,8 +87,7 @@ module world_time_surface #(
         if (!coordinate_in_range) begin
           range_error <= 1'b1;
         end else begin
-          if (!valid_mem[write_addr] ||
-              occurrence_timestamp > timestamp_mem[write_addr]) begin
+          if (!valid_mem[write_addr] || timestamp_is_newer) begin
             valid_mem[write_addr] <= 1'b1;
             timestamp_mem[write_addr] <= occurrence_timestamp;
             polarity_mem[write_addr] <= incoming_polarity;

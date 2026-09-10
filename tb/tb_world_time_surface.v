@@ -146,6 +146,24 @@ module tb_world_time_surface;
     send_event(6, 5, 77, 0, 1);
     check_read(6, 5, 1, 77, 2'b01);
     check_read(2, 3, 1, 110, 2'b10);
+
+    // Counter wrap preserves occurrence order within the half-range window.
+    send_event(5, 4, 16'hfffe, 0, 1);
+    send_event(5, 4, 16'h0002, 1, 1);
+    if (!update_applied || equal_time_merged || stale_ignored || range_error)
+      errors = errors + 1;
+    check_read(5, 4, 1, 16'h0002, 2'b10);
+    send_event(5, 4, 16'hfffd, 0, 1);
+    if (update_applied || equal_time_merged || !stale_ignored || range_error)
+      errors = errors + 1;
+    check_read(5, 4, 1, 16'h0002, 2'b10);
+
+    // Exactly half the counter range has no unique modular ordering.
+    send_event(5, 4, 16'h8002, 0, 1);
+    if (update_applied || equal_time_merged || !stale_ignored || range_error)
+      errors = errors + 1;
+    check_read(5, 4, 1, 16'h0002, 2'b10);
+
     check_read(0, 0, 0, 0, 2'b00);
     check_read(7, 7, 0, 0, 2'b00);
 

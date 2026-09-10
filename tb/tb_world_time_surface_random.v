@@ -173,6 +173,7 @@ module tb_world_time_surface_random;
     reg expected_range;
     reg apply_update;
     reg [TIMESTAMP_W-1:0] next_timestamp;
+    reg [TIMESTAMP_W-1:0] timestamp_delta;
     reg [1:0] next_polarity;
     reg [1:0] incoming_polarity;
     begin
@@ -201,8 +202,11 @@ module tb_world_time_surface_random;
           expected_range = 1'b1;
         end else begin
           event_address = $signed(world_y) * GRID_W + $signed(world_x);
+          timestamp_delta = occurrence_timestamp -
+                            model_timestamp[event_address];
           if (!model_valid[event_address] ||
-              occurrence_timestamp > model_timestamp[event_address]) begin
+              ((timestamp_delta != {TIMESTAMP_W{1'b0}}) &&
+               !timestamp_delta[TIMESTAMP_W-1])) begin
             expected_update = 1'b1;
             apply_update = 1'b1;
           end else if (occurrence_timestamp ==

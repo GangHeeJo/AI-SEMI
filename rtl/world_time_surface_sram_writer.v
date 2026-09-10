@@ -2,7 +2,10 @@
 //
 // The external memory stores {valid, timestamp, polarity_seen}. This block
 // accepts one event, issues one read, compares the stored timestamp, and issues
-// a write only for a newer or equal-time event. There is deliberately only one
+// a write only for a newer or equal-time event. Timestamp ordering is modulo
+// the counter width and is unambiguous while compared events differ by less
+// than half the timestamp range; an exact half-range difference is stale.
+// There is deliberately only one
 // outstanding event: with zero stalls, an updating event takes a read-request,
 // read-response, and write-request cycle before the next event can be accepted.
 // Large-map storage and initialization therefore stay outside resettable FFs.
@@ -64,6 +67,11 @@ module world_time_surface_sram_writer #(
     ($signed(world_x) >= 0) && ($signed(world_x) < GRID_W) &&
     ($signed(world_y) >= 0) && ($signed(world_y) < GRID_H);
   wire [1:0] incoming_polarity = pending_polarity ? 2'b10 : 2'b01;
+  wire [TIMESTAMP_W-1:0] timestamp_delta =
+    pending_timestamp - mem_rd_rsp_timestamp;
+  wire timestamp_is_newer =
+    (timestamp_delta != {TIMESTAMP_W{1'b0}}) &&
+    !timestamp_delta[TIMESTAMP_W-1];
 
   assign event_ready = !rst && (state == IDLE);
   assign mem_rd_req_valid = !rst && (state == READ_REQUEST);
@@ -75,8 +83,9 @@ module world_time_surface_sram_writer #(
   assign mem_wr_req_timestamp = pending_write_timestamp;
   assign mem_wr_req_polarity_seen = pending_write_polarity;
 
-  // Contract: grid dimensions, TIMESTAMP_W, and ADDR_W are positive, and
-  // COORD_W >= 2.  Checks stay in verification code for synthesis portability.
+  // Contract: grid dimensions and ADDR_W are positive; COORD_W and
+  // TIMESTAMP_W are at least 2. Checks stay in verification code for
+  // synthesis portability.
   always @(posedge clk) begin
     if (rst) begin
       state <= IDLE;
@@ -122,8 +131,7 @@ module world_time_surface_sram_writer #(
 
         READ_RESPONSE: begin
           if (mem_rd_rsp_valid) begin
-            if (!mem_rd_rsp_cell_valid ||
-                pending_timestamp > mem_rd_rsp_timestamp) begin
+            if (!mem_rd_rsp_cell_valid || timestamp_is_newer) begin
               pending_write_timestamp <= pending_timestamp;
               pending_write_polarity <= incoming_polarity;
               pending_equal <= 1'b0;
