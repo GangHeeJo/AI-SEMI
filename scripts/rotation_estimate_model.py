@@ -239,6 +239,61 @@ def run_bayes_filter(events, table, diffuse_eps=0.02, like_match=2.0, like_misma
     return errors
 
 
+def run_bayes_filter_confidence(events, table, diffuse_eps=0.04, like_match=4.0, like_mismatch=0.25,
+                                 max_strength=4):
+    """run_bayes_filter()의 world_mem 표현을 강화한 판(§124) -- 칸마다 "마지막 극성 1개"만
+    저장하던 걸 ON/OFF 관측 횟수 누적으로 바꿔서, 한 번 본 칸과 여러 번 일관되게 본 칸을
+    다르게(신뢰도 가중) 취급한다. Kim2014의 지도가 단일 비트가 아니라 누적 gradient
+    추정치인 것과 같은 방향 -- 정보 손실(반복 관측을 버리던 것)을 줄이는 게 목적.
+
+    strength = min(총 관측횟수, max_strength) / max_strength (0~1) -- 처음 본 칸은 약하게,
+    여러 번 일관되게 확인된 칸은 강하게 믿는다(포화형, 무한정 확신하지 않도록 상한을 둠).
+    """
+    world_on = {}
+    world_off = {}
+    belief = [0.0] * N_THETA
+    belief[0] = 1.0
+    errors = []
+
+    for row, col, pol, gt in events:
+        new_belief = [0.0] * N_THETA
+        for i in range(N_THETA):
+            new_belief[i] = ((1 - 2 * diffuse_eps) * belief[i]
+                              + diffuse_eps * belief[i - 1]
+                              + diffuse_eps * belief[(i + 1) % N_THETA])
+        belief = new_belief
+
+        total = 0.0
+        for theta_idx in range(N_THETA):
+            X, Y = table[(row, col, theta_idx)]
+            n_on = world_on.get((X, Y), 0)
+            n_off = world_off.get((X, Y), 0)
+            n_total = n_on + n_off
+            if n_total == 0:
+                like = 1.0
+            else:
+                dominant = 1 if n_on > n_off else 0
+                strength = min(n_total, max_strength) / max_strength
+                if dominant == pol:
+                    like = 1.0 + strength * (like_match - 1.0)
+                else:
+                    like = 1.0 - strength * (1.0 - like_mismatch)
+            belief[theta_idx] *= like
+            total += belief[theta_idx]
+        if total > 0:
+            belief = [b / total for b in belief]
+
+        map_theta = max(range(N_THETA), key=lambda t: belief[t])
+        X, Y = table[(row, col, map_theta)]
+        if pol:
+            world_on[(X, Y)] = world_on.get((X, Y), 0) + 1
+        else:
+            world_off[(X, Y)] = world_off.get((X, Y), 0) + 1
+        errors.append(circular_diff(map_theta, gt))
+
+    return errors
+
+
 def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
     events = load_events(eventmeta_path, n)
     table = build_transform_table(n)
