@@ -2701,3 +2701,5 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 수정: `rtl/world_mem_writer.v`, `rtl/aer_tx16_coord_transform_v1.v`, `tb/tb_aer_tx16_coord_transform_v1_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_correctness.v`, `syn/run_genus_aer_tx16_coord_transform_v1.tcl`
 - 다음: 새 구조로 Genus 재합성 -- 저장소가 이제 RTL에 없으니 §112의 98% 면적 문제가 실제로 사라지는지 실측 확인
 
+**참고(2026-09-10, Genus 재합성 대기 중 확인)**: `gsclib045` PDK 안에 SRAM 매크로/메모리 컴파일러가 있는지 찾아봤는데 **없음**(`cdl/gds/lef/timing/verilog` 등 표준셀 라이브러리만 있는 순수 교육용 kit) -- 그래서 world memory 저장소를 "진짜 SRAM 숫자"로 채우는 건 이 툴체인으로는 애초에 불가능함. 처리 파이프라인(steal_buf_polarity_pose + coord_transform_rmcm x8 + world_mem_writer의 FIFO/arbiter) PPA만 실측 보고하고, 저장소는 이상화된 외부 컴포넌트로 계속 가정하는 게 이 환경에서 낼 수 있는 최선의 정직한 답 -- 발표 시 이 한계를 명시할 것.
+
