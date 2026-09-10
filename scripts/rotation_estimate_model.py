@@ -47,6 +47,24 @@ def load_events(path, n=PATCH_N):
     return events
 
 
+def load_events_ts(path, n=PATCH_N):
+    """load_events()와 같지만 타임스탬프도 같이 반환 -- §119에서 발견한 confound(패치가
+    커질수록 같은 이벤트 개수가 더 짧은 실제 시간만 담는 문제)를 없앤 시간 기준 윈도우용."""
+    events = []
+    with open(path) as f:
+        header = f.readline().rstrip("\n").split("\t")
+        idx = {name: i for i, name in enumerate(header)}
+        for line in f:
+            parts = line.rstrip("\n").split("\t")
+            source = int(parts[idx["source"]])
+            row, col = source // n, source % n
+            pol = int(parts[idx["polarity"]])
+            gt_theta = int(parts[idx["theta_idx"]])
+            ts_ns = int(parts[idx["occurrence_timestamp_ns"]])
+            events.append((row, col, pol, gt_theta, ts_ns))
+    return events
+
+
 def build_transform_table(n=PATCH_N):
     """(row,col,theta_idx) -> (X,Y) 사전계산(n=4면 RMCM 룩업과 같은 4096가지 표) --
     매 윈도우마다 transform()을 다시 부르는 대신 이 표를 인덱싱해서 속도를 낸다."""
@@ -88,6 +106,53 @@ def run_window_size(events, table, window):
 
         gt_repr = chunk[len(chunk) // 2][3]  # 윈도우 중간 이벤트의 실제 theta를 대표값으로 사용
         errors.append(circular_diff(best_theta, gt_repr))
+    return errors
+
+
+def run_window_time(events_ts, table, window_ms, min_events=1):
+    """run_window_size()와 같은 채점/부트스트랩 로직이지만, 이벤트 개수 대신 실제 시간
+    (window_ms) 단위로 윈도우를 자른다 -- N(패치 크기)이 달라져도 각 윈도우가 담는 실제
+    시간 길이가 똑같아서 §119의 confound 없이 공정하게 비교 가능.
+
+    min_events: 시간이 다 찼어도 이벤트가 이 개수 미만이면 계속 누적(다음 시간 구간과
+    합침) -- 조용한 구간에서 이벤트 1~2개짜리 윈도우가 사실상 무작위 추정을 내고 그게
+    causal하게 이후 윈도우까지 오염시키는 문제(실측으로 확인, §119 재실험)를 막는다."""
+    world_mem = {}
+    errors = []
+    if not events_ts:
+        return errors
+    window_ns = window_ms * 1_000_000
+    bucket_end = events_ts[0][4] + window_ns
+    bucket = []
+
+    def process(chunk):
+        if not chunk:
+            return
+        scores = [0] * N_THETA
+        for row, col, pol, _gt, _ts in chunk:
+            for theta_idx in range(N_THETA):
+                X, Y = table[(row, col, theta_idx)]
+                cell = world_mem.get((X, Y))
+                if cell is not None:
+                    scores[theta_idx] += 1 if cell == pol else -1
+        best_theta = max(range(N_THETA), key=lambda t: scores[t])
+        if not world_mem:
+            best_theta = 0
+        for row, col, pol, _gt, _ts in chunk:
+            X, Y = table[(row, col, best_theta)]
+            world_mem[(X, Y)] = pol
+        gt_repr = chunk[len(chunk) // 2][3]
+        errors.append(circular_diff(best_theta, gt_repr))
+
+    for ev in events_ts:
+        if ev[4] >= bucket_end and len(bucket) >= min_events:
+            process(bucket)
+            bucket = []
+            bucket_end = ev[4] + window_ns
+        elif ev[4] >= bucket_end:
+            bucket_end = ev[4] + window_ns  # 시간은 다 찼지만 개수 부족 -- 창을 밀고 계속 누적
+        bucket.append(ev)
+    process(bucket)
     return errors
 
 
