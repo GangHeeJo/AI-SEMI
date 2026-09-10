@@ -2707,3 +2707,21 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규 오라클/검증: `scripts/gen_uzh_physical_affine_vectors.py`, `tb/tb_coord_transform_affine2d_uzh_physical.v`, `STAGE2_PHYSICAL_MAPPING.md`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`
 
+## 113. K=4 좌표변환 → 4-bank 외부 SRAM time-surface 통합(2026-09-10)
+
+**왜 이 단계가 필요한가**: §111에서 K=4 변환기를 단일 출력으로 다시 합치면 K=1과 같은 1 event/cycle 병목이 생겨, K=4의 무손실 이점이 사라지는 것을 확인했다. 따라서 변환 lane 수만 늘린 미완성 endpoint가 아니라 downstream map까지 네 이벤트를 독립적으로 받을 수 있는 구조를 실제 RTL로 닫았다.
+
+**주소 기반 4-bank map**: `world_time_surface_sram_banked4`는 transform lane 번호가 아니라 최종 `world_x mod 4`로 bank를 선택하고 bank-local x를 `world_x/4`로 만든다. 그래서 같은 world cell은 입력 lane과 도착 순서가 달라도 반드시 같은 timestamp writer에서 비교된다. 네 개의 stall-safe round-robin arbiter와 네 개의 기존 external-SRAM read/modify/write writer를 사용하며, 다른 bank는 병렬 진행하고 같은 bank 충돌은 손실 없이 backpressure한다. 미등록 pose인 `mapped_valid=0` record는 메모리를 건드리지 않고 소비하며, mapped range error는 기존 writer의 진단 pulse를 유지한다. 최종 cell 상태는 서비스 순서와 무관하지만 update/stale pulse 개수는 서비스 순서에 따라 달라질 수 있음을 계약에 명시했다.
+
+**완전한 4x4 endpoint**: `aer_tx16_pose_affine2d_k4_sram_surface`로 1차 4x4 AER, occurrence pose/timestamp 보존, K=4 FIFO/affine transform, world-coordinate crossbar, 네 external SRAM bank interface를 한 top으로 연결했다. storage bitcell은 포함하지 않고 bank당 `{valid,timestamp,polarity_seen[1:0]}` memory-controller handshake만 노출한다. `GRID_W`는 4의 배수이고, 두 grid 축의 signed coordinate 표현 범위, `TIMESTAMP_W>=2`, bank address 폭 계약도 문서화했다.
+
+**검증**:
+
+- router/writer 단위: 서로 다른 네 bank 동시 진행, read/write port 독립 stall, 네 lane의 동일 bank 동시 경쟁, newer/equal/stale, unmapped 및 range-error를 검사했다. `accepted=16`, `reads=14`, `writes=13`, `updates=13`, `equal=1`, `stale=1`, `range=1`, 오류 0.
+- 전체 E2E: identity pose에서 한 row의 네 column이 같은 cycle에 네 bank로 진행하는지, bank-local 주소와 polarity/timestamp write payload, 같은 cell의 newer/equal/stale, unknown pose의 SRAM 무접근, AER/FIFO/pose guard 최종 drain을 검사했다. `inputs=8`, `world=8`, `invalid=1`, `reads=7`, `writes=6`, `updates=6`, `equal=1`, `stale=1`, 오류 0.
+- 기본 회귀 **23/23 PASS**, 합성-facing Verilog-2005 top elaboration **8/8 PASS**. 실제 45 nm Genus PPA와 SRAM macro 면적·전력은 서버 후속 측정이며 아직 완료로 쓰지 않는다.
+
+- 신규 RTL: `rtl/world_time_surface_sram_banked4.v`, `rtl/aer_tx16_pose_affine2d_k4_sram_surface.v`
+- 신규 검증/합성 entry: `tb/tb_world_time_surface_sram_banked4.v`, `tb/tb_aer_tx16_pose_affine2d_k4_sram_surface.v`, `syn/run_genus_stage2_tx16_k4_banked_surface.tcl`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`
+

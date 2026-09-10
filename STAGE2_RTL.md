@@ -12,6 +12,7 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `aer_tx16_pose_affine2d_serial` | 4x4 | 1 | one ready/valid event | K=1 throughput/PPA endpoint |
 | `aer_tx16_pose_affine2d_banked` | 4x4 | parameterized 1/2/4/8 | K independent ready/valid events | measured intermediate K endpoints |
 | `aer_tx16_pose_affine2d_k4_serial` | 4x4 | 4, merged to 1 | one ready/valid event | apples-to-apples single-port K=4 PPA endpoint |
+| `aer_tx16_pose_affine2d_k4_sram_surface` | 4x4 | 4 | four address-striped external SRAM banks | complete K=4 map-control endpoint |
 | `aer_tx64_pose_affine2d_serial` | 8x8 (four leaves) | 1 shared | one ready/valid event | tile hierarchy and upper-merge proof |
 | `aer_tx64_pose_time_surface` | 8x8 (four leaves) | 1 shared | internal always-ready map writer plus read port | closed sensor-to-map proof |
 | `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
@@ -71,6 +72,19 @@ The reference time surface keeps the newest occurrence timestamp per cell. Equal
 
 For a large grid, `world_time_surface_sram_writer` stores no cell array internally. It issues one ready/valid read request, waits for the matching response, and issues a write only for a newer or equal-time event. The external memory cell is `{valid, timestamp, polarity_seen[1:0]}`. Request valid/address/data remain stable until ready. The current writer deliberately allows only one outstanding event, so it is a correctness-oriented macro boundary rather than a high-throughput memory engine; banking or a hazard-aware pipeline is required if measured traffic cannot tolerate its backpressure.
 
+`world_time_surface_sram_banked4` stripes valid mapped cells by
+`bank=world_x mod 4`, with bank-local `x=floor(world_x/4)`. Four round-robin
+arbiters resolve same-bank collisions and four independent writers preserve
+parallel progress across different banks. Routing by world coordinate—not by
+transform lane—is required so every update to one cell reaches the same
+timestamp authority. `GRID_W` must be at least four and divisible by four.
+Both grid dimensions must fit signed `COORD_W`, `TIMESTAMP_W` must be at least
+two, and an overridden `ADDR_W` must cover `(GRID_W/4)*GRID_H` cells per bank.
+There is no hidden router drop or ingress FIFO: a busy destination propagates
+backpressure to the affected transform. The current writer still takes a
+multi-cycle read/modify/write transaction, so four banks provide concurrency,
+not an unconditional sustained four events per cycle.
+
 ## Verification
 
 Run the normal suite from the repository root:
@@ -107,9 +121,15 @@ python scripts/run_stage2_regression.py --physical
 `STAGE2_PHYSICAL_MAPPING.md` records the input hashes, quaternion-direction
 validation, exact spherical model, measured affine error, and limitations.
 
+The default suite also drives the complete 4x4 K=4 path through identity
+mapping and a four-bank SRAM model. It checks concurrent bank progress,
+same-cell newer/equal/stale handling, unknown-pose suppression, and final
+AER/FIFO/pose-reference drain accounting. The standalone router test adds
+same-bank four-way contention plus independent read/write-port stalls.
+
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in UZH timing, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the seven PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the eight PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
 
 The default suite includes a same-stimulus K=1/K=8 comparison. Its light profile must be lossless for both endpoints; its deliberately overloaded profile reports the finite K=1 FIFO loss and latency instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random stress is part of `--extended` because it is substantially slower under Icarus.
 
@@ -124,6 +144,7 @@ genus -batch -files syn/run_genus_stage2_tx16_serial_d128.tcl
 genus -batch -files syn/run_genus_stage2_tx16_banked_k2_d32.tcl
 genus -batch -files syn/run_genus_stage2_tx16_banked_k4_d8.tcl
 genus -batch -files syn/run_genus_stage2_tx16_k4_serial_d32.tcl
+genus -batch -files syn/run_genus_stage2_tx16_k4_banked_surface.tcl
 genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
 ```
 

@@ -252,6 +252,9 @@ def run_synthesis_elaboration(
         "rtl/rr_stream_arbiter4.v",
         "rtl/aer_tx16_pose_affine2d_k4_serial.v",
         "rtl/aer_tx64_pose_affine2d_serial.v",
+        "rtl/world_time_surface_sram_writer.v",
+        "rtl/world_time_surface_sram_banked4.v",
+        "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
     )
     configurations = (
         ("k8", "aer_tx16_pose_affine2d", ()),
@@ -269,6 +272,7 @@ def run_synthesis_elaboration(
         ("k4_serial_d32", "aer_tx16_pose_affine2d_k4_serial", (
             "-Paer_tx16_pose_affine2d_k4_serial.FIFO_DEPTH=32",
         )),
+        ("k4_banked_surface", "aer_tx16_pose_affine2d_k4_sram_surface", ()),
         ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
     )
     failures: list[str] = []
@@ -297,7 +301,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "7/7 Verilog-2005 tops elaborated" if not failures
+        "8/8 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -568,6 +572,38 @@ def regular_tests() -> tuple[HDLTest, ...]:
             ("rtl/world_time_surface_sram_writer.v",),
             "tb/tb_world_time_surface_sram_writer.v",
             "WORLD_TIME_SURFACE_SRAM_WRITER_PASS",
+        ),
+        HDLTest(
+            "world_time_surface_sram_banked4",
+            "tb_world_time_surface_sram_banked4",
+            (
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/world_time_surface_sram_writer.v",
+                "rtl/world_time_surface_sram_banked4.v",
+            ),
+            "tb/tb_world_time_surface_sram_banked4.v",
+            "WORLD_TIME_SURFACE_SRAM_BANKED4_PASS",
+        ),
+        HDLTest(
+            "aer_4x4_k4_sram_surface_e2e",
+            "tb_aer_tx16_pose_affine2d_k4_sram_surface",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx16_pose_affine2d_banked.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/world_time_surface_sram_writer.v",
+                "rtl/world_time_surface_sram_banked4.v",
+                "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
+            ),
+            "tb/tb_aer_tx16_pose_affine2d_k4_sram_surface.v",
+            "AER_TX16_POSE_AFFINE2D_K4_SRAM_SURFACE_PASS",
         ),
         HDLTest(
             "aer_8x8_pose_time_surface",
