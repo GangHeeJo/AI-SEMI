@@ -10,15 +10,20 @@ import sys
 
 from build_uzh_eventmeta_nxn import build as build_eventmeta
 from build_uzh_pose_theta import augment_eventmeta
-from rotation_estimate_model import N_THETA, build_transform_table, load_events_ts, run_window_time
+from rotation_estimate_model import N_THETA, build_transform_table, load_events, run_bayes_filter
 
 GROUNDTRUTH = "common_traces_uzh/uzh_shapes_rotation_groundtruth.txt"
 EVENTS_TXT = "shapes_rotation/events.txt"
 OUT_DIR = "common_traces_uzh"
-CENTER_X, CENTER_Y = 111, 86  # 기존 4x4 패치(110-113,85-88) 중심과 동일 -- N을 키워도
-                              # 같은 물리적 위치를 계속 관측해야 비교가 공정함
-WINDOW_MS_LIST = (50, 100, 200, 400, 800)  # §119 확인: 이벤트 "개수" 대신 실제 시간으로
-                                            # 잘라야 N마다 윈도우가 같은 시간폭을 담아 공정함
+CENTER_X, CENTER_Y = 112, 87  # 기존 4x4 패치(110-113,85-88)를 정확히 재현하는 중심 --
+                              # (n=4일 때 x0=center-2=110,x1=x0+3=113로 정확히 일치, 이벤트수
+                              # 8503으로 검증됨). §123에서 (111,86)이 실수로 1픽셀 어긋난
+                              # 다른(훨씬 안 좋은) 패치였음을 발견 -- 반드시 (112,87) 사용.
+                              # N을 키워도 같은 물리적 위치를 계속 관측해야 비교가 공정함.
+# §122에서 찾은 튜닝값(원래 4x4 패치 기준 최선) -- 이산 베이즈 필터, 윈도우 없음
+DIFFUSE_EPS = 0.04
+LIKE_MATCH = 4.0
+LIKE_MISMATCH = 0.25
 
 
 def run_one(n):
@@ -27,26 +32,23 @@ def run_one(n):
     build_eventmeta(n, CENTER_X, CENTER_Y, EVENTS_TXT, eventmeta)
     augment_eventmeta(eventmeta, GROUNDTRUTH, eventmeta_theta)
 
-    events_ts = load_events_ts(eventmeta_theta, n)
+    events = load_events(eventmeta_theta, n)
     table = build_transform_table(n)
-    best = None
-    for window_ms in WINDOW_MS_LIST:
-        errors = run_window_time(events_ts, table, window_ms, min_events=16)
-        if not errors:
-            continue
-        mean_err = sum(errors) / len(errors)
-        if best is None or mean_err < best[1]:
-            best = (window_ms, mean_err, max(errors), len(errors))
-    return len(events_ts), best
+    errors = run_bayes_filter(events, table, DIFFUSE_EPS, LIKE_MATCH, LIKE_MISMATCH)
+    mean_err = sum(errors) / len(errors)
+    max_err = max(errors)
+    tail = errors[-len(errors) // 10:]
+    tail_mean = sum(tail) / len(tail)
+    return len(events), mean_err, max_err, tail_mean
 
 
 def main():
     sizes = [int(x) for x in sys.argv[1:]] if len(sys.argv) > 1 else [4, 6, 8, 12, 16]
     deg_per_idx = 360.0 / N_THETA
-    print(f"{'N':>4} {'events':>8} {'best_Wms':>8} {'windows':>7} {'mean_err(idx)':>14} {'mean_err(deg)':>14} {'max_err(deg)':>13}")
+    print(f"{'N':>4} {'events':>8} {'mean_err(deg)':>14} {'max_err(deg)':>13} {'tail10%(deg)':>13}")
     for n in sizes:
-        n_events, (window_ms, mean_err, max_err, n_windows) = run_one(n)
-        print(f"{n:4d} {n_events:8d} {window_ms:8d} {n_windows:7d} {mean_err:14.2f} {mean_err*deg_per_idx:14.1f} {max_err*deg_per_idx:13.1f}")
+        n_events, mean_err, max_err, tail_mean = run_one(n)
+        print(f"{n:4d} {n_events:8d} {mean_err*deg_per_idx:14.1f} {max_err*deg_per_idx:13.1f} {tail_mean*deg_per_idx:13.1f}")
 
 
 if __name__ == "__main__":
