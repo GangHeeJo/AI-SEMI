@@ -10,10 +10,17 @@
 //
 // FIFO+arbiter8 부분은 v2와 동일: 레인마다 작은 FIFO(깊이 파라미터화, `small_fifo.v`)로
 // 버퍼링하고 arbiter8로 매 사이클 1개만 골라 커밋한다.
+//
+// stall(신규, 병렬 세션(codex/ai-semi-stage2) 제안 반영 -- progress.md 참고): 8레인 중
+// 하나라도 FIFO가 거의 찼으면(near_full) 업스트림(steal_buf)에 백프레셔를 걸어서 이번
+// 사이클 grant를 잠깐 멈추게 한다 -- "꽉 차면 버리고 개수만 센다"(overrun) 대신, 순간
+// 버스트를 steal_buf 자체의 2-deep 버퍼에 잠깐 담아두게 해서 애초에 overrun 자체를
+// 줄이는 게 목적. 지속적 과부하(steal_buf 2-deep도 다 차는 상황)에서는 손실이 steal_buf
+// 쪽 overrun으로 옮겨갈 뿐이라 여전히 발생할 수 있음 -- 이건 근본적 용량 한계라 정직한 결과.
 module world_mem_writer #(
   parameter integer N_LANES    = 8,
   parameter integer ADDR_BITS  = 6,
-  parameter integer FIFO_DEPTH = 32 // 실측(§114): 실트래픽에서 깊이4=13.3% overrun, 16=0.01%, 32=0%
+  parameter integer FIFO_DEPTH = 32 // 실측(§114, 백프레셔 추가 후에도 최종 채택): 깊이4=13.3% overrun, 16=0.01%, 32=0%
 )(
   input                             clk,
   input                             rst,
@@ -22,6 +29,7 @@ module world_mem_writer #(
   input  [N_LANES*ADDR_BITS-1:0]    wr_y,
   input  [N_LANES-1:0]              wr_pol,
   output [N_LANES-1:0]              wr_overrun,
+  output                            stall,
 
   // SRAM 스타일 단일 쓰기 포트 -- 실제 저장소는 이 인터페이스 바깥(테스트벤치 모델/BRAM/
   // SRAM 매크로)에 붙는다.
@@ -33,22 +41,25 @@ module world_mem_writer #(
 
   wire [N_LANES-1:0]   fifo_empty;
   wire [N_LANES-1:0]   fifo_full;
+  wire [N_LANES-1:0]   fifo_near_full;
   wire [N_LANES-1:0]   gnt;
   wire [FIFO_W-1:0]    fifo_pop_data [0:N_LANES-1];
 
   assign wr_overrun = wr_valid & fifo_full;
+  assign stall = |fifo_near_full;
 
   genvar g;
   generate
     for (g = 0; g < N_LANES; g = g + 1) begin : FIFO
-      small_fifo #(.WIDTH(FIFO_W), .DEPTH(FIFO_DEPTH)) u_fifo (
+      small_fifo #(.WIDTH(FIFO_W), .DEPTH(FIFO_DEPTH), .MARGIN(2)) u_fifo (
         .clk(clk), .rst(rst),
         .push(wr_valid[g]),
         .push_data({wr_y[g*ADDR_BITS +: ADDR_BITS], wr_x[g*ADDR_BITS +: ADDR_BITS], wr_pol[g]}),
         .pop(gnt[g]),
         .pop_data(fifo_pop_data[g]),
         .empty(fifo_empty[g]),
-        .full(fifo_full[g])
+        .full(fifo_full[g]),
+        .near_full(fifo_near_full[g])
       );
     end
   endgenerate

@@ -5,15 +5,21 @@
 // 대기하는 동안 카메라가 돌아서, 배출 시점 theta를 쓰면 틀린다"는 2차 설계의 실제 문제를
 // 근본적으로 해결(v1은 배출 시점의 살아있는 theta를 썼음, progress.md §111의 캐베앗 참고).
 //
-// 변경점은 딱 하나: polarity_in과 나란히 theta_idx_in을 입력받아 같은 타이밍(같은 push/pop
-// 조건)으로 저장하고, pol_mask0/1(4x1비트)과 같은 방식으로 pose_mask0/1(4x8비트, 열마다
-// 서로 다른 발생시점 theta를 가질 수 있음)을 출력한다.
+// 변경점 1: polarity_in과 나란히 theta_idx_in을 입력받아 같은 타이밍(같은 push/pop 조건)으로
+// 저장하고, pol_mask0/1(4x1비트)과 같은 방식으로 pose_mask0/1(4x8비트, 열마다 서로 다른
+// 발생시점 theta를 가질 수 있음)을 출력한다.
+//
+// 변경점 2(백프레셔, 병렬 세션(codex/ai-semi-stage2) 제안 반영): `stall` 입력이 1이면 이번
+// 사이클 grant를 전부 보류 -- 도착(arrival)/버퍼링(pending_cnt, pol/pose_fifo)은 그대로
+// 계속되고, "밖으로 내보내는 것"만 멈춘다. 소스당 2-deep 버퍼가 이미 있어서 순간적인
+// 다운스트림 정체를 몇 사이클은 조용히 흡수함(overrun으로 버리는 대신).
 module aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose (
   input         clk,
   input         rst,
   input  [15:0] arrival,
   input  [15:0] polarity_in,   // arrival[i]=1인 소스에 대해서만 의미 있음
   input  [127:0] theta_idx_in, // 소스별 8비트(발생 시점의 world theta_idx), 위와 동일 조건에서만 의미 있음
+  input          stall,        // 1이면 이번 사이클 grant 보류(도착/버퍼링은 계속됨)
   output [15:0] overrun,
   output reg        valid0,
   output reg [1:0]  row0,
@@ -93,6 +99,7 @@ module aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose (
     end else begin
       lane0_valid_c = 1'b0; lane0_row_c = 2'd0; lane0_cols_c = 4'd0; lane0_pol_c = 4'd0; lane0_pose_c = 32'd0;
     end
+    if (stall) lane0_valid_c = 1'b0;
   end
 
   reg lane1_valid_c;
@@ -116,6 +123,7 @@ module aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose (
     end else begin
       lane1_valid_c = 1'b0; lane1_row_c = 2'd0; lane1_cols_c = 4'd0; lane1_pol_c = 4'd0; lane1_pose_c = 32'd0;
     end
+    if (stall) lane1_valid_c = 1'b0;
   end
 
   always @(posedge clk) begin

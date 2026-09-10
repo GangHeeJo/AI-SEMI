@@ -28,9 +28,12 @@ module aer_tx16_coord_transform_v1 (
   wire [3:0]  col_mask0, col_mask1, pol_mask0, pol_mask1;
   wire [31:0] pose_mask0, pose_mask1;
 
+  wire wmem_stall;
+
   aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose u_tx (
     .clk(clk), .rst(rst),
     .arrival(arrival), .polarity_in(polarity_in), .theta_idx_in({16{theta_idx}}),
+    .stall(wmem_stall),
     .overrun(overrun),
     .valid0(valid0), .row0(row0), .col_mask0(col_mask0), .pol_mask0(pol_mask0), .pose_mask0(pose_mask0),
     .valid1(valid1), .row1(row1), .col_mask1(col_mask1), .pol_mask1(pol_mask1), .pose_mask1(pose_mask1)
@@ -99,7 +102,7 @@ module aer_tx16_coord_transform_v1 (
   world_mem_writer #(.N_LANES(8), .ADDR_BITS(6)) u_wmem (
     .clk(clk), .rst(rst),
     .wr_valid(xf_valid), .wr_x(wr_x_flat), .wr_y(wr_y_flat), .wr_pol(wr_pol_flat),
-    .wr_overrun(wmem_overrun),
+    .wr_overrun(wmem_overrun), .stall(wmem_stall),
     .world_we(world_we), .world_addr(world_addr), .world_pol(world_pol)
   );
 endmodule

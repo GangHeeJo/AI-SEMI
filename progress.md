@@ -2818,3 +2818,29 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 수정: `scripts/rotation_estimate_model.py`(`load_events_ts()`, `run_window_time()` 추가), `scripts/sweep_patch_size_estimate.py`(시간 기준으로 전환)
 - 다음: 사용자와 2단계 진행 방향 최종 결정
 
+## 121. 백프레셔(backpressure) 추가 -- 병렬 세션(codex/ai-semi-stage2) 아이디어 채택(2026-09-10)
+
+**배경**: `codex/ai-semi-stage2` 브랜치(사용자 본인의 독립 병렬 시도, 발견 경위는 브랜치 확인 기록 참고) 검토 후, 그 계획서(`STAGE2_PLAN.md`)의 두 아이디어 중 "백프레셔 + 명시적 상태 보고"를 채택하기로 결정(시나리오 자체(차량/도로평면)는 채택 안 함, 회전-only 유지). 지금까지 설계는 "다운스트림이 꽉 차면 조용히 버리고 개수만 센다"(overrun) 방식이었는데, 진짜 백프레셔는 다운스트림이 밀리면 업스트림이 새 grant를 잠깐 멈추고 이미 있는 버퍼에 담아두게 하는 것.
+
+**구현**:
+- `rtl/small_fifo.v`: `near_full` 출력 추가(깊이-MARGIN칸 남으면 조기경보, MARGIN=2 -- coord_transform_rmcm 1사이클 latency 감안해도 충분한 여유).
+- `rtl/world_mem_writer.v`: 8레인 `near_full`을 OR해서 `stall` 출력.
+- `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`: `stall` 입력 추가, 1이면 이번 사이클 grant(lane0_valid_c/lane1_valid_c)만 보류 -- 도착(arrival)과 버퍼링(pending_cnt, pol/pose_fifo)은 그대로 계속됨(소스당 2-deep이 이미 있어서 순간 정체를 조용히 흡수).
+- `rtl/aer_tx16_coord_transform_v1.v`: 위 둘을 연결(`wmem_stall`). 레지스터 상태(FIFO count)에서 나온 신호를 조합적으로 되먹임하는 구조라 진짜 combinational loop는 아님(1사이클 전 상태 기준).
+
+**실측 -- 백프레셔가 설계대로 작동함**: FIFO 깊이를 일부러 줄여서(4/8/16) 백프레셔 유무를 비교(실트래픽 8503 이벤트):
+
+| 깊이 | 백프레셔 없음(§114) | 백프레셔 있음(이번, world_mem_writer 자체 overrun) |
+|---:|---:|---:|
+| 4  | 13.3% | world_mem_writer 쪽 **0%**(전체 시스템 손실은 9.2% -- steal_buf 쪽으로 병목이 옮겨감) |
+| 8  | (미측정) | world_mem_writer 쪽 **0%**(전체 2.4%) |
+| 16 | 0.01% | world_mem_writer 쪽 **0%**(전체 0.047%) |
+| 32 | 0% | **0%**(전체도 0%) |
+
+world_mem_writer 자신의 FIFO overrun은 테스트한 모든 깊이에서 정확히 0%로 확인됨 -- 백프레셔가 의도한 대로 "이 단계에서는 절대 조용히 안 버림"을 달성함. 다만 지속적 과부하에서는 손실이 **steal_buf 자체의 2-deep 버퍼 쪽으로 옮겨갈 뿐**(이건 근본적 용량 한계라 백프레셔로도 못 없앰, 정직한 결과) -- 20000cycle 스트레스 테스트(20%/source, 의도적 극한 부하)에서도 확인: 백프레셔가 걸리자 실제 push 자체가 146470(§114)→20241로 줄어듦(시스템이 자기 처리 속도(사이클당 1개)에 맞춰 스스로 유입을 억제), content_mismatches=0, world_mem_writer 쪽 overrun 여전히 0%.
+
+**최종 채택**: FIFO_DEPTH=32는 그대로 유지(이미 충분하고 면적 비용이 무시할 수준, §114) -- 백프레셔는 이 depth 자체를 줄이는 용도가 아니라, **지금까지 실측 안 해본 다른 트래픽 패턴(더 심한 버스트 등)에 대한 안전 마진**으로 추가하는 것. 실트래픽/스트레스 테스트 둘 다 회귀 없이 PASS 재확인.
+
+- 수정: `rtl/small_fifo.v`, `rtl/world_mem_writer.v`, `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`, `rtl/aer_tx16_coord_transform_v1.v`
+- 다음: 사용자와 2단계 진행 방향 최종 결정(§120에서 낸 4가지 선택지 그대로 유효)
+
