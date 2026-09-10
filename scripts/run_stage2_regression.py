@@ -176,6 +176,61 @@ def run_affine_vectors(
     )
 
 
+def run_uzh_physical_vectors(
+    root: Path,
+    temp_root: Path,
+    iverilog: str,
+    vvp: str,
+) -> Result:
+    started = time.perf_counter()
+    vector_path = temp_root / "tb" / "uzh_physical_affine_vectors.tsv"
+    vector_path.parent.mkdir(parents=True, exist_ok=True)
+    generator = run_process(
+        [
+            sys.executable,
+            "scripts/gen_uzh_physical_affine_vectors.py",
+            "--output",
+            str(vector_path),
+        ],
+        root,
+    )
+    generator_output = process_output(generator)
+    if (
+        generator.returncode != 0
+        or "UZH_PHYSICAL_ORACLE_PASS" not in generator.stdout
+    ):
+        reason = (
+            f"generator exited {generator.returncode}"
+            if generator.returncode != 0
+            else "missing stdout marker 'UZH_PHYSICAL_ORACLE_PASS'"
+        )
+        return Result(
+            "uzh_physical_affine",
+            False,
+            reason,
+            generator_output,
+            time.perf_counter() - started,
+        )
+
+    test = HDLTest(
+        "uzh_physical_affine_rtl",
+        "tb_coord_transform_affine2d_uzh_physical",
+        ("rtl/coord_transform_affine2d.v",),
+        "tb/tb_coord_transform_affine2d_uzh_physical.v",
+        "UZH_PHYSICAL_AFFINE_RTL_PASS",
+    )
+    rtl_result = run_hdl_test(
+        test, root, temp_root, iverilog, vvp, run_cwd=temp_root
+    )
+    return Result(
+        "uzh_physical_affine",
+        rtl_result.passed,
+        rtl_result.detail,
+        f"{generator_output}\n{rtl_result.output}".strip(),
+        time.perf_counter() - started,
+    )
+
+
 def run_synthesis_elaboration(
     root: Path,
     temp_root: Path,
@@ -730,6 +785,12 @@ def parse_args() -> argparse.Namespace:
         help=("also sweep K=2/K=4 bank depths and the fair single-output "
               "K=4 endpoint on exact-cycle UZH timing"),
     )
+    parser.add_argument(
+        "--physical",
+        action="store_true",
+        help=("also regenerate measured-pose/calibration UZH vectors and "
+              "compare all 8,503 events with the affine RTL"),
+    )
     return parser.parse_args()
 
 
@@ -774,6 +835,13 @@ def main() -> int:
 
         for test in tests[4:]:
             result = run_hdl_test(test, root, temp_root, iverilog, vvp)
+            results.append(result)
+            print_result(result)
+
+        if args.physical:
+            result = run_uzh_physical_vectors(
+                root, temp_root, iverilog, vvp
+            )
             results.append(result)
             print_result(result)
 

@@ -2685,3 +2685,25 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 
 **회귀**: K=4 single-output depth 8/16/32/64 sweep과 depth32 random-ready stall 검증을 `--lane-sweep`에 추가했다. stall 중 `valid`, 전체 payload, 선택 bank가 고정되고 실제 handshake에서만 이벤트를 retire하는지 확인했으며, 기존 기능시험과 합성 smoke를 포함해 **36/36 PASS**했다. 합성 smoke 후보도 K4-serial-d32를 포함한 7개로 확장했다.
 
+## 112. UZH 실제 pose/calibration → 구면 오라클 → affine RTL 8,503건 검증(2026-09-10)
+
+**`main` 결과와 분리한 새 기준선**: `main`의 기존 `theta=2*acos(abs(q_rel.w))`와 반지름 20 synthetic 원호는 실측 quaternion에서 회전 크기만 꺼낸 software feasibility라 물리적 world 좌표 정답으로 쓰지 않았다. 대신 `origin/main@d39e457`의 추적된 11,883-sample groundtruth와 로컬 UZH 원본의 radtan calibration을 입력으로 추가했다. 이벤트는 기존 8,503-row `eventmeta.tsv`의 개별 ns timestamp를 사용하며, 세 입력 SHA-256은 `STAGE2_PHYSICAL_MAPPING.md`에 봉인했다.
+
+**물리 방향 오라클**: quaternion을 정규화하고 파일에 존재하는 204번의 부호 반전을 보정한 뒤 이벤트 시각마다 SLERP했다. `(u,v)`는 Brown-Conrady 역왜곡해 camera ray로 만들고, 측정 pose로 world ray에 회전한 뒤 512x256 equirectangular direction grid에 투영했다. 512x256은 2:1 각도 검증 grid이지 최종 제품 map 크기 스펙이 아니다. 각 pose에서 중앙 4x4의 16점을 정확히 투영하고 longitude seam을 unwrap한 뒤 affine을 최소제곱 fitting해 signed Q2.14 matrix/Q10.14 offset으로 양자화했다.
+
+**quaternion 규약 독립 확인**: translation이 3 mm 이하인 인접 intensity frame 120쌍을 distortion-aware 회전 warp로 비교했다. `qx qy qz qw`를 Hamilton active camera→world로 해석한 쪽이 inverse보다 ZNCC `0.94295 vs 0.85427`, gradient cosine `0.77470 vs 0.35710`, normalized robust MAE `0.10738 vs 0.14549`였고, pair별 ZNCC 116/120·gradient 118/120에서 승리했다. `wxyz` 해석도 열세였다. pixel center 0과 +0.5는 데이터로 구분할 수 없을 정도로 같아서 OpenCV integer `(u,v)` 계약을 사용했다.
+
+**중앙 4x4 전체 실측 결과**:
+
+- 각 event pose마다 중앙 4x4의 16점 전부, 총 136,048 pose-pixel을 평가했다. float affine 대 exact spherical mean/p99/max=`0.000474/0.001512/0.002428 px`.
+- Q14 RTL cell 대 exact rounded cell: 135,506/136,048 exact(99.6016%), 나머지는 모두 1-cell rounding boundary, mean/p99/max=`0.003984/0/1 cell`. 실제 event pixel만 보면 8,479/8,503 exact(99.7177%).
+- coefficient overflow=0, seam crossing=0, out-of-range=0.
+- `coord_transform_affine2d`가 생성된 8,503 fixed-point event 결과를 모두 bit-exact 재현했고 polarity와 64-bit occurrence timestamp도 전부 보존했다. 세 입력 hash를 회귀에 고정했고 float max 0.01 px, Q14 max 1 cell, exact-cell 99%를 명시적 PASS 한계로 추가했다.
+- 기본+물리 회귀 **22/22 PASS**.
+
+**정직한 범위**: `shapes_rotation`에도 event 구간에서 최대 약 0.180 m 위치 변화가 있지만 depth가 없으므로 translation/parallax는 모델링하지 않았다. 이것은 supplied ground-truth pose를 쓰는 infinite-depth direction panorama의 **transform-only** 검증이지 pose estimator나 SLAM 정확도가 아니다. 계수도 event마다 직접 주입했으므로 pose-history update rate를 증명하지 않는다. 중앙 한 tile의 매우 작은 오차는 고무적이지만 240x180 전체 sensor에 그대로 일반화할 수 없으며 panorama seam modulo도 아직 없다. 다음 geometry 단계는 전체 4x4 tile/held-out pose sweep과 실제 pose-version cadence 통합이다. 그 결과가 cell-error budget을 넘을 때만 homography/divider를 고려한다.
+
+- 신규 데이터: `common_traces_uzh/uzh_shapes_rotation_groundtruth.txt`, `common_traces_uzh/uzh_shapes_rotation_calib.txt`
+- 신규 오라클/검증: `scripts/gen_uzh_physical_affine_vectors.py`, `tb/tb_coord_transform_affine2d_uzh_physical.v`, `STAGE2_PHYSICAL_MAPPING.md`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`
+

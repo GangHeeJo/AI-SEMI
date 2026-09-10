@@ -97,6 +97,16 @@ Sweep the banked K=2/K=4 endpoints and the single-output K=4 endpoint on the sam
 python scripts/run_stage2_regression.py --lane-sweep
 ```
 
+Regenerate the measured UZH pose/calibration oracle and compare all 8,503
+fixed-point coordinates with the RTL:
+
+```text
+python scripts/run_stage2_regression.py --physical
+```
+
+`STAGE2_PHYSICAL_MAPPING.md` records the input hashes, quaternion-direction
+validation, exact spherical model, measured affine error, and limitations.
+
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in UZH timing, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
 On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the seven PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
