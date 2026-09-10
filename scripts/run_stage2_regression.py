@@ -195,6 +195,7 @@ def run_synthesis_elaboration(
         "rtl/aer_tx16_pose_affine2d_serial.v",
         "rtl/aer_tx16_pose_affine2d_banked.v",
         "rtl/rr_stream_arbiter4.v",
+        "rtl/aer_tx16_pose_affine2d_k4_serial.v",
         "rtl/aer_tx64_pose_affine2d_serial.v",
     )
     configurations = (
@@ -209,6 +210,9 @@ def run_synthesis_elaboration(
         ("k4_d8", "aer_tx16_pose_affine2d_banked", (
             "-Paer_tx16_pose_affine2d_banked.K=4",
             "-Paer_tx16_pose_affine2d_banked.FIFO_DEPTH=8",
+        )),
+        ("k4_serial_d32", "aer_tx16_pose_affine2d_k4_serial", (
+            "-Paer_tx16_pose_affine2d_k4_serial.FIFO_DEPTH=32",
         )),
         ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
     )
@@ -238,7 +242,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "6/6 Verilog-2005 tops elaborated" if not failures
+        "7/7 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -651,6 +655,54 @@ def lane_sweep_tests() -> tuple[HDLTest, ...]:
     )
 
 
+def serialized_k4_sweep_tests() -> tuple[HDLTest, ...]:
+    trace = "common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt"
+    dependencies = (
+        "rtl/arbiter2.v",
+        "rtl/arbiter4_tree.v",
+        "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+        "rtl/aer_bitmap_to_event8_pose.v",
+        "rtl/event_batch_fifo.v",
+        "rtl/pose_inflight_guard8.v",
+        "rtl/pose_history_affine8.v",
+        "rtl/coord_transform_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d_banked.v",
+        "rtl/rr_stream_arbiter4.v",
+        "rtl/aer_tx16_pose_affine2d_k4_serial.v",
+    )
+    always_ready = tuple(
+        HDLTest(
+            f"uzh_k4_serial_depth_{depth}",
+            "tb_stage2_k2_k4_uzh_trace",
+            dependencies,
+            "tb/tb_stage2_k2_k4_uzh_trace.v",
+            "STAGE2_BANKED_UZH_TRACE_PASS",
+            (
+                "-Ptb_stage2_k2_k4_uzh_trace.K=4",
+                f"-Ptb_stage2_k2_k4_uzh_trace.FIFO_DEPTH={depth}",
+                "-Ptb_stage2_k2_k4_uzh_trace.SERIALIZE_OUTPUT=1",
+            ),
+            (f"+TRACE_FILE={trace}",),
+        )
+        for depth in (8, 16, 32, 64)
+    )
+    stalled = HDLTest(
+        "uzh_k4_serial_stall_depth_32",
+        "tb_stage2_k2_k4_uzh_trace",
+        dependencies,
+        "tb/tb_stage2_k2_k4_uzh_trace.v",
+        "STAGE2_BANKED_UZH_TRACE_PASS",
+        (
+            "-Ptb_stage2_k2_k4_uzh_trace.K=4",
+            "-Ptb_stage2_k2_k4_uzh_trace.FIFO_DEPTH=32",
+            "-Ptb_stage2_k2_k4_uzh_trace.SERIALIZE_OUTPUT=1",
+            "-Ptb_stage2_k2_k4_uzh_trace.SERIAL_STALL_OUTPUT=1",
+        ),
+        (f"+TRACE_FILE={trace}",),
+    )
+    return always_ready + (stalled,)
+
+
 def print_result(result: Result) -> None:
     label = "PASS" if result.passed else "FAIL"
     print(f"[{label}] {result.name} ({result.seconds:.2f}s) - {result.detail}")
@@ -675,7 +727,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--lane-sweep",
         action="store_true",
-        help="also sweep K=2/K=4 bank depths on exact-cycle UZH timing",
+        help=("also sweep K=2/K=4 bank depths and the fair single-output "
+              "K=4 endpoint on exact-cycle UZH timing"),
     )
     return parser.parse_args()
 
@@ -741,6 +794,10 @@ def main() -> int:
 
         if args.lane_sweep:
             for test in lane_sweep_tests():
+                result = run_hdl_test(test, root, temp_root, iverilog, vvp)
+                results.append(result)
+                print_result(result)
+            for test in serialized_k4_sweep_tests():
                 result = run_hdl_test(test, root, temp_root, iverilog, vvp)
                 results.append(result)
                 print_result(result)

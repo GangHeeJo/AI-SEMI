@@ -1,9 +1,9 @@
-# Stage-2 4x4 measured UZH-lossless point: K=4, 8 entries per bank.
-# Parameter order is {K FIFO_DEPTH}; run from the repository root.
+# Stage-2 fair single-output K=4 point, lossless on the checked-in UZH trace.
+# The four transform banks feed one ready/valid stream; FIFO_DEPTH=32 per bank.
 
-set DESIGN aer_tx16_pose_affine2d_banked
-set RUN_NAME ${DESIGN}_k4_d8
-set PARAMS {4 8}
+set DESIGN aer_tx16_pose_affine2d_k4_serial
+set RUN_NAME ${DESIGN}_d32
+set PARAMS {32}
 set RTL_LIST {
   rtl/arbiter2.v
   rtl/arbiter4_tree.v
@@ -14,6 +14,8 @@ set RTL_LIST {
   rtl/pose_history_affine8.v
   rtl/coord_transform_affine2d.v
   rtl/aer_tx16_pose_affine2d_banked.v
+  rtl/rr_stream_arbiter4.v
+  rtl/aer_tx16_pose_affine2d_k4_serial.v
 }
 set SDC_FILE syn/constraints_5ns.sdc
 set LIB_FILE /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib

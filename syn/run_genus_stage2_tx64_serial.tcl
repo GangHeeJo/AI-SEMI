@@ -22,7 +22,7 @@ file mkdir $OUT_DIR
 set_db library $LIB_FILE
 set_db lp_insert_clock_gating true
 
-read_hdl $RTL_LIST
+read_hdl -sv $RTL_LIST
 elaborate $DESIGN
 read_sdc $SDC_FILE
 syn_generic

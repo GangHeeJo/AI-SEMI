@@ -11,6 +11,7 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `aer_tx16_pose_affine2d` | 4x4 | 8 | eight always-draining event slots | correctness/PPA upper endpoint |
 | `aer_tx16_pose_affine2d_serial` | 4x4 | 1 | one ready/valid event | K=1 throughput/PPA endpoint |
 | `aer_tx16_pose_affine2d_banked` | 4x4 | parameterized 1/2/4/8 | K independent ready/valid events | measured intermediate K endpoints |
+| `aer_tx16_pose_affine2d_k4_serial` | 4x4 | 4, merged to 1 | one ready/valid event | apples-to-apples single-port K=4 PPA endpoint |
 | `aer_tx64_pose_affine2d_serial` | 8x8 (four leaves) | 1 shared | one ready/valid event | tile hierarchy and upper-merge proof |
 | `aer_tx64_pose_time_surface` | 8x8 (four leaves) | 1 shared | internal always-ready map writer plus read port | closed sensor-to-map proof |
 | `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
@@ -90,15 +91,15 @@ Sweep the K=1 FIFO against K=8 while preserving every cycle in the checked-in UZ
 python scripts/run_stage2_regression.py --trace-sweep
 ```
 
-Sweep the banked K=2/K=4 endpoints on the same timing:
+Sweep the banked K=2/K=4 endpoints and the single-output K=4 endpoint on the same timing:
 
 ```text
 python scripts/run_stage2_regression.py --lane-sweep
 ```
 
-The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution.
+The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in UZH timing, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the six PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the seven PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
 
 The default suite includes a same-stimulus K=1/K=8 comparison. Its light profile must be lossless for both endpoints; its deliberately overloaded profile reports the finite K=1 FIFO loss and latency instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random stress is part of `--extended` because it is substantially slower under Icarus.
 
@@ -112,9 +113,10 @@ genus -batch -files syn/run_genus_stage2_tx16_serial.tcl
 genus -batch -files syn/run_genus_stage2_tx16_serial_d128.tcl
 genus -batch -files syn/run_genus_stage2_tx16_banked_k2_d32.tcl
 genus -batch -files syn/run_genus_stage2_tx16_banked_k4_d8.tcl
+genus -batch -files syn/run_genus_stage2_tx16_k4_serial_d32.tcl
 genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
 ```
 
-Map storage is deliberately excluded from the three logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation.
+Map storage is deliberately excluded from the logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation. Do not compare the four-output K=4-d8 area directly with a one-port K=1 endpoint as though the downstream map interface were identical; use K4-serial-d32 for a one-port comparison, or include the complete banked map fabric for a multi-port comparison.
 
 These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM.

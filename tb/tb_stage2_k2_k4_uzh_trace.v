@@ -6,6 +6,8 @@ module tb_stage2_k2_k4_uzh_trace;
   parameter integer K = 2;
   parameter integer FIFO_DEPTH = 32;
   parameter integer DRAIN_LIMIT = 20000;
+  parameter integer SERIALIZE_OUTPUT = 0;
+  parameter integer SERIAL_STALL_OUTPUT = 0;
 
   localparam integer POSE_W = 3;
   localparam integer SENSOR_W = 4;
@@ -15,11 +17,14 @@ module tb_stage2_k2_k4_uzh_trace;
   localparam integer FRAC_W = 14;
   localparam integer TIMESTAMP_W = 16;
   localparam integer COUNT_W = 11;
+  localparam integer OCC_W = $clog2(FIFO_DEPTH + 1);
   localparam integer POSE_IDS = (1 << POSE_W);
   localparam integer Q = (1 << FRAC_W);
   localparam integer TIMESTAMP_VALUES = (1 << TIMESTAMP_W);
   localparam integer KEY_COUNT = TIMESTAMP_VALUES * 16;
   localparam integer MAX_LATENCY = 70000;
+  localparam integer SERIAL_PAYLOAD_W =
+    2 + 3 + 2*SENSOR_W + 1 + POSE_W + TIMESTAMP_W + 2*RESULT_W;
 
   reg [1023:0] trace_file_r;
   reg clk = 1'b0;
@@ -36,6 +41,10 @@ module tb_stage2_k2_k4_uzh_trace;
   reg signed [MATRIX_W-1:0] pose_wr_m11;
   reg signed [OFFSET_W-1:0] pose_wr_tx;
   reg signed [OFFSET_W-1:0] pose_wr_ty;
+  reg serial_world_ready;
+  reg [15:0] ready_lfsr;
+  reg serial_stall_held;
+  reg [SERIAL_PAYLOAD_W-1:0] serial_stall_payload;
 
   wire [15:0] aer_overrun;
   wire [7:0] fifo_overflow;
@@ -44,6 +53,7 @@ module tb_stage2_k2_k4_uzh_trace;
   wire pose_wr_rejected;
   wire pose_accounting_error;
   wire [K-1:0] world_valid;
+  wire [K-1:0] world_fire;
   wire [K-1:0] mapped_valid;
   wire [K-1:0] pose_found;
   wire [K-1:0] in_range;
@@ -54,35 +64,159 @@ module tb_stage2_k2_k4_uzh_trace;
   wire [K*TIMESTAMP_W-1:0] timestamp_flat;
   wire [K*RESULT_W-1:0] world_x_flat;
   wire [K*RESULT_W-1:0] world_y_flat;
+  wire [7:0] debug_batch_valid;
+  wire [8*SENSOR_W-1:0] debug_batch_x_flat;
+  wire [8*SENSOR_W-1:0] debug_batch_y_flat;
+  wire [7:0] debug_batch_polarity;
+  wire [8*POSE_W-1:0] debug_batch_pose_flat;
+  wire [8*TIMESTAMP_W-1:0] debug_batch_time_flat;
+  wire [K*OCC_W-1:0] debug_fifo_occupancy_flat;
+  wire [POSE_IDS-1:0] debug_pose_busy;
+  wire debug_serial_valid;
+  wire debug_serial_ready;
+  wire [SERIAL_PAYLOAD_W-1:0] debug_serial_payload;
 
-  aer_tx16_pose_affine2d_banked #(
-    .K(K), .POSE_W(POSE_W), .SENSOR_W(SENSOR_W),
-    .RESULT_W(RESULT_W), .MATRIX_W(MATRIX_W), .OFFSET_W(OFFSET_W),
-    .FRAC_W(FRAC_W), .TIMESTAMP_W(TIMESTAMP_W),
-    .FIFO_DEPTH(FIFO_DEPTH), .GUARD_COUNT_W(COUNT_W),
-    .X_MIN(0), .X_MAX(31), .Y_MIN(0), .Y_MAX(31)
-  ) dut (
-    .clk(clk), .rst(rst), .arrival(arrival), .polarity_in(polarity_in),
-    .occurrence_pose_version(occurrence_pose_version),
-    .occurrence_timestamp(occurrence_timestamp),
-    .aer_overrun(aer_overrun), .fifo_overflow(fifo_overflow),
-    .pose_wr_req(pose_wr_req), .pose_wr_id(pose_wr_id),
-    .pose_wr_m00(pose_wr_m00), .pose_wr_m01(pose_wr_m01),
-    .pose_wr_m10(pose_wr_m10), .pose_wr_m11(pose_wr_m11),
-    .pose_wr_tx(pose_wr_tx), .pose_wr_ty(pose_wr_ty),
-    .pose_wr_ready(pose_wr_ready), .pose_wr_commit(pose_wr_commit),
-    .pose_wr_rejected(pose_wr_rejected),
-    .pose_accounting_error(pose_accounting_error),
-    .tile_origin_x({SENSOR_W{1'b0}}),
-    .tile_origin_y({SENSOR_W{1'b0}}),
-    .world_valid(world_valid), .world_ready({K{1'b1}}),
-    .mapped_valid(mapped_valid), .pose_found(pose_found),
-    .in_range(in_range), .sensor_x_out_flat(sensor_x_flat),
-    .sensor_y_out_flat(sensor_y_flat), .polarity_out(polarity_out),
-    .pose_version_out_flat(pose_flat),
-    .occurrence_timestamp_out_flat(timestamp_flat),
-    .world_x_out_flat(world_x_flat), .world_y_out_flat(world_y_flat)
-  );
+  genvar parallel_pose_index;
+  genvar serialized_pose_index;
+
+  generate
+    if (SERIALIZE_OUTPUT == 0) begin: parallel_dut
+      aer_tx16_pose_affine2d_banked #(
+        .K(K), .POSE_W(POSE_W), .SENSOR_W(SENSOR_W),
+        .RESULT_W(RESULT_W), .MATRIX_W(MATRIX_W), .OFFSET_W(OFFSET_W),
+        .FRAC_W(FRAC_W), .TIMESTAMP_W(TIMESTAMP_W),
+        .FIFO_DEPTH(FIFO_DEPTH), .GUARD_COUNT_W(COUNT_W),
+        .X_MIN(0), .X_MAX(31), .Y_MIN(0), .Y_MAX(31)
+      ) dut (
+        .clk(clk), .rst(rst), .arrival(arrival), .polarity_in(polarity_in),
+        .occurrence_pose_version(occurrence_pose_version),
+        .occurrence_timestamp(occurrence_timestamp),
+        .aer_overrun(aer_overrun), .fifo_overflow(fifo_overflow),
+        .pose_wr_req(pose_wr_req), .pose_wr_id(pose_wr_id),
+        .pose_wr_m00(pose_wr_m00), .pose_wr_m01(pose_wr_m01),
+        .pose_wr_m10(pose_wr_m10), .pose_wr_m11(pose_wr_m11),
+        .pose_wr_tx(pose_wr_tx), .pose_wr_ty(pose_wr_ty),
+        .pose_wr_ready(pose_wr_ready), .pose_wr_commit(pose_wr_commit),
+        .pose_wr_rejected(pose_wr_rejected),
+        .pose_accounting_error(pose_accounting_error),
+        .tile_origin_x({SENSOR_W{1'b0}}),
+        .tile_origin_y({SENSOR_W{1'b0}}),
+        .world_valid(world_valid), .world_ready({K{1'b1}}),
+        .mapped_valid(mapped_valid), .pose_found(pose_found),
+        .in_range(in_range), .sensor_x_out_flat(sensor_x_flat),
+        .sensor_y_out_flat(sensor_y_flat), .polarity_out(polarity_out),
+        .pose_version_out_flat(pose_flat),
+        .occurrence_timestamp_out_flat(timestamp_flat),
+        .world_x_out_flat(world_x_flat), .world_y_out_flat(world_y_flat)
+      );
+
+      assign debug_batch_valid = dut.batch_valid;
+      assign debug_batch_x_flat = dut.batch_x_flat;
+      assign debug_batch_y_flat = dut.batch_y_flat;
+      assign debug_batch_polarity = dut.batch_polarity;
+      assign debug_batch_pose_flat = dut.batch_pose_flat;
+      assign debug_batch_time_flat = dut.batch_time_flat;
+      assign debug_fifo_occupancy_flat = dut.fifo_occupancy_flat;
+      assign debug_serial_valid = 1'b0;
+      assign debug_serial_ready = 1'b1;
+      assign debug_serial_payload = {SERIAL_PAYLOAD_W{1'b0}};
+      assign world_fire = world_valid;
+      for (parallel_pose_index = 0; parallel_pose_index < POSE_IDS;
+           parallel_pose_index = parallel_pose_index + 1) begin: pose_busy
+        assign debug_pose_busy[parallel_pose_index] =
+          |dut.u_pose_guard.outstanding[parallel_pose_index];
+      end
+    end else begin: serialized_dut
+      wire serial_valid;
+      wire serial_mapped;
+      wire serial_found;
+      wire serial_range;
+      wire [SENSOR_W-1:0] serial_sensor_x;
+      wire [SENSOR_W-1:0] serial_sensor_y;
+      wire [1:0] serial_bank;
+      wire serial_polarity;
+      wire [POSE_W-1:0] serial_pose;
+      wire [TIMESTAMP_W-1:0] serial_timestamp;
+      wire signed [RESULT_W-1:0] serial_world_x;
+      wire signed [RESULT_W-1:0] serial_world_y;
+
+      aer_tx16_pose_affine2d_k4_serial #(
+        .FIFO_DEPTH(FIFO_DEPTH), .POSE_W(POSE_W), .SENSOR_W(SENSOR_W),
+        .RESULT_W(RESULT_W), .MATRIX_W(MATRIX_W), .OFFSET_W(OFFSET_W),
+        .FRAC_W(FRAC_W), .TIMESTAMP_W(TIMESTAMP_W),
+        .GUARD_COUNT_W(COUNT_W),
+        .X_MIN(0), .X_MAX(31), .Y_MIN(0), .Y_MAX(31)
+      ) dut (
+        .clk(clk), .rst(rst), .arrival(arrival), .polarity_in(polarity_in),
+        .occurrence_pose_version(occurrence_pose_version),
+        .occurrence_timestamp(occurrence_timestamp),
+        .aer_overrun(aer_overrun), .fifo_overflow(fifo_overflow),
+        .pose_wr_req(pose_wr_req), .pose_wr_id(pose_wr_id),
+        .pose_wr_m00(pose_wr_m00), .pose_wr_m01(pose_wr_m01),
+        .pose_wr_m10(pose_wr_m10), .pose_wr_m11(pose_wr_m11),
+        .pose_wr_tx(pose_wr_tx), .pose_wr_ty(pose_wr_ty),
+        .pose_wr_ready(pose_wr_ready), .pose_wr_commit(pose_wr_commit),
+        .pose_wr_rejected(pose_wr_rejected),
+        .pose_accounting_error(pose_accounting_error),
+        .tile_origin_x({SENSOR_W{1'b0}}),
+        .tile_origin_y({SENSOR_W{1'b0}}),
+        .world_valid(serial_valid), .world_ready(serial_world_ready),
+        .mapped_valid(serial_mapped), .pose_found(serial_found),
+        .in_range(serial_range), .sensor_x_out(serial_sensor_x),
+        .sensor_y_out(serial_sensor_y), .bank_id_out(serial_bank),
+        .polarity_out(serial_polarity), .pose_version_out(serial_pose),
+        .occurrence_timestamp_out(serial_timestamp),
+        .world_x_out(serial_world_x), .world_y_out(serial_world_y)
+      );
+
+      assign debug_batch_valid = dut.u_banked.batch_valid;
+      assign debug_batch_x_flat = dut.u_banked.batch_x_flat;
+      assign debug_batch_y_flat = dut.u_banked.batch_y_flat;
+      assign debug_batch_polarity = dut.u_banked.batch_polarity;
+      assign debug_batch_pose_flat = dut.u_banked.batch_pose_flat;
+      assign debug_batch_time_flat = dut.u_banked.batch_time_flat;
+      assign debug_fifo_occupancy_flat = dut.u_banked.fifo_occupancy_flat;
+      assign debug_serial_valid = serial_valid;
+      assign debug_serial_ready = serial_world_ready;
+      assign debug_serial_payload = {
+        serial_bank, serial_mapped, serial_found, serial_range,
+        serial_sensor_x, serial_sensor_y, serial_polarity, serial_pose,
+        serial_timestamp, serial_world_x, serial_world_y
+      };
+      for (serialized_pose_index = 0; serialized_pose_index < POSE_IDS;
+           serialized_pose_index = serialized_pose_index + 1) begin: pose_busy
+        assign debug_pose_busy[serialized_pose_index] =
+          |dut.u_banked.u_pose_guard.outstanding[serialized_pose_index];
+      end
+
+      genvar serial_lane;
+      for (serial_lane = 0; serial_lane < K;
+           serial_lane = serial_lane + 1) begin: expose_selected_bank
+        assign world_valid[serial_lane] =
+          serial_valid && (serial_bank == serial_lane);
+        assign world_fire[serial_lane] =
+          serial_valid && serial_world_ready && (serial_bank == serial_lane);
+        assign mapped_valid[serial_lane] =
+          serial_valid && (serial_bank == serial_lane) && serial_mapped;
+        assign pose_found[serial_lane] =
+          serial_valid && (serial_bank == serial_lane) && serial_found;
+        assign in_range[serial_lane] =
+          serial_valid && (serial_bank == serial_lane) && serial_range;
+        assign sensor_x_flat[serial_lane*SENSOR_W +: SENSOR_W] =
+          serial_sensor_x;
+        assign sensor_y_flat[serial_lane*SENSOR_W +: SENSOR_W] =
+          serial_sensor_y;
+        assign polarity_out[serial_lane] = serial_polarity;
+        assign pose_flat[serial_lane*POSE_W +: POSE_W] = serial_pose;
+        assign timestamp_flat[serial_lane*TIMESTAMP_W +: TIMESTAMP_W] =
+          serial_timestamp;
+        assign world_x_flat[serial_lane*RESULT_W +: RESULT_W] =
+          serial_world_x;
+        assign world_y_flat[serial_lane*RESULT_W +: RESULT_W] =
+          serial_world_y;
+      end
+    end
+  endgenerate
 
   always #5 clk = ~clk;
 
@@ -177,7 +311,7 @@ module tb_stage2_k2_k4_uzh_trace;
   task automatic check_outputs;
     begin
       for (bank = 0; bank < K; bank = bank + 1) begin
-        if (world_valid[bank]) begin
+        if (world_fire[bank]) begin
           got_time = timestamp_flat[bank*TIMESTAMP_W +: TIMESTAMP_W];
           got_pose = pose_flat[bank*POSE_W +: POSE_W];
           got_pol = polarity_out[bank];
@@ -216,25 +350,42 @@ module tb_stage2_k2_k4_uzh_trace;
               end
             end
           end
-        end else if (mapped_valid[bank] || pose_found[bank]
-                     || in_range[bank]) begin
+        end else if (!world_valid[bank]
+                     && (mapped_valid[bank] || pose_found[bank]
+                         || in_range[bank])) begin
           fail("inactive output bank asserted validity metadata");
         end
       end
     end
   endtask
 
+  task automatic check_serial_stall;
+    begin
+      if (SERIALIZE_OUTPUT != 0) begin
+        if (serial_stall_held) begin
+          if (!debug_serial_valid)
+            fail("serialized output valid dropped while stalled");
+          else if (debug_serial_payload !== serial_stall_payload)
+            fail("serialized output payload or bank changed while stalled");
+        end
+        serial_stall_held = debug_serial_valid && !debug_serial_ready;
+        if (debug_serial_valid && !debug_serial_ready)
+          serial_stall_payload = debug_serial_payload;
+      end
+    end
+  endtask
+
   task automatic process_fifo_drops;
     begin
-      if ((fifo_overflow & ~dut.batch_valid) != 0)
+      if ((fifo_overflow & ~debug_batch_valid) != 0)
         fail("FIFO overflow asserted for an inactive adapter lane");
       for (lane = 0; lane < 8; lane = lane + 1) begin
         if (fifo_overflow[lane]) begin
-          drop_x = dut.batch_x_flat[lane*SENSOR_W +: SENSOR_W];
-          drop_y = dut.batch_y_flat[lane*SENSOR_W +: SENSOR_W];
-          drop_pol = dut.batch_polarity[lane];
-          drop_pose = dut.batch_pose_flat[lane*POSE_W +: POSE_W];
-          drop_time = dut.batch_time_flat[lane*TIMESTAMP_W +: TIMESTAMP_W];
+          drop_x = debug_batch_x_flat[lane*SENSOR_W +: SENSOR_W];
+          drop_y = debug_batch_y_flat[lane*SENSOR_W +: SENSOR_W];
+          drop_pol = debug_batch_polarity[lane];
+          drop_pose = debug_batch_pose_flat[lane*POSE_W +: POSE_W];
+          drop_time = debug_batch_time_flat[lane*TIMESTAMP_W +: TIMESTAMP_W];
           got_source = drop_y * 4 + drop_x;
           got_key = drop_time * 16 + got_source;
           if (drop_x > 3 || drop_y > 3) begin
@@ -291,7 +442,16 @@ module tb_stage2_k2_k4_uzh_trace;
       occurrence_pose_version = replay_cycle % 3;
       occurrence_timestamp = replay_cycle[TIMESTAMP_W-1:0];
       pose_wr_req = 1'b0;
+      if (SERIALIZE_OUTPUT != 0 && SERIAL_STALL_OUTPUT != 0) begin
+        ready_lfsr = {ready_lfsr[14:0],
+                      ready_lfsr[15] ^ ready_lfsr[13]
+                      ^ ready_lfsr[12] ^ ready_lfsr[10]};
+        serial_world_ready = ready_lfsr[0] | ready_lfsr[3];
+      end else begin
+        serial_world_ready = 1'b1;
+      end
       #1;
+      check_serial_stall;
       check_outputs;
       process_fifo_drops;
       process_inputs;
@@ -358,6 +518,8 @@ module tb_stage2_k2_k4_uzh_trace;
   initial begin
     if (K != 2 && K != 4)
       $fatal(1, "trace TB supports compile-time K=2 or K=4");
+    if (SERIALIZE_OUTPUT != 0 && K != 4)
+      $fatal(1, "serialized trace mode requires K=4");
 
     rst = 1'b1;
     arrival = 0;
@@ -372,6 +534,10 @@ module tb_stage2_k2_k4_uzh_trace;
     pose_wr_m11 = 0;
     pose_wr_tx = 0;
     pose_wr_ty = 0;
+    serial_world_ready = 1'b1;
+    ready_lfsr = 16'h1ace;
+    serial_stall_held = 1'b0;
+    serial_stall_payload = 0;
     replay_cycle = 0;
     first_trace_cycle = -1;
     last_trace_cycle = -1;
@@ -450,10 +616,10 @@ module tb_stage2_k2_k4_uzh_trace;
 
     if (pending_count != 0)
       fail("bounded drain did not resolve every accepted event");
-    if (|dut.fifo_occupancy_flat || |world_valid)
+    if (|debug_fifo_occupancy_flat || |world_valid)
       fail("FIFO or transform remained nonempty after drain");
     for (i = 0; i < POSE_IDS; i = i + 1)
-      if (dut.u_pose_guard.outstanding[i] != 0)
+      if (debug_pose_busy[i])
         fail("pose guard leaked an outstanding reference");
     pose_wr_id = 0;
     #1;

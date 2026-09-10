@@ -2656,3 +2656,32 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 elaboration을 `run_stage2_regression.py` 기본 경로에 넣었다. 각 top을 testbench 없이 Verilog-2005 모드로 parameter override까지 적용해 compile하므로 source 누락, 합성 parser 문법, 후보별 parameter 깨짐을 모든 회귀에서 즉시 잡는다. 편입 후 기본 회귀는 simulation/벡터 20개와 합성 후보 묶음 1개를 합쳐 **21/21 PASS**, 후보 내부는 **6/6 PASS**했다. 이는 Icarus elaboration smoke이며 Genus 합성·PPA 완료를 뜻하지 않는다.
 
+## 111. main 신규 PPA 감사 + 공정한 K=4 단일출력 기준선(2026-09-10)
+
+**`main` 확인 범위**: `origin/main@d39e457`이 기록한 서버 Genus 결과를 읽기 전용으로 검토했다. 이 결과는 우리 브랜치 후보들을 GPDK045 slow 1.0 V, 5 ns/200 MHz, clock uncertainty 0.1 ns, I/O delay 0.25 ns, output load 0.010, clock-gating enabled 조건에서 실행한 것이다. raw report와 timing slack/Fmax, tx64 완료값은 커밋돼 있지 않고 activity 파일도 사용하지 않은 vectorless power이므로 아래 숫자는 중간 증거다.
+
+| 기존 endpoint | area (um2) | cells | vectorless power (mW) | UZH 결과 |
+|---|---:|---:|---:|---|
+| K=8 direct | 102,574.333 | 45,373 | 0.886 | 8,503/8,503 |
+| K=1 d32 | 76,750.255 | 28,384 | 0.818 | 7,802/8,503, 701 drop |
+| K=1 d128 | 177,569.239 | 66,504 | 0.841 | 8,503/8,503 |
+| K=2 d32 | 103,628.326 | 36,451 | 0.841 | 8,503/8,503, 2 outputs |
+| K=4 d8 | 83,576.848 | 31,689 | 0.916 | 8,503/8,503, 4 outputs |
+
+서버에서 발견된 실제 실행 결함도 반영했다. 여섯 Genus script가 SystemVerilog 문법을 쓰는 RTL을 `read_hdl`로 읽고 있어서 임시 수정 없이는 parse되지 않았고, 모두 `read_hdl -sv`로 고쳤다.
+
+**비교 공정성 문제**: 위 K=4-d8은 네 transform 결과를 네 개의 독립 `ready/valid` 출력으로 동시에 뺄 수 있지만 K=1은 출력 하나뿐이다. 따라서 K=4-d8의 무손실·면적을 단일-port world map 제품점처럼 K=1과 직접 비교하면 downstream 비용과 처리능력을 생략하게 된다. 이를 닫기 위해 기존 K=4 banked top 뒤에 검증된 stall-safe `rr_stream_arbiter4`를 붙인 `aer_tx16_pose_affine2d_k4_serial`을 만들었다. transform 자체가 stall 중 payload를 보존하므로 별도 output FIFO는 추가하지 않았다.
+
+**동일 UZH exact-cycle, 단일 world output 결과**:
+
+| K=4 bank당 depth | 총 FIFO slot | FIFO drop | delivered | latency p50/p99/max |
+|---:|---:|---:|---:|---:|
+| 8 | 32 | 717 | 7,786 | 19/38/39 |
+| 16 | 64 | 109 | 8,394 | 21/64/71 |
+| 32 | 128 | 0 | 8,503 | 21/78/97 |
+| 64 | 256 | 0 | 8,503 | 21/78/97 |
+
+단일 출력에서는 K=4도 결국 1 event/cycle 병목을 공유하므로 최초 무손실점이 K=1-d128과 똑같이 총 FIFO 128칸이다. K=4-serial-d32의 p50/p99/max `21/78/97`도 K=1-d128의 `22/74/94`와 사실상 같은 범위다. 즉 **K=4의 실제 장점은 transform을 네 개 둔 사실만으로 생기지 않고, downstream world memory도 병렬 retire를 받아야 생긴다**. 현재 선택지는 (A) 작은 단일-port 구현이면 K=1-d128을 유지하거나, (B) 성능형 구현이면 주소 기반 banked map/crossbar 비용까지 포함해 K=4-d8을 다시 평가하는 것이다. K=4-serial-d32 Genus entry를 추가해 단일-port 공정 PPA 기준선을 만들었지만, 이 수치와 banked-map 전체 PPA가 나오기 전에는 최종 K를 선정하지 않는다.
+
+**회귀**: K=4 single-output depth 8/16/32/64 sweep과 depth32 random-ready stall 검증을 `--lane-sweep`에 추가했다. stall 중 `valid`, 전체 payload, 선택 bank가 고정되고 실제 handshake에서만 이벤트를 retire하는지 확인했으며, 기존 기능시험과 합성 smoke를 포함해 **36/36 PASS**했다. 합성 smoke 후보도 K4-serial-d32를 포함한 7개로 확장했다.
+
