@@ -2721,3 +2721,16 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 다음: 2단계 착수 -- §2-C(reference_papers.md)에서 정리한 세 후보(Kim2014 파티클필터/CMax-SLAM/EROAM) 중 방향 결정 + 설계 기획
 
+## 116. 독립 실제 영상(비-UZH) 일반화 검증 -- 시간 해상도 버그 발견+수정, 최종 PASS(2026-09-10)
+
+**동기**: 사용자가 폴더에 UZH와 무관한 실제 영상(`KakaoTalk_20260907_201023489.mp4`, 이벤트카메라 스타일 좌우분할 시각화 -- 왼쪽 흑백 인텐시티/오른쪽 이미 렌더링된 ON=빨강/OFF=파랑 이벤트)을 추가하고 "이걸로 테스트해보라"고 지시 -- UZH 하나에만 의존하지 않는 일반화 검증 기회.
+
+**변환**: `scripts/convert_video_to_cyclemask.py`(신규) -- 왼쪽 흑백 프레임만으로 표준 DVS 온셋 방식(로그 인텐시티 차분 + ~15% 문턱값)으로 합성 이벤트 생성. 프레임 전체(960x720)를 스캔해서 프레임간 변화가 가장 많은 4x4 패치 자동 탐색(y=392,x=773, 활동량 최대). 실제 pose(자세) 데이터가 없어서 theta는 상수 0으로 고정 -- 좌표 정확도가 아니라 AER 파이프라인의 구조적 견고성(무손실/내용 일관성)만 검증하는 게 목적.
+
+**버그 발견+수정(진짜 RTL 문제가 아니라 변환 방법론 문제)**: 처음엔 "영상 프레임 하나(24fps=41.7ms)=1cycle"로 그대로 매핑해서 변환 -- 실행 결과 `push=10505 pop=1692 overrun=8813(83.9%)`로 심각한 손실 발생. 사용자가 "원래 테스트가 너무 널널했던 거 아니냐"고 지적한 게 계기가 돼서 원인을 되짚어봄: UZH 변환(`convert_uzh_to_cyclemask.py`)은 1ms=1cycle 해상도를 쓰는데, 이 영상은 41.7ms를 통째로 1cycle에 욱여넣어서 **실제로는 41.7ms 동안 흩어져 발생했을 이벤트들이 전부 같은 사이클에 뭉쳐 인위적인 버스트**를 만든 것 -- RTL의 진짜 처리량 한계가 아니라 변환 스크립트의 시간압축 인공물이었음. 프레임 구간 안에서 균등난수로 이벤트 시점을 흩뿌려 1ms=1cycle로 다시 변환(59872cycle로 확장)하니 **overrun이 83.9%→0%로 완전히 사라짐** -- 가설이 실측으로 확정됨.
+
+**최종 검증**(`tb/tb_aer_tx16_coord_transform_v1_video_trace.v`, 신규, 검증 방법은 UZH trace TB와 동일 -- 도착 시점 관찰(row,col,pose)의 LUT 기대값이 1클럭 뒤 push 데이터와 일치하는지 + push=pop+overrun 무손실): `generated=13609 push=13609 pop=13609 overrun=0 content_checks=13609 content_mismatches=0 world_filled=16/4096` -- **PASS**. UZH 하나가 아니라 완전히 독립된 실제 영상에서도(같은 시간 해상도 기준) 무손실+내용 정확하게 동작함을 추가로 확인.
+
+- 신규: `scripts/convert_video_to_cyclemask.py`, `tb/tb_aer_tx16_coord_transform_v1_video_trace.v`, `common_traces_video/kakao_video_patch.addrpol.txt`, `common_traces_video/kakao_video_patch.cycle_theta.txt`
+- 원본 영상 파일(`KakaoTalk_20260907_201023489.mp4`, 15.2MB)은 UZH 원본 이벤트 데이터와 같은 이유로 git에 커밋 안 함(변환된 텍스트 트레이스만 추적)
+
