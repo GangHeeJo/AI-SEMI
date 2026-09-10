@@ -324,11 +324,36 @@ def regular_tests() -> tuple[HDLTest, ...]:
             ("-Ptb_rr_stream_arbiter4.DATA_W=32",),
         ),
         HDLTest(
+            "aer_8x8_serial_e2e",
+            "tb_aer_tx64_pose_affine2d_serial",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx64_pose_affine2d_serial.v",
+            ),
+            "tb/tb_aer_tx64_pose_affine2d_serial.v",
+            "AER_TX64_POSE_AFFINE2D_SERIAL_PASS",
+        ),
+        HDLTest(
             "world_time_surface",
             "tb_world_time_surface",
             ("rtl/world_time_surface.v",),
             "tb/tb_world_time_surface.v",
             "WORLD_TIME_SURFACE_PASS",
+        ),
+        HDLTest(
+            "world_time_surface_random",
+            "tb_world_time_surface_random",
+            ("rtl/world_time_surface.v",),
+            "tb/tb_world_time_surface_random.v",
+            "WORLD_TIME_SURFACE_RANDOM_PASS",
         ),
     )
 

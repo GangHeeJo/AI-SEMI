@@ -7,20 +7,22 @@ This document defines the smallest geometry block that can be translated to RTL 
 Each accepted event carries:
 
 - `local_x`, `local_y`: unsigned 2-bit coordinates for one 4x4 sensor tile.
+- `sensor_x = tile_origin_x + local_x`, `sensor_y = tile_origin_y + local_y`: parameterized-width coordinates produced by the bitmap adapter. The transform consumes these coordinates; the checked-in vectors use a zero tile origin.
 - `polarity`: one bit, transported unchanged by the geometry block.
 - `pose_version`: an unsigned, parameterized-width key captured when the event occurs, not when it retires from AER arbitration. The checked-in verification vectors use 8 bits; the first small RTL integration may use fewer entries to keep the pose table measurable.
+- `occurrence_timestamp`: an unsigned, parameterized-width event time captured by the same source FIFO entry as polarity and pose. It is transported unchanged through coordinate conversion.
 
 Every event in a row bitmap needs its own `pose_version`. Different columns in one transmitted bitmap may have entered their source FIFOs in different cycles, so one tag per output lane is insufficient.
 
-The pose table maps `pose_version` to one record `(a, b, c, d, tx, ty)`. How the table is loaded is outside this first contract.
+The pose table maps `pose_version` to one record `(a, b, c, d, tx, ty)`. A write may commit only when no accepted event still references that ID; a busy-ID write is explicitly rejected. How coefficients are produced is outside this first contract.
 
 ## Fixed-point transform
 
 The authoritative equations are:
 
 ```text
-x_acc = a * local_x + b * local_y + tx
-y_acc = c * local_x + d * local_y + ty
+x_acc = a * sensor_x + b * sensor_y + tx
+y_acc = c * sensor_x + d * sensor_y + ty
 ```
 
 - `a`, `b`, `c`, `d`: signed 16-bit Q2.14 values, range `[-2, 2 - 2^-14]`.
@@ -48,6 +50,8 @@ The shifts above operate on non-negative magnitudes. This rule is intentionally 
 - Out of range: preserve the computed signed coordinates for debug, set `in_range=0` and `write_valid=0`. Never clamp or wrap an address.
 - In range: `pose_found=1`, `in_range=1`, `write_valid=1`.
 - `polarity` is not changed by geometry and is meaningful only when `write_valid=1` downstream.
+- `event_valid` remains asserted for known, unknown, and out-of-range events so every accepted event has an observable terminal status.
+- On a ready/valid stall, coordinates and all metadata remain stable until the consumer accepts the event.
 
 The checked-in vectors use an 8x8 reference window (`0..7` on both axes) only to exercise boundaries. It is a verification fixture, not a product-resolution decision.
 

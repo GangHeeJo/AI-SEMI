@@ -2556,3 +2556,24 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규: `scripts/run_stage2_regression.py`
 - 전체 명령: `python scripts/run_stage2_regression.py --extended`
 
+## 105. 8x8 계층형 tile merge RTL — 네 leaf를 실제 ready-aware 상위 스트림으로 통합(2026-09-10)
+
+**구조**: 1차의 4x4 최종 leaf 네 개를 2x2 tile로 놓고, 각 leaf의 두 bitmap lane을 최대 8개 event로 해제한 뒤 tile별 16-entry batch FIFO에 넣었다. 네 FIFO head는 stall-safe round-robin으로 하나의 공통 pose-history read port와 K=1 affine transform에 들어간다. tile0/1/2/3 origin은 각각 `(0,0)/(4,0)/(0,4)/(4,4)`이고 base sensor origin을 별도로 더한다. 기존 `aer_tx64_cluster2_tree4`처럼 독립 출력 8개를 단순 노출한 구조가 아니라 실제 한 개 ready/valid 상위 stream으로 병합한다.
+
+**손실과 pose lifetime 경계**: source-local AER full은 `aer_overrun[63:0]`, tile FIFO full은 event-slot별 `tile_fifo_overflow[31:0]`로 분리했다. pose guard는 64-source accept를 세고, terminal retire를 `32 FIFO overflow + 1 RR→transform handshake`의 33 lane으로 받는다. 따라서 상위 FIFO에서 명시적으로 버린 event도 pose 참조를 해제해 ID가 영구 busy가 되는 누수를 막는다. transform이 event와 계수를 capture한 뒤에는 world output이 stall되어도 pose record를 안전하게 재사용할 수 있다.
+
+**통합 검증**:
+
+- 한 번의 64-source frame에서 base origin을 포함한 8x8 sensor coordinate 64개가 정확히 한 번씩 round-trip, drop 0.
+- 네 tile이 동시에 non-empty일 때 RR 순서 `0,1,2,3`, 각 tile 서비스 확인.
+- world stall 31회 동안 valid/status/sensor coordinate/tile/polarity/pose/timestamp/world coordinate 전부 고정.
+- occurrence pose/time, missing pose, busy rewrite reject와 transform capture 후 commit 확인.
+- 의도적 포화 결과: `generated=1606`, `aer_accepted=902`, `aer_drop=704`, `fifo_drop=767`, `rr_retired=delivered=135`. 보존식 `1606=704+767+135`, guard 최종 0.
+
+**time-surface 추가 검증**: 7x6 non-power-of-two grid에서 10,000-cycle random oracle를 추가했다. newer/equal/older timestamp, ON/OFF merge, mapped-invalid, signed range error, invalid read address, 중간 reset을 섞어 update 2277/equal 1113/stale 1059/range 4445를 검사했고 status/read/ready 오류는 모두 0.
+
+**전체 회귀**: 8x8 directed와 random time-surface를 기본 suite에 넣어 12/12 PASS.
+
+- 신규: `rtl/aer_tx64_pose_affine2d_serial.v`, `tb/tb_aer_tx64_pose_affine2d_serial.v`, `tb/tb_world_time_surface_random.v`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`, `STAGE2_GEOMETRY_SPEC.md`
+

@@ -88,6 +88,7 @@
 - `arrival[15:0]`
 - `polarity[15:0]`
 - 같은 입력 사이클의 `pose_version`
+- 같은 입력 사이클의 `occurrence_timestamp`
 - 고정 또는 설정 가능한 `tile_origin_x`, `tile_origin_y`
 
 ### Leaf 내부 FIFO record
@@ -95,20 +96,20 @@
 각 source의 두 슬롯을 다음 record로 취급한다.
 
 ```text
-{polarity, pose_version}
+{polarity, pose_version, occurrence_timestamp}
 ```
 
-`pose_version`은 polarity와 동일한 push/pop 조건으로 저장한다.
+`pose_version`과 `occurrence_timestamp`는 polarity와 동일한 push/pop 조건으로 저장한다.
 
 ### Leaf 출력 뒤 event adapter
 
 row bitmap을 최대 8개의 독립 event record로 푼다.
 
 ```text
-{valid, sensor_x, sensor_y, polarity, pose_version}
+{valid, sensor_x, sensor_y, polarity, pose_version, occurrence_timestamp}
 ```
 
-한 row packet의 네 column은 서로 다른 source FIFO에서 왔으므로 pose version도 column마다 독립적으로 출력해야 한다. lane 또는 packet당 pose tag 하나는 허용하지 않는다.
+한 row packet의 네 column은 서로 다른 source FIFO에서 왔으므로 pose version과 timestamp도 column마다 독립적으로 출력해야 한다. lane 또는 packet당 tag 하나는 허용하지 않는다.
 
 ### 좌표변환 출력
 
@@ -305,11 +306,22 @@ M0~M7 완료 뒤에만 진행한다.
 - full-resolution scaling에서 출력 링크가 병목이면 leaf 수를 더 늘리기 전에 상위 merge와 bandwidth 계약을 다시 정의한다.
 - world memory가 전체 PPA를 지배하면 map 크기를 임의로 줄이지 말고 SRAM macro 또는 off-chip consumer 경계를 명시한다.
 
-## 10. 바로 다음 작업
+## 10. 현재 구현 상태와 다음 작업
 
-1. M0 회귀 명령과 결과표 작성
-2. v1에서 event latency/source skew를 뽑는 측정 testbench 확정
-3. pose-tag 폭 산정을 위한 `max in-flight time / pose update period` 계산
-4. M1 좌표계 정의와 floating-point oracle 작성
+2026-09-10 독립 브랜치 기준:
 
-M0와 M1 결과가 나오기 전에는 Stage-2 RTL을 추가하지 않는다.
+- M0: official full50, UZH, random conservation과 latency/skew 재현 완료
+- M1: supplied-pose 2D affine fixed-point contract, vector generator, 122-vector bit-exact RTL 완료
+- M3: column별 pose/timestamp를 보존하는 4x4 AER와 pose overwrite guard 완료
+- M4: 8-parallel transform 4x4 top 및 ready/valid coordinate stream 완료
+- M5 일부: 8-to-1 batch FIFO와 stall-safe 4-way RR, 8x8/K=1 serial top 완료
+- M6 일부: occurrence timestamp 우선의 작은 reference time-surface 완료; macro interface/PPA는 미완료
+- M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge, single transform 통합 완료
+
+다음 순서는 다음과 같다.
+
+1. 4x4에서 K=1과 K=8 endpoint를 같은 workload로 비교하고 transform FIFO overflow/latency를 측정한다.
+2. 8x8 serial stream을 time-surface에 연결해 stale occurrence와 동일-cell 충돌까지 end-to-end 검증한다.
+3. 실제 차량/회전 trace로 application metric과 정상 부하 envelope를 정한다.
+4. 서버에서 4x4 K=1/K=8 및 8x8 K=1의 Genus PPA를 얻는다.
+5. 측정 결과가 필요성을 보일 때만 K=2/4 또는 SRAM/BRAM writer를 추가한다.
