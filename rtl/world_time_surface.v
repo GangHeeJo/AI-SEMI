@@ -58,11 +58,7 @@ module world_time_surface #(
                         ? timestamp_mem[read_addr] : {TIMESTAMP_W{1'b0}};
   assign read_polarity_seen = read_valid ? polarity_mem[read_addr] : 2'b00;
 
-  initial begin
-    if (GRID_W < 2 || GRID_H < 2 || COORD_W < 2 || TIMESTAMP_W < 1)
-      $fatal(1, "world_time_surface requires GRID_W/H >= 2 and positive widths");
-  end
-
+  // Contract: GRID_W/H and COORD_W are at least 2; TIMESTAMP_W is positive.
   always @(posedge clk) begin
     if (rst) begin
       update_applied <= 1'b0;

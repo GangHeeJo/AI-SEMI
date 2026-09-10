@@ -6,6 +6,8 @@
 // drops. All remaining events retire from the pose in-flight guard when the
 // transform captures them, so a pose entry may be reused while the already
 // transformed result is held under downstream backpressure.
+// tile_origin_x/y are static physical configuration and must remain constant
+// while rst is deasserted; they are intentionally not copied into every event.
 module aer_tx16_pose_affine2d_serial #(
   parameter integer POSE_W = 4,
   parameter integer SENSOR_W = 10,

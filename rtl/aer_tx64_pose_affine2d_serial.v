@@ -4,6 +4,8 @@
 // FIFO absorbs that batch, then a fair arbiter serializes the four FIFO heads
 // into one ready/valid affine-transform lane.  Events rejected by a full tile
 // FIFO are terminal drops and therefore retire from the pose in-flight guard.
+// base_sensor_origin_x/y locate this physical 8x8 sensor block.  They are
+// static configuration and must not change while rst is deasserted.
 module aer_tx64_pose_affine2d_serial #(
   parameter integer POSE_W = 4,
   parameter integer SENSOR_W = 10,
@@ -67,11 +69,7 @@ module aer_tx64_pose_affine2d_serial #(
   localparam integer POSE_LSB = POL_LSB + 1;
   localparam integer TIME_LSB = POSE_LSB + POSE_W;
 
-  initial begin
-    if (SENSOR_W < 3)
-      $fatal(1, "aer_tx64_pose_affine2d_serial requires SENSOR_W >= 3");
-  end
-
+  // Contract: SENSOR_W >= 3 so the 2x2 arrangement of 4x4 leaves fits.
   wire [TILE_COUNT-1:0] leaf_valid0;
   wire [TILE_COUNT-1:0] leaf_valid1;
   wire [(TILE_COUNT*2)-1:0] leaf_row0_flat;

@@ -31,7 +31,8 @@ syn_opt
 
 report_area   > $OUT_DIR/${DESIGN}_area.rpt
 report_timing > $OUT_DIR/${DESIGN}_timing.rpt
-report_power  > $OUT_DIR/${DESIGN}_power.rpt
+# No activity file is read here: this is vectorless smoke power only.
+report_power  > $OUT_DIR/${DESIGN}_power_vectorless.rpt
 report_gates  > $OUT_DIR/${DESIGN}_gates.rpt
 write_hdl     > $OUT_DIR/${DESIGN}_netlist.v
 write_sdc     > $OUT_DIR/${DESIGN}_out.sdc

@@ -1,0 +1,136 @@
+// End-to-end 8x8 AER -> pose-affine transform -> external-memory time surface.
+// The affine world stream is backpressured directly by the serialized surface
+// writer. Transform bounds exactly match the selected world grid.
+module aer_tx64_pose_sram_surface #(
+  parameter integer POSE_W = 4,
+  parameter integer SENSOR_W = 10,
+  parameter integer RESULT_W = 16,
+  parameter integer MATRIX_W = 16,
+  parameter integer OFFSET_W = 24,
+  parameter integer FRAC_W = 14,
+  parameter integer TIMESTAMP_W = 32,
+  parameter integer FIFO_DEPTH = 32,
+  parameter integer GUARD_COUNT_W = 10,
+  parameter integer GRID_W = 256,
+  parameter integer GRID_H = 256,
+  parameter integer ADDR_W = ((GRID_W * GRID_H) <= 1)
+                           ? 1 : $clog2(GRID_W * GRID_H)
+) (
+  input                              clk,
+  input                              rst,
+  input      [63:0]                  arrival,
+  input      [63:0]                  polarity_in,
+  input      [POSE_W-1:0]            occurrence_pose_version,
+  input      [TIMESTAMP_W-1:0]       occurrence_timestamp,
+  output     [63:0]                  aer_overrun,
+  output     [31:0]                  tile_fifo_overflow,
+
+  input                              pose_wr_req,
+  input      [POSE_W-1:0]            pose_wr_id,
+  input signed [MATRIX_W-1:0]        pose_wr_m00,
+  input signed [MATRIX_W-1:0]        pose_wr_m01,
+  input signed [MATRIX_W-1:0]        pose_wr_m10,
+  input signed [MATRIX_W-1:0]        pose_wr_m11,
+  input signed [OFFSET_W-1:0]        pose_wr_tx,
+  input signed [OFFSET_W-1:0]        pose_wr_ty,
+  output                             pose_wr_ready,
+  output                             pose_wr_commit,
+  output                             pose_wr_rejected,
+  output                             pose_accounting_error,
+
+  input      [SENSOR_W-1:0]          base_sensor_origin_x,
+  input      [SENSOR_W-1:0]          base_sensor_origin_y,
+
+  output                             world_valid,
+  output                             world_ready,
+  output                             mapped_valid,
+  output                             pose_found,
+  output                             in_range,
+  output     [SENSOR_W-1:0]          sensor_x,
+  output     [SENSOR_W-1:0]          sensor_y,
+  output     [1:0]                   tile_id,
+  output                             polarity_out,
+  output     [POSE_W-1:0]            pose_version_out,
+  output     [TIMESTAMP_W-1:0]       occurrence_timestamp_out,
+  output signed [RESULT_W-1:0]       world_x,
+  output signed [RESULT_W-1:0]       world_y,
+
+  output                             surface_update_applied,
+  output                             surface_equal_time_merged,
+  output                             surface_stale_ignored,
+  output                             surface_range_error,
+
+  output                             mem_rd_req_valid,
+  input                              mem_rd_req_ready,
+  output     [ADDR_W-1:0]            mem_rd_req_addr,
+  input                              mem_rd_rsp_valid,
+  output                             mem_rd_rsp_ready,
+  input                              mem_rd_rsp_cell_valid,
+  input      [TIMESTAMP_W-1:0]       mem_rd_rsp_timestamp,
+  input      [1:0]                   mem_rd_rsp_polarity_seen,
+  output                             mem_wr_req_valid,
+  input                              mem_wr_req_ready,
+  output     [ADDR_W-1:0]            mem_wr_req_addr,
+  output                             mem_wr_req_cell_valid,
+  output     [TIMESTAMP_W-1:0]       mem_wr_req_timestamp,
+  output     [1:0]                   mem_wr_req_polarity_seen
+);
+  aer_tx64_pose_affine2d_serial #(
+    .POSE_W(POSE_W), .SENSOR_W(SENSOR_W), .RESULT_W(RESULT_W),
+    .MATRIX_W(MATRIX_W), .OFFSET_W(OFFSET_W), .FRAC_W(FRAC_W),
+    .TIMESTAMP_W(TIMESTAMP_W), .FIFO_DEPTH(FIFO_DEPTH),
+    .GUARD_COUNT_W(GUARD_COUNT_W),
+    .X_MIN(0), .X_MAX(GRID_W-1), .Y_MIN(0), .Y_MAX(GRID_H-1)
+  ) u_tx (
+    .clk(clk), .rst(rst), .arrival(arrival), .polarity_in(polarity_in),
+    .occurrence_pose_version(occurrence_pose_version),
+    .occurrence_timestamp(occurrence_timestamp),
+    .aer_overrun(aer_overrun),
+    .tile_fifo_overflow(tile_fifo_overflow),
+    .pose_wr_req(pose_wr_req), .pose_wr_id(pose_wr_id),
+    .pose_wr_m00(pose_wr_m00), .pose_wr_m01(pose_wr_m01),
+    .pose_wr_m10(pose_wr_m10), .pose_wr_m11(pose_wr_m11),
+    .pose_wr_tx(pose_wr_tx), .pose_wr_ty(pose_wr_ty),
+    .pose_wr_ready(pose_wr_ready), .pose_wr_commit(pose_wr_commit),
+    .pose_wr_rejected(pose_wr_rejected),
+    .pose_accounting_error(pose_accounting_error),
+    .base_sensor_origin_x(base_sensor_origin_x),
+    .base_sensor_origin_y(base_sensor_origin_y),
+    .world_valid(world_valid), .world_ready(world_ready),
+    .mapped_valid(mapped_valid), .pose_found(pose_found),
+    .in_range(in_range), .sensor_x(sensor_x), .sensor_y(sensor_y),
+    .tile_id(tile_id), .polarity(polarity_out),
+    .pose_version(pose_version_out),
+    .occurrence_timestamp_out(occurrence_timestamp_out),
+    .world_x(world_x), .world_y(world_y)
+  );
+
+  world_time_surface_sram_writer #(
+    .GRID_W(GRID_W), .GRID_H(GRID_H), .COORD_W(RESULT_W),
+    .TIMESTAMP_W(TIMESTAMP_W), .ADDR_W(ADDR_W)
+  ) u_surface (
+    .clk(clk), .rst(rst),
+    .event_valid(world_valid), .event_ready(world_ready),
+    .mapped_valid(mapped_valid), .world_x(world_x), .world_y(world_y),
+    .polarity(polarity_out),
+    .occurrence_timestamp(occurrence_timestamp_out),
+    .update_applied(surface_update_applied),
+    .equal_time_merged(surface_equal_time_merged),
+    .stale_ignored(surface_stale_ignored),
+    .range_error(surface_range_error),
+    .mem_rd_req_valid(mem_rd_req_valid),
+    .mem_rd_req_ready(mem_rd_req_ready),
+    .mem_rd_req_addr(mem_rd_req_addr),
+    .mem_rd_rsp_valid(mem_rd_rsp_valid),
+    .mem_rd_rsp_ready(mem_rd_rsp_ready),
+    .mem_rd_rsp_cell_valid(mem_rd_rsp_cell_valid),
+    .mem_rd_rsp_timestamp(mem_rd_rsp_timestamp),
+    .mem_rd_rsp_polarity_seen(mem_rd_rsp_polarity_seen),
+    .mem_wr_req_valid(mem_wr_req_valid),
+    .mem_wr_req_ready(mem_wr_req_ready),
+    .mem_wr_req_addr(mem_wr_req_addr),
+    .mem_wr_req_cell_valid(mem_wr_req_cell_valid),
+    .mem_wr_req_timestamp(mem_wr_req_timestamp),
+    .mem_wr_req_polarity_seen(mem_wr_req_polarity_seen)
+  );
+endmodule

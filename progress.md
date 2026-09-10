@@ -2594,3 +2594,21 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규 실행 문서/PPA script: `STAGE2_RTL.md`, `syn/run_genus_stage2_tx16_parallel.tcl`, `syn/run_genus_stage2_tx16_serial.tcl`, `syn/run_genus_stage2_tx64_serial.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`
 
+## 107. 실제 UZH cycle 재생 + 외부 SRAM/BRAM world-map 경계(2026-09-10)
+
+**UZH rotation trace를 압축하지 않고 재생**: `uzh_shapes_rotation_patch.addrpol.txt`의 cycle field 0~59,424를 빈 cycle까지 그대로 재생했다. 원본은 active row 3,259개, event 8,503개, 전체 구간 평균 0.1537 event/cycle지만 active cycle은 평균 2.609개이고 최대 11개가 동시에 온다. 주소와 polarity는 실제 trace 그대로다. 단, 이 파일에는 pose가 없으므로 identity/90도/translation 세 pose를 `cycle mod 3`으로 **합성 부여**했다. 따라서 이 검증은 실제 arrival burst/timing에 대한 throughput·metadata 시험이지 실제 camera pose나 world-map 정확도 평가가 아니다.
+
+**K=1 FIFO depth sweep 대 K=8**: 모든 구성에서 AER overrun은 0이고 K=8은 8,503개를 전부 전달했다(latency p50/p99/max=`3/4/5 cycle`). K=1은 depth 8에서 `drop/delivered=3606/4897`, latency `9/12/13`; depth 16은 `2388/6115`, `14/20/21`; depth 32는 `701/7802`, `20/36/36`; depth 64는 `73/8430`, `21/66/68`; 최초 무손실인 depth 128은 `0/8503`, `22/74/94`였다. FIFO를 키우면 평균 처리율 1 event/cycle보다 낮은 이 trace는 결국 drain되지만 burst를 저장한 대가로 tail latency와 storage가 커진다. 이 결과로 K=2/K=4 중간 endpoint를 구현·비교할 근거가 생겼으며, K=1 depth128이나 K=8을 아직 최종 선택하지 않는다.
+
+**외부 memory용 time-surface writer**: 큰 world grid를 resettable FF array로 복제하지 않도록 `world_time_surface_sram_writer`를 추가했다. cell `{valid,timestamp,polarity_seen}`에 대해 ready/valid read request→response→조건부 write를 수행하고, newer update/equal OR merge/older stale-ignore 규칙을 그대로 지킨다. 7x6 grid에서 event 2,508개, random request stall과 1~8 cycle response latency를 넣어 update/equal/stale/range/mapped-invalid=`1273/474/491/489/255`, 총 18,120 cycle을 검사했고 42셀 전체가 oracle과 일치했다. 현재는 single-outstanding 직렬 writer라 정확성 기준선이며, 고처리량 제품형은 banking 또는 hazard-aware pipeline이 필요하다.
+
+**8x8 AER→외부 SRAM 폐루프**: 8x8 serial world stream의 ready를 writer의 event ready에 직접 연결한 wrapper를 추가했다. random memory stall/response delay와 의도적 sensor 포화를 함께 넣은 결과 `generated=3080 = AER drop 1472 + FIFO drop 1530 + completed 78`, update/equal/stale=`51/1/1`, mapped-invalid 26, memory read/write=`52/51`, 최종 pending/pose outstanding 0이었다. missing pose와 x/y 범위 밖 event는 memory request를 만들지 않았고, 동일-cell newer/older/equal-polarity 결과를 실제 외부 memory model readback으로 확인했다. 큰 drop 수치는 느린 single-outstanding writer까지 포함한 고의 과부하 결과다.
+
+**독립 합성/계약 감사 반영**: 기본 파라미터 기능 버그는 없었지만 네 가지 위험을 보강했다. (1) tile/base origin은 event별 tag가 아니라 물리적 static config이므로 reset 해제 중 변경 금지를 RTL/문서 계약으로 명시했다. (2) pose guard counter가 잘못된 파라미터나 protocol violation으로 over/underflow하면 해당 ID를 reset까지 poison해, 포화 count가 나중에 0이 됐다는 이유로 unsafe overwrite를 허용하지 않게 했다. (3) 합성 RTL의 elaboration-time `initial/$fatal`을 제거해 Genus parser 이식성을 높였다. (4) activity 없는 Genus power 파일을 `*_power_vectorless.rpt`로 명시해 실제 trace power처럼 오해하지 않게 했다. 여전히 batch FIFO는 한 cycle multi-write라 단일 SRAM inference를 기대하지 않으며 mapped-cell breakdown을 확인해야 한다.
+
+**전체 재현 회귀**: 기본 + `--extended --trace-sweep`을 한 번에 실행해 26/26 PASS했다. 여기에 official full50 합계, 기존 UZH polarity, 8x8 10,000-cycle random, SRAM writer/폐루프, pose guard의 16-source와 비표준 5-source 구성, UZH FIFO depth 8/16/32/64/128가 모두 포함된다.
+
+- 신규 RTL: `rtl/world_time_surface_sram_writer.v`, `rtl/aer_tx64_pose_sram_surface.v`
+- 신규 검증: `tb/tb_world_time_surface_sram_writer.v`, `tb/tb_aer_tx64_pose_sram_surface.v`, `tb/tb_stage2_k1_k8_uzh_trace.v`
+- 수정: pose guard/guard TB, synthesis-facing RTL parameter checks, geometry/integration 문서, Genus script, regression runner
+

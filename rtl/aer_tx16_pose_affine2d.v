@@ -4,6 +4,8 @@
 //
 // There is deliberately no world memory here.  Every accepted event remains
 // visible at the output, including missing-pose and out-of-range events.
+// tile_origin_x/y are physical configuration, not occurrence metadata: keep
+// them constant while rst is deasserted, or drain/reset before reconfiguration.
 module aer_tx16_pose_affine2d #(
   parameter POSE_W   = 4,
   parameter SENSOR_W = 10,

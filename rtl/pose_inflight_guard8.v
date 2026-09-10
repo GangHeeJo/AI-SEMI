@@ -3,6 +3,10 @@
 // the start of the cycle:
 //   - count==0 plus a same-cycle first accept: write commits.
 //   - count==1 plus a same-cycle last retire: write rejects until next cycle.
+// If an invalid configuration or protocol violation over/underflows a counter,
+// that pose ID is poisoned until reset.  Saturating the visible count alone is
+// not sufficient: after it drains, an unknown number of references may remain,
+// so fail-safe overwrite blocking is required.
 module pose_inflight_guard8 #(
   parameter integer POSE_W = 4,
   parameter integer COUNT_W = 8,
@@ -34,6 +38,7 @@ module pose_inflight_guard8 #(
   localparam [COUNT_W-1:0] MAX_COUNT = {COUNT_W{1'b1}};
 
   reg [COUNT_W-1:0] outstanding [0:POSE_IDS-1];
+  reg poisoned [0:POSE_IDS-1];
 
   function [ACCEPT_COUNT_W-1:0] popcount_accepted;
     input [ACCEPT_SOURCES-1:0] bits;
@@ -60,7 +65,8 @@ module pose_inflight_guard8 #(
   endfunction
 
   wire [ACCEPT_COUNT_W-1:0] accepted_count = popcount_accepted(accepted_mask);
-  wire pose_wr_busy = (outstanding[pose_wr_id] != {COUNT_W{1'b0}});
+  wire pose_wr_busy = (outstanding[pose_wr_id] != {COUNT_W{1'b0}}) |
+                      poisoned[pose_wr_id];
   assign pose_wr_ready = ~rst & ~pose_wr_busy;
   assign pose_wr_commit = pose_wr_req & pose_wr_ready;
   assign pose_wr_rejected = pose_wr_req & ~rst & pose_wr_busy;
@@ -89,14 +95,18 @@ module pose_inflight_guard8 #(
       assign count_error[pose_id] = underflow | overflow;
 
       always @(posedge clk) begin
-        if (rst)
+        if (rst) begin
           outstanding[pose_id] <= 0;
-        else if (underflow)
+          poisoned[pose_id] <= 1'b0;
+        end else if (underflow) begin
           outstanding[pose_id] <= 0;
-        else if (overflow)
+          poisoned[pose_id] <= 1'b1;
+        end else if (overflow) begin
           outstanding[pose_id] <= MAX_COUNT;
-        else
+          poisoned[pose_id] <= 1'b1;
+        end else begin
           outstanding[pose_id] <= next_count[COUNT_W-1:0];
+        end
       end
     end
   endgenerate

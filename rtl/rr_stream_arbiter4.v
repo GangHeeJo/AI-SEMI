@@ -25,11 +25,7 @@ module rr_stream_arbiter4 #(
   integer offset_i;
   integer source_i;
 
-  initial begin
-    if (DATA_W < 1)
-      $fatal(1, "rr_stream_arbiter4 requires DATA_W >= 1");
-  end
-
+  // Contract: DATA_W >= 1.
   always @(*) begin
     pick_valid = 1'b0;
     pick_source = rr_ptr;

@@ -7,7 +7,7 @@ This document defines the smallest geometry block that can be translated to RTL 
 Each accepted event carries:
 
 - `local_x`, `local_y`: unsigned 2-bit coordinates for one 4x4 sensor tile.
-- `sensor_x = tile_origin_x + local_x`, `sensor_y = tile_origin_y + local_y`: parameterized-width coordinates produced by the bitmap adapter. The transform consumes these coordinates; the checked-in vectors use a zero tile origin.
+- `sensor_x = tile_origin_x + local_x`, `sensor_y = tile_origin_y + local_y`: parameterized-width coordinates produced by the bitmap adapter. The transform consumes these coordinates; the checked-in vectors use a zero tile origin. Tile/base origins describe fixed physical placement and must remain stable while reset is deasserted. A dynamically moving ROI would require draining/resetting first or adding origin to each occurrence record.
 - `polarity`: one bit, transported unchanged by the geometry block.
 - `pose_version`: an unsigned, parameterized-width key captured when the event occurs, not when it retires from AER arbitration. The checked-in verification vectors use 8 bits; the first small RTL integration may use fewer entries to keep the pose table measurable.
 - `occurrence_timestamp`: an unsigned, parameterized-width event time captured by the same source FIFO entry as polarity and pose. It is transported unchanged through coordinate conversion.

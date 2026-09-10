@@ -285,6 +285,14 @@ def regular_tests() -> tuple[HDLTest, ...]:
             "POSE_INFLIGHT_GUARD8_PASS",
         ),
         HDLTest(
+            "pose_guard_accept5",
+            "tb_pose_inflight_guard8",
+            ("rtl/pose_inflight_guard8.v",),
+            "tb/tb_pose_inflight_guard8.v",
+            "POSE_INFLIGHT_GUARD8_PASS",
+            ("-DPOSE_GUARD_ACCEPT_SOURCES=5",),
+        ),
+        HDLTest(
             "affine_backpressure",
             "tb_coord_transform_affine2d_backpressure",
             ("rtl/coord_transform_affine2d.v",),
@@ -391,6 +399,13 @@ def regular_tests() -> tuple[HDLTest, ...]:
             "WORLD_TIME_SURFACE_RANDOM_PASS",
         ),
         HDLTest(
+            "world_time_surface_sram_writer",
+            "tb_world_time_surface_sram_writer",
+            ("rtl/world_time_surface_sram_writer.v",),
+            "tb/tb_world_time_surface_sram_writer.v",
+            "WORLD_TIME_SURFACE_SRAM_WRITER_PASS",
+        ),
+        HDLTest(
             "aer_8x8_pose_time_surface",
             "tb_aer_tx64_pose_time_surface",
             (
@@ -409,6 +424,26 @@ def regular_tests() -> tuple[HDLTest, ...]:
             ),
             "tb/tb_aer_tx64_pose_time_surface.v",
             "AER_TX64_POSE_TIME_SURFACE_PASS",
+        ),
+        HDLTest(
+            "aer_8x8_pose_sram_surface",
+            "tb_aer_tx64_pose_sram_surface",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx64_pose_affine2d_serial.v",
+                "rtl/world_time_surface_sram_writer.v",
+                "rtl/aer_tx64_pose_sram_surface.v",
+            ),
+            "tb/tb_aer_tx64_pose_sram_surface.v",
+            "AER_TX64_POSE_SRAM_SURFACE_PASS",
         ),
     )
 
@@ -449,6 +484,34 @@ def extended_tests(root: Path) -> tuple[HDLTest, ...]:
     )
 
 
+def trace_sweep_tests() -> tuple[HDLTest, ...]:
+    trace = "common_traces_uzh/uzh_shapes_rotation_patch.addrpol.txt"
+    dependencies = (
+        "rtl/arbiter2.v",
+        "rtl/arbiter4_tree.v",
+        "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+        "rtl/aer_bitmap_to_event8_pose.v",
+        "rtl/event_batch_fifo.v",
+        "rtl/pose_inflight_guard8.v",
+        "rtl/pose_history_affine8.v",
+        "rtl/coord_transform_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d_serial.v",
+    )
+    return tuple(
+        HDLTest(
+            f"uzh_k1_k8_depth_{depth}",
+            "tb_stage2_k1_k8_uzh_trace",
+            dependencies,
+            "tb/tb_stage2_k1_k8_uzh_trace.v",
+            "STAGE2_K1_K8_UZH_TRACE_PASS",
+            (f"-Ptb_stage2_k1_k8_uzh_trace.FIFO_DEPTH={depth}",),
+            (f"+TRACE_FILE={trace}",),
+        )
+        for depth in (8, 16, 32, 64, 128)
+    )
+
+
 def print_result(result: Result) -> None:
     label = "PASS" if result.passed else "FAIL"
     print(f"[{label}] {result.name} ({result.seconds:.2f}s) - {result.detail}")
@@ -464,6 +527,11 @@ def parse_args() -> argparse.Namespace:
         "--extended",
         action="store_true",
         help="also run the slower UZH and 50-trace suites",
+    )
+    parser.add_argument(
+        "--trace-sweep",
+        action="store_true",
+        help="also compare K=1 FIFO depths 8..128 against K=8 on UZH timing",
     )
     return parser.parse_args()
 
@@ -516,6 +584,12 @@ def main() -> int:
             result = run_full50(root, temp_root, iverilog, vvp)
             results.append(result)
             print_result(result)
+
+        if args.trace_sweep:
+            for test in trace_sweep_tests():
+                result = run_hdl_test(test, root, temp_root, iverilog, vvp)
+                results.append(result)
+                print_result(result)
 
     passed = sum(result.passed for result in results)
     print(f"\nStage-2 regression: {passed}/{len(results)} tests passed")

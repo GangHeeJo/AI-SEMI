@@ -74,6 +74,8 @@ module tb_pose_inflight_guard8;
   reg [POSE_IDS-1:0] committed_before;
   reg [POSE_IDS-1:0] accepted_id_seen;
   reg [POSE_IDS-1:0] retired_id_seen;
+  reg [POSE_IDS-1:0] model_poisoned;
+  reg [POSE_IDS-1:0] next_poisoned;
 
   function integer popcount_accepted;
     input [ACCEPT_SOURCES-1:0] bits;
@@ -115,6 +117,11 @@ module tb_pose_inflight_guard8;
           $display("COUNT_FAIL cycle=%0d id=%0d dut=%0d model=%0d",
             cycle_no, i, dut.outstanding[i], model[i]);
         end
+        if (dut.poisoned[i] !== model_poisoned[i]) begin
+          errors = errors + 1;
+          $display("POISON_FAIL cycle=%0d id=%0d dut=%0b model=%0b",
+            cycle_no, i, dut.poisoned[i], model_poisoned[i]);
+        end
       end
     end
   endtask
@@ -137,6 +144,7 @@ module tb_pose_inflight_guard8;
       #1;
       for (i = 0; i < POSE_IDS; i = i + 1)
         model[i] = 0;
+      model_poisoned = 0;
       expected_error = 0;
       compare_counts();
       check(accounting_error === 1'b0, "reset clears sticky accounting error");
@@ -149,10 +157,13 @@ module tb_pose_inflight_guard8;
   task automatic step;
     begin
       #1;
-      expected_commit = pose_wr_req && (model[pose_wr_id] == 0);
-      expected_reject = pose_wr_req && (model[pose_wr_id] != 0);
-      check(pose_wr_ready === (model[pose_wr_id] == 0),
-        "pose write ready reflects current ID count");
+      expected_commit = pose_wr_req && (model[pose_wr_id] == 0) &&
+                        !model_poisoned[pose_wr_id];
+      expected_reject = pose_wr_req && ((model[pose_wr_id] != 0) ||
+                        model_poisoned[pose_wr_id]);
+      check(pose_wr_ready === ((model[pose_wr_id] == 0) &&
+                              !model_poisoned[pose_wr_id]),
+        "pose write ready reflects current ID count and poison state");
       check(pose_wr_commit === expected_commit[0], "pose write commit decision");
       check(pose_wr_rejected === expected_reject[0], "pose write rejection decision");
       check(!(pose_wr_commit && pose_wr_rejected), "commit and reject are exclusive");
@@ -163,6 +174,7 @@ module tb_pose_inflight_guard8;
       end
       if (expected_reject) rejects = rejects + 1;
 
+      next_poisoned = model_poisoned;
       for (i = 0; i < POSE_IDS; i = i + 1)
         next_model[i] = model[i];
       accepted_n = popcount_accepted(accepted_mask);
@@ -201,9 +213,11 @@ module tb_pose_inflight_guard8;
       for (i = 0; i < POSE_IDS; i = i + 1) begin
         if (next_model[i] < 0) begin
           next_model[i] = 0;
+          next_poisoned[i] = 1'b1;
           expected_error = 1;
         end else if (next_model[i] > MAX_COUNT) begin
           next_model[i] = MAX_COUNT;
+          next_poisoned[i] = 1'b1;
           expected_error = 1;
         end
       end
@@ -212,6 +226,7 @@ module tb_pose_inflight_guard8;
       #1;
       for (i = 0; i < POSE_IDS; i = i + 1)
         model[i] = next_model[i];
+      model_poisoned = next_poisoned;
       compare_counts();
       check(accounting_error === expected_error[0], "sticky accounting error state");
     end
@@ -366,17 +381,22 @@ module tb_pose_inflight_guard8;
     check(accepted_id_seen == {POSE_IDS{1'b1}}, "random traffic accepted every pose ID");
     check(retired_id_seen == {POSE_IDS{1'b1}}, "random traffic retired every pose ID");
 
-    // Underflow is clamped to zero, reported, and sticky until reset.
+    // Underflow is clamped/reported and poisons the ID until reset.  Blocking
+    // overwrite is fail-safe because the true number of references is unknown.
     reset_guard();
     cycle_no = cycle_no + 1;
     retire_valid = 1;
     retire_pose_version_flat[0 +: POSE_W] = 2;
     step();
-    check(model[2] == 0 && accounting_error, "retire underflow is detected");
+    check(model[2] == 0 && model_poisoned[2] && accounting_error,
+      "retire underflow is detected and poisons the ID");
     @(negedge clk); clear_inputs();
+    pose_wr_req = 1'b1;
+    pose_wr_id = 2;
     cycle_no = cycle_no + 1;
     step();
-    check(accounting_error, "underflow error remains sticky");
+    check(!pose_wr_commit && pose_wr_rejected && accounting_error,
+      "poisoned zero-count ID remains blocked until reset");
 
     // Repeated all-source accepts exceed the count representation.
     reset_guard();
@@ -395,8 +415,8 @@ module tb_pose_inflight_guard8;
       accepted_pose_version = 6;
       step();
     end
-    check(model[6] == MAX_COUNT && accounting_error,
-      "count overflow saturates and is detected");
+    check(model[6] == MAX_COUNT && model_poisoned[6] && accounting_error,
+      "count overflow saturates, is detected, and poisons the ID");
 
     reset_guard();
     check(wrap_seen, "pose version wrap 7 to 0 was exercised");

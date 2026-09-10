@@ -12,8 +12,9 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `aer_tx16_pose_affine2d_serial` | 4x4 | 1 | one ready/valid event | K=1 throughput/PPA endpoint |
 | `aer_tx64_pose_affine2d_serial` | 8x8 (four leaves) | 1 shared | one ready/valid event | tile hierarchy and upper-merge proof |
 | `aer_tx64_pose_time_surface` | 8x8 (four leaves) | 1 shared | internal always-ready map writer plus read port | closed sensor-to-map proof |
+| `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
 
-The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution.
+The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution. Tile/base origins are static physical configuration and must remain unchanged while reset is deasserted; unlike pose and timestamp, they are not captured per event.
 
 ## Event lifetime
 
@@ -37,7 +38,7 @@ Drive the requested pose ID and all six coefficients with `pose_wr_req`. A write
 
 - `pose_wr_ready=1`: no accepted event still needs that ID.
 - `pose_wr_rejected=1`: the requested ID is busy; keep the old record and retry later or use another free ID.
-- `pose_accounting_error=1`: sticky underflow/overflow indicator; treat this as a contract failure and reset/debug it.
+- `pose_accounting_error=1`: sticky underflow/overflow indicator. The affected pose ID is fail-safe poisoned and cannot be overwritten until reset, because a saturated count no longer proves that all references drained. Treat this as a contract failure and reset/debug it.
 
 The last transform lookup and a rewrite of the same ID are not allowed on the same edge. The rewrite becomes ready on the following cycle. This prevents a retiring event from observing new coefficients.
 
@@ -66,6 +67,8 @@ For the 8x8 top, apply the same equation across all four tiles. AER overrun and 
 
 The reference time surface keeps the greatest occurrence timestamp per cell. Equal-time ON/OFF events OR into a two-bit polarity set; an older event that retires later is reported as stale and cannot roll the cell back. Timestamp comparison assumes no counter wrap within one map epoch.
 
+For a large grid, `world_time_surface_sram_writer` stores no cell array internally. It issues one ready/valid read request, waits for the matching response, and issues a write only for a newer or equal-time event. The external memory cell is `{valid, timestamp, polarity_seen[1:0]}`. Request valid/address/data remain stable until ready. The current writer deliberately allows only one outstanding event, so it is a correctness-oriented macro boundary rather than a high-throughput memory engine; banking or a hazard-aware pipeline is required if measured traffic cannot tolerate its backpressure.
+
 ## Verification
 
 Run the normal suite from the repository root:
@@ -78,6 +81,12 @@ Add the original UZH trace and official 50-workload baseline:
 
 ```text
 python scripts/run_stage2_regression.py --extended
+```
+
+Sweep the K=1 FIFO against K=8 while preserving every cycle in the checked-in UZH trace:
+
+```text
+python scripts/run_stage2_regression.py --trace-sweep
 ```
 
 On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails.
@@ -95,3 +104,5 @@ genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
 ```
 
 Map storage is deliberately excluded from the three logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation.
+
+The three scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM.

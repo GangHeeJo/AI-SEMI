@@ -33,12 +33,9 @@ module event_batch_fifo #(
   assign out_valid = !rst && (occupancy != 0);
   assign out_data = mem[read_ptr];
 
-  initial begin
-    if (DATA_W < 1 || IN_LANES < 1 || DEPTH < 1 ||
-        ((DEPTH & (DEPTH - 1)) != 0))
-      $fatal(1, "event_batch_fifo requires positive widths and power-of-two DEPTH");
-  end
-
+  // Contract: DATA_W/IN_LANES are positive and DEPTH is a positive power of 2.
+  // Testbenches validate the supported configurations; keeping the RTL free of
+  // elaboration-time system tasks makes the block portable to the Genus flow.
   always @(*) begin
     accept_mask = {IN_LANES{1'b0}};
     in_overflow = {IN_LANES{1'b0}};
