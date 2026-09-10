@@ -2508,3 +2508,37 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 - 수정: `scripts/join_event_logger_output.py`, `scripts/join_polarity_event_logger_output.py`, `common_traces_uzh/event_logger_out/*.manifest.json`(재생성)
 
+## 103. Codex 독립 2차 착수 — occurrence-time pose/timestamp 보존부터 world event까지(2026-09-10)
+
+**작업 격리**: Claude가 작업 중인 `main`은 건드리지 않고, 1차 마지막 기준점 `ff9d5d2`에서 `codex/ai-semi-stage2` 브랜치와 별도 worktree를 만들었다. 기존 2차 산출물은 가져오지 않았고 1차 최종 후보 `aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity` v1만 출발점으로 사용했다. 방향과 단계별 종료조건은 `STAGE2_PLAN.md`, 좌표·고정소수점 계약은 `STAGE2_GEOMETRY_SPEC.md`에 고정했다.
+
+**1차 기준선 재현(M0)**:
+
+- 공식 50-workload: 50/50 보존식 PASS, `generated=106416`, `overrun=502`(0.4717%), `delivered=105914`.
+- UZH `shapes_rotation` patch: `generated=8503`, `delivered=8503`, `overrun=0`, polarity mismatch 0.
+- 별도 burst/latency 계측: `generated=15146`, `accepted=retired=13805`, 명시적 overrun 1341, latency p50/p99/max=`2/3/3 cycle`, cross-source skew p50/p99/max=`1/2/2 cycle`, phantom/duplicate/order/polarity 오류 0.
+
+**4x4 occurrence metadata AER(M3)**: v1의 source별 depth-2 FIFO entry를 `{polarity, pose_version, occurrence_timestamp}`로 확장했다. 한 row bitmap 안의 네 column은 발생 시점이 서로 다를 수 있으므로 pose와 timestamp를 packet당 하나가 아니라 column마다 독립 출력한다. 주소·steal·v1 full+grant drop 정책은 그대로 유지했다. 30,000-cycle random과 wrap/directed 검증에서 `generated=190319 = delivered 162939 + overrun 27380`, 주소/overrun/polarity/pose/timestamp/phantom/duplicate 오류 0.
+
+**좌표변환 파이프라인(M1/M4)**:
+
+- 두 AER bitmap lane을 최대 8개 독립 event로 푸는 adapter 작성.
+- version-keyed pose history(8 read port, same-cycle write-through) 작성.
+- signed Q2.14 matrix와 Q10.14 translation을 쓰는 2D affine transform 작성. round-to-nearest, exact half away from zero, unknown pose와 out-of-range를 drop하지 않고 status로 출력한다.
+- transform 출력에 ready/valid hold를 추가해 downstream stall 중 좌표·극성·pose·timestamp가 안정적으로 유지되게 했다.
+- Python 정답모델이 만든 122개 vector와 RTL을 bit-exact 대조해 오류 0. identity, 90/180도, signed translation, ±0.5 tie, quantized 45도, unknown pose를 포함한다.
+- 4x4 전체 E2E: `generated=85`, `accepted=retired=67`, `overrun=18`, 정상 mapping 55, missing pose 1, out-of-range 11, occurrence-pose 혼합 bitmap 확인 1, 모든 정합 오류 0.
+
+**확장에 필요한 독립 블록**:
+
+- `event_batch_fifo`: 8-lane burst를 1-lane ready/valid로 압축하며 낮은 lane 순서 보존, lane별 overflow 명시, 같은 cycle pop 공간 재사용. DEPTH 1/2/8/16/32 random oracle PASS.
+- `rr_stream_arbiter4`: 네 tile stream을 handshake에서만 round-robin 이동하고 stall 중 source/data를 잠근다. 연속 경쟁 시 각 source 16/64회 서비스, 5,000-cycle random stall 오류 0.
+- `pose_inflight_guard8`: pose ID별 accepted-minus-retired를 세어 참조 중인 record overwrite를 차단한다. 마지막 retire와 같은 edge의 rewrite도 차단하고 다음 cycle부터 허용한다. 20,000-cycle random에서 commit 2279/reject 201, 오류 0.
+- `world_time_surface`: 작은 reference grid에 각 cell의 최신 occurrence timestamp와 동시간 ON/OFF set을 저장한다. 늦게 retire한 오래된 이벤트가 최신 cell을 되돌리지 않으며, 같은 timestamp 충돌은 OR merge라 순서 독립적이다. directed test PASS. 큰 map에서는 이 배열을 그대로 플립플롭으로 키우지 않고 SRAM/BRAM interface로 교체해야 한다.
+
+**현재 정직한 경계**: affine 블록은 supplied-pose planar/reference-coordinate의 첫 RTL 가능 부분이지, depth 없는 일반 3D world reconstruction이나 완전한 projective road-plane homography를 뜻하지 않는다. pose 추정/SLAM은 범위 밖이다. 8x8은 위의 검증된 FIFO와 ready-aware arbiter를 실제 네 leaf에 통합하는 다음 체크포인트이며, pose overwrite guard도 top에 연결한 뒤 재검증한다. 로컬에는 Icarus만 있어 기능 검증은 가능하지만 신규 블록의 Genus/Innovus PPA는 서버 실행이 필요하다.
+
+- 신규 문서: `STAGE2_PLAN.md`, `STAGE2_GEOMETRY_SPEC.md`
+- 신규 RTL: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`, `rtl/aer_bitmap_to_event8_pose.v`, `rtl/pose_history_affine8.v`, `rtl/pose_inflight_guard8.v`, `rtl/coord_transform_affine2d.v`, `rtl/aer_tx16_pose_affine2d.v`, `rtl/event_batch_fifo.v`, `rtl/rr_stream_arbiter4.v`, `rtl/world_time_surface.v`
+- 신규 검증: `scripts/gen_stage2_affine_vectors.py`, `tb/stage2_affine_vectors.tsv`, `tb/tb_stage2_m0_latency_skew.v`, `tb/tb_steal_buf_polarity_pose_correctness.v`, `tb/tb_pose_history_affine8.v`, `tb/tb_pose_inflight_guard8.v`, `tb/tb_coord_transform_affine2d.v`, `tb/tb_coord_transform_affine2d_backpressure.v`, `tb/tb_aer_tx16_pose_affine2d_e2e.v`, `tb/tb_event_batch_fifo.v`, `tb/tb_rr_stream_arbiter4.v`, `tb/tb_world_time_surface.v`
+

@@ -1,0 +1,62 @@
+# Stage-2 geometry reference contract
+
+This document defines the smallest geometry block that can be translated to RTL without committing the project to a particular sensor size, map size, or application. It deliberately stops at a supplied-pose 2D affine transform; pose estimation and map storage are separate stages.
+
+## Event contract
+
+Each accepted event carries:
+
+- `local_x`, `local_y`: unsigned 2-bit coordinates for one 4x4 sensor tile.
+- `polarity`: one bit, transported unchanged by the geometry block.
+- `pose_version`: an unsigned, parameterized-width key captured when the event occurs, not when it retires from AER arbitration. The checked-in verification vectors use 8 bits; the first small RTL integration may use fewer entries to keep the pose table measurable.
+
+Every event in a row bitmap needs its own `pose_version`. Different columns in one transmitted bitmap may have entered their source FIFOs in different cycles, so one tag per output lane is insufficient.
+
+The pose table maps `pose_version` to one record `(a, b, c, d, tx, ty)`. How the table is loaded is outside this first contract.
+
+## Fixed-point transform
+
+The authoritative equations are:
+
+```text
+x_acc = a * local_x + b * local_y + tx
+y_acc = c * local_x + d * local_y + ty
+```
+
+- `a`, `b`, `c`, `d`: signed 16-bit Q2.14 values, range `[-2, 2 - 2^-14]`.
+- `tx`, `ty`: signed 24-bit Q10.14 values, range `[-512, 512 - 2^-14]`.
+- `x_acc`, `y_acc`: exact signed Q*.14 intermediate values. For 2-bit coordinates and the widths above, a signed 25-bit accumulator is sufficient. No intermediate saturation or wrapping is allowed.
+- Translation is applied after the matrix multiplication.
+
+The matrix values, rather than a clockwise/counter-clockwise label, define the coordinate convention. For example, `(a,b,c,d)=(0,-1,1,0)` means `X=-y+tx`, `Y=x+ty`.
+
+## Rounding
+
+Each accumulator is rounded independently to the nearest integer. Exact half-way cases round away from zero:
+
+```text
+round(q) =  ( q + 2^13) >> 14                  when q >= 0
+round(q) = -((-q + 2^13) >> 14)                when q < 0
+```
+
+The shifts above operate on non-negative magnitudes. This rule is intentionally explicit so Python, RTL, and later software do not disagree on negative values.
+
+## Pose and range validity
+
+- Unknown `pose_version`: `pose_found=0`, `in_range=0`, `write_valid=0`, and deterministic diagnostic coordinates `(0,0)`.
+- Known pose: round first, then compare the integer result against configurable inclusive bounds `[x_min,x_max]` and `[y_min,y_max]`.
+- Out of range: preserve the computed signed coordinates for debug, set `in_range=0` and `write_valid=0`. Never clamp or wrap an address.
+- In range: `pose_found=1`, `in_range=1`, `write_valid=1`.
+- `polarity` is not changed by geometry and is meaningful only when `write_valid=1` downstream.
+
+The checked-in vectors use an 8x8 reference window (`0..7` on both axes) only to exercise boundaries. It is a verification fixture, not a product-resolution decision.
+
+## Vector format
+
+`tb/stage2_affine_vectors.tsv` contains directed cases followed by every `(x,y)` in the 4x4 tile for every defined pose. Coefficients, raw accumulators, rounded coordinates, and all validity bits are included in each row so an RTL testbench does not need a hidden copy of the Python pose table.
+
+Generate and self-check it with:
+
+```text
+python scripts/gen_stage2_affine_vectors.py
+```
