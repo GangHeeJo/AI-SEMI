@@ -14,14 +14,23 @@
 # 이 스크립트는 RTL을 전혀 안 건드림 -- 정확도가 나쁘면 여기서 멈추고 방향을 다시 잡는다.
 
 import sys
-from collections import defaultdict
 
-from coord_transform_model import N_THETA, local_xy_from_row_col, transform
+from coord_transform_model import N_THETA, transform
 
 EVENTMETA_PATH = "common_traces_uzh/uzh_shapes_rotation_patch.eventmeta_theta.tsv"
+PATCH_N = 4  # 로컬 센서 한 변 크기 -- §119(센서 커버리지 확장)부터 4가 아닌 값도 지원
 
 
-def load_events(path):
+def local_xy_from_row_col_n(row, col, n):
+    """coord_transform_model.local_xy_from_row_col()의 일반화판(n=4일 때 완전히 동일한 값을
+    냄) -- 그 함수는 4x4 전용 RTL(steal_buf)에 묶여있어서 건드리지 않고, 임의 크기 패치를
+    쓰는 이 소프트웨어 실험 전용으로 여기에 따로 둔다."""
+    xc2 = 2 * col - (n - 1)
+    yc2 = 2 * row - (n - 1)
+    return xc2, yc2
+
+
+def load_events(path, n=PATCH_N):
     """(row, col, polarity, gt_theta_idx) 리스트. gt_theta_idx는 채점(정확도 측정)에만 쓰고
     추정 알고리즘 입력으로는 절대 안 씀."""
     events = []
@@ -31,20 +40,20 @@ def load_events(path):
         for line in f:
             parts = line.rstrip("\n").split("\t")
             source = int(parts[idx["source"]])
-            row, col = source // 4, source % 4
+            row, col = source // n, source % n
             pol = int(parts[idx["polarity"]])
             gt_theta = int(parts[idx["theta_idx"]])
             events.append((row, col, pol, gt_theta))
     return events
 
 
-def build_transform_table():
-    """(row,col,theta_idx) -> (X,Y) 전체 4096가지 사전계산 -- RMCM 룩업과 같은 표,
+def build_transform_table(n=PATCH_N):
+    """(row,col,theta_idx) -> (X,Y) 사전계산(n=4면 RMCM 룩업과 같은 4096가지 표) --
     매 윈도우마다 transform()을 다시 부르는 대신 이 표를 인덱싱해서 속도를 낸다."""
     table = {}
-    for row in range(4):
-        for col in range(4):
-            xc2, yc2 = local_xy_from_row_col(row, col)
+    for row in range(n):
+        for col in range(n):
+            xc2, yc2 = local_xy_from_row_col_n(row, col, n)
             for theta_idx in range(N_THETA):
                 table[(row, col, theta_idx)] = transform(xc2, yc2, theta_idx)
     return table
@@ -120,10 +129,10 @@ def run_tracking(events, table, window, radius):
     return errors
 
 
-def demo():
-    events = load_events(EVENTMETA_PATH)
-    table = build_transform_table()
-    print(f"loaded {len(events)} real UZH events, theta 후보 {N_THETA}개, 사전계산 테이블 {len(table)}칸")
+def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
+    events = load_events(eventmeta_path, n)
+    table = build_transform_table(n)
+    print(f"patch={n}x{n} loaded {len(events)} real UZH events, theta 후보 {N_THETA}개, 사전계산 테이블 {len(table)}칸")
 
     deg_per_idx = 360.0 / N_THETA
 
@@ -148,6 +157,7 @@ def demo():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        EVENTMETA_PATH = sys.argv[1]
-    demo()
+    # usage: rotation_estimate_model.py [eventmeta.tsv] [N]
+    path = sys.argv[1] if len(sys.argv) > 1 else EVENTMETA_PATH
+    patch_n = int(sys.argv[2]) if len(sys.argv) > 2 else PATCH_N
+    demo(path, patch_n)
