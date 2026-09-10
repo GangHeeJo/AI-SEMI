@@ -176,6 +176,75 @@ def run_affine_vectors(
     )
 
 
+def run_synthesis_elaboration(
+    root: Path,
+    temp_root: Path,
+    iverilog: str,
+) -> Result:
+    started = time.perf_counter()
+    common_rtl = (
+        "rtl/arbiter2.v",
+        "rtl/arbiter4_tree.v",
+        "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+        "rtl/aer_bitmap_to_event8_pose.v",
+        "rtl/event_batch_fifo.v",
+        "rtl/pose_inflight_guard8.v",
+        "rtl/pose_history_affine8.v",
+        "rtl/coord_transform_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d_serial.v",
+        "rtl/aer_tx16_pose_affine2d_banked.v",
+        "rtl/rr_stream_arbiter4.v",
+        "rtl/aer_tx64_pose_affine2d_serial.v",
+    )
+    configurations = (
+        ("k8", "aer_tx16_pose_affine2d", ()),
+        ("k1_d32", "aer_tx16_pose_affine2d_serial", ()),
+        ("k1_d128", "aer_tx16_pose_affine2d_serial",
+         ("-Paer_tx16_pose_affine2d_serial.FIFO_DEPTH=128",)),
+        ("k2_d32", "aer_tx16_pose_affine2d_banked", (
+            "-Paer_tx16_pose_affine2d_banked.K=2",
+            "-Paer_tx16_pose_affine2d_banked.FIFO_DEPTH=32",
+        )),
+        ("k4_d8", "aer_tx16_pose_affine2d_banked", (
+            "-Paer_tx16_pose_affine2d_banked.K=4",
+            "-Paer_tx16_pose_affine2d_banked.FIFO_DEPTH=8",
+        )),
+        ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
+    )
+    failures: list[str] = []
+    outputs: list[str] = []
+    for name, top, parameters in configurations:
+        executable = temp_root / f"synthesis_{name}.vvp"
+        compile_run = run_process(
+            [
+                iverilog,
+                "-g2005",
+                "-s",
+                top,
+                *parameters,
+                "-o",
+                str(executable),
+                *common_rtl,
+            ],
+            root,
+        )
+        output = process_output(compile_run)
+        if output:
+            outputs.append(f"[{name}]\n{output}")
+        if compile_run.returncode != 0:
+            failures.append(f"{name}: compile exited {compile_run.returncode}")
+
+    return Result(
+        "synthesis_elaboration",
+        not failures,
+        "6/6 Verilog-2005 tops elaborated" if not failures
+        else "; ".join(failures),
+        "\n".join(outputs),
+        time.perf_counter() - started,
+    )
+
+
 def run_full50(
     root: Path,
     temp_root: Path,
@@ -643,6 +712,10 @@ def main() -> int:
             print_result(result)
 
         result = run_affine_vectors(root, temp_root, iverilog, vvp)
+        results.append(result)
+        print_result(result)
+
+        result = run_synthesis_elaboration(root, temp_root, iverilog)
         results.append(result)
         print_result(result)
 

@@ -98,7 +98,7 @@ python scripts/run_stage2_regression.py --lane-sweep
 
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the six PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
 
 The default suite includes a same-stimulus K=1/K=8 comparison. Its light profile must be lossless for both endpoints; its deliberately overloaded profile reports the finite K=1 FIFO loss and latency instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random stress is part of `--extended` because it is substantially slower under Icarus.
 

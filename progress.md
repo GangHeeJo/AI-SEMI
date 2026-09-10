@@ -2652,3 +2652,7 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 **검증 추가**: 두 memory 경로에 wrap 직전 `0xffe/0xfffe`에서 wrap 직후 `0x002/0x0002`로의 정상 갱신, wrap 이전 지연 event의 stale 처리, 정확히 half-range 차이의 보수적 stale 처리를 추가했다. SRAM 경로는 최종 cell 값과 stale pulse 두 번을 상수로 직접 검사해 RTL과 oracle의 동형 오류도 방지했다. 첫 상수검사는 event input handshake 직후 아직 SRAM transaction이 끝나기 전에 memory를 읽어 3건 실패했고, transaction drain 뒤 검사하도록 고쳐 통과했다. random SRAM oracle도 같은 모듈러 규칙으로 바꿔 wrap을 반복 통과하도록 유지했다. 기본 20/20과 UZH/full50/K1·K2·K4·K8 sweep을 포함한 전체 회귀 **38/38 PASS**.
 
+## 110. 합성 후보 elaboration 상시 회귀 편입(2026-09-10)
+
+K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 elaboration을 `run_stage2_regression.py` 기본 경로에 넣었다. 각 top을 testbench 없이 Verilog-2005 모드로 parameter override까지 적용해 compile하므로 source 누락, 합성 parser 문법, 후보별 parameter 깨짐을 모든 회귀에서 즉시 잡는다. 편입 후 기본 회귀는 simulation/벡터 20개와 합성 후보 묶음 1개를 합쳐 **21/21 PASS**, 후보 내부는 **6/6 PASS**했다. 이는 Icarus elaboration smoke이며 Genus 합성·PPA 완료를 뜻하지 않는다.
+
