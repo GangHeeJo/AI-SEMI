@@ -194,6 +194,51 @@ def run_tracking(events, table, window, radius):
     return errors
 
 
+def run_bayes_filter(events, table, diffuse_eps=0.02, like_match=2.0, like_mismatch=0.5):
+    """알고리즘 재설계(§122) -- Kim2014의 파티클 필터 정신을 우리 문제(theta가 정확히 256개
+    이산값)에 맞게 다시 만듦: 파티클(몬테카를로 샘플) 대신 256개 상태 전부에 대한 정확한
+    확률분포(belief)를 유지하는 이산 베이즈 필터(histogram filter). §117~120의 "윈도우마다
+    1등만 뽑고 확정"(argmax, all-or-nothing) 방식이 근본 문제였다고 보고 -- 매 이벤트마다:
+      1) 확산(diffuse_eps): "그새 조금 돌았을 수도 있다"를 반영해 belief를 살짝 펴줌 -- 한 번
+         틀린 방향으로 쏠려도 나중에 복구 가능(§118 tracking에서 못 풀었던 lock-in 문제).
+      2) 갱신: 이 이벤트가 world_mem과 맞으면 belief를 올리고(like_match), 틀리면
+         내리고(like_mismatch), 안 쓰여있으면 그대로(중립) 곱한 뒤 정규화.
+      3) 이번 이벤트는 belief의 최댓값(MAP) theta로 world_mem에 기록(causal, §117과 동일 철학).
+    윈도우 개념 자체가 없어짐(매 이벤트가 곧 하나의 갱신) -- §119/120에서 계속 문제였던
+    "윈도우를 개수/시간 중 뭘로 자르느냐"라는 confound 자체가 사라짐.
+    """
+    world_mem = {}
+    belief = [0.0] * N_THETA
+    belief[0] = 1.0  # 부트스트랩: 시작 자세 기준(우리 theta 정의와 일치, §117 참고) --
+    # world_mem이 비어있는 동안은 모든 theta의 우도가 1(중립)이라 belief가 그대로 유지됨.
+    errors = []
+
+    for row, col, pol, gt in events:
+        new_belief = [0.0] * N_THETA
+        for i in range(N_THETA):
+            new_belief[i] = ((1 - 2 * diffuse_eps) * belief[i]
+                              + diffuse_eps * belief[i - 1]
+                              + diffuse_eps * belief[(i + 1) % N_THETA])
+        belief = new_belief
+
+        total = 0.0
+        for theta_idx in range(N_THETA):
+            X, Y = table[(row, col, theta_idx)]
+            cell = world_mem.get((X, Y))
+            like = 1.0 if cell is None else (like_match if cell == pol else like_mismatch)
+            belief[theta_idx] *= like
+            total += belief[theta_idx]
+        if total > 0:
+            belief = [b / total for b in belief]
+
+        map_theta = max(range(N_THETA), key=lambda t: belief[t])
+        X, Y = table[(row, col, map_theta)]
+        world_mem[(X, Y)] = pol
+        errors.append(circular_diff(map_theta, gt))
+
+    return errors
+
+
 def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
     events = load_events(eventmeta_path, n)
     table = build_transform_table(n)
@@ -219,6 +264,19 @@ def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
             print(f"W={window:3d} radius={radius:3d}: windows={len(errors):4d} "
                   f"mean_err={mean_err:5.2f}idx({mean_err*deg_per_idx:5.1f}deg) "
                   f"max_err={max_err:3d}idx({max_err*deg_per_idx:5.1f}deg)")
+
+    print("-- v3(§122): 이산 베이즈 필터(윈도우 없음, 매 이벤트 갱신) --")
+    for diffuse_eps in (0.0, 0.01, 0.02, 0.05):
+        for like_match, like_mismatch in ((2.0, 0.5), (1.5, 0.7), (3.0, 0.3)):
+            errors = run_bayes_filter(events, table, diffuse_eps, like_match, like_mismatch)
+            mean_err = sum(errors) / len(errors)
+            max_err = max(errors)
+            last10pct = errors[-len(errors) // 10:]
+            tail_mean = sum(last10pct) / len(last10pct)
+            print(f"eps={diffuse_eps:.2f} like=({like_match},{like_mismatch}): "
+                  f"mean_err={mean_err:5.2f}idx({mean_err*deg_per_idx:5.1f}deg) "
+                  f"max_err={max_err:3d}idx({max_err*deg_per_idx:5.1f}deg) "
+                  f"tail10%_mean={tail_mean*deg_per_idx:5.1f}deg")
 
 
 if __name__ == "__main__":
