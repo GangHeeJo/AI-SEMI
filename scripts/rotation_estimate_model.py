@@ -294,6 +294,53 @@ def run_bayes_filter_confidence(events, table, diffuse_eps=0.04, like_match=4.0,
     return errors
 
 
+def run_bayes_filter_proper(events, table, diffuse_eps=0.04, prior_alpha=0.5):
+    """run_bayes_filter_confidence()의 결함 수정판(§127) -- 그쪽의 `strength =
+    min(총관측횟수,max_s)/max_s`는 5:5로 팽팽하게 갈린 칸도 "다수결" 극성을 무조건 강하게
+    믿어버리는 결함이 있음(총 횟수만 보고 얼마나 쏠렸는지는 안 봄). 대신 정식 베이지안
+    사후예측확률(Beta-Bernoulli 켤레사전분포, prior_alpha=Jeffreys류 유사사전)을 그대로 씀:
+      P(이번 관측=pol | 이 칸의 지금까지 이력) = (해당 극성 관측횟수 + alpha) / (총 관측 + 2*alpha)
+    안 본 칸은 자동으로 0.5(중립), 쏠릴수록 자연스럽게 0 또는 1에 가까워짐 -- like_match/
+    like_mismatch/max_strength 같은 임의 하이퍼파라미터가 필요 없어짐(diffuse_eps, prior_alpha
+    둘 뿐).
+    """
+    world_on = {}
+    world_off = {}
+    belief = [0.0] * N_THETA
+    belief[0] = 1.0
+    errors = []
+
+    for row, col, pol, gt in events:
+        new_belief = [0.0] * N_THETA
+        for i in range(N_THETA):
+            new_belief[i] = ((1 - 2 * diffuse_eps) * belief[i]
+                              + diffuse_eps * belief[i - 1]
+                              + diffuse_eps * belief[(i + 1) % N_THETA])
+        belief = new_belief
+
+        total = 0.0
+        for theta_idx in range(N_THETA):
+            X, Y = table[(row, col, theta_idx)]
+            n_on = world_on.get((X, Y), 0)
+            n_off = world_off.get((X, Y), 0)
+            n_match = n_on if pol else n_off
+            like = (n_match + prior_alpha) / (n_on + n_off + 2 * prior_alpha)
+            belief[theta_idx] *= like
+            total += belief[theta_idx]
+        if total > 0:
+            belief = [b / total for b in belief]
+
+        map_theta = max(range(N_THETA), key=lambda t: belief[t])
+        X, Y = table[(row, col, map_theta)]
+        if pol:
+            world_on[(X, Y)] = world_on.get((X, Y), 0) + 1
+        else:
+            world_off[(X, Y)] = world_off.get((X, Y), 0) + 1
+        errors.append(circular_diff(map_theta, gt))
+
+    return errors
+
+
 def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
     events = load_events(eventmeta_path, n)
     table = build_transform_table(n)
