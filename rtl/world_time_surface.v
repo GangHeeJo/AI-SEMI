@@ -42,16 +42,18 @@ module world_time_surface #(
   reg [1:0] polarity_mem [0:CELLS-1];
 
   integer reset_i;
-  integer write_addr;
   wire coordinate_in_range =
     ($signed(world_x) >= 0) && ($signed(world_x) < GRID_W) &&
     ($signed(world_y) >= 0) && ($signed(world_y) < GRID_H);
   wire accept = event_valid && event_ready;
   wire [1:0] incoming_polarity = polarity ? 2'b10 : 2'b01;
 
+  wire [$clog2(CELLS)-1:0] write_addr =
+    $unsigned(world_y) * GRID_W + $unsigned(world_x);
   wire [$clog2(CELLS)-1:0] read_addr = read_y * GRID_W + read_x;
+  wire read_coordinate_in_range = (read_x < GRID_W) && (read_y < GRID_H);
   assign event_ready = ~rst;
-  assign read_valid = valid_mem[read_addr];
+  assign read_valid = read_coordinate_in_range ? valid_mem[read_addr] : 1'b0;
   assign read_timestamp = read_valid
                         ? timestamp_mem[read_addr] : {TIMESTAMP_W{1'b0}};
   assign read_polarity_seen = read_valid ? polarity_mem[read_addr] : 2'b00;
@@ -82,7 +84,6 @@ module world_time_surface #(
         if (!coordinate_in_range) begin
           range_error <= 1'b1;
         end else begin
-          write_addr = $unsigned(world_y) * GRID_W + $unsigned(world_x);
           if (!valid_mem[write_addr] ||
               occurrence_timestamp > timestamp_mem[write_addr]) begin
             valid_mem[write_addr] <= 1'b1;

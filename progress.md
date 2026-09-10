@@ -2542,3 +2542,17 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규 RTL: `rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`, `rtl/aer_bitmap_to_event8_pose.v`, `rtl/pose_history_affine8.v`, `rtl/pose_inflight_guard8.v`, `rtl/coord_transform_affine2d.v`, `rtl/aer_tx16_pose_affine2d.v`, `rtl/event_batch_fifo.v`, `rtl/rr_stream_arbiter4.v`, `rtl/world_time_surface.v`
 - 신규 검증: `scripts/gen_stage2_affine_vectors.py`, `tb/stage2_affine_vectors.tsv`, `tb/tb_stage2_m0_latency_skew.v`, `tb/tb_steal_buf_polarity_pose_correctness.v`, `tb/tb_pose_history_affine8.v`, `tb/tb_pose_inflight_guard8.v`, `tb/tb_coord_transform_affine2d.v`, `tb/tb_coord_transform_affine2d_backpressure.v`, `tb/tb_aer_tx16_pose_affine2d_e2e.v`, `tb/tb_event_batch_fifo.v`, `tb/tb_rr_stream_arbiter4.v`, `tb/tb_world_time_surface.v`
 
+## 104. 4x4 pose-history overwrite 보호 통합 + 원클릭 회귀(2026-09-10)
+
+**pose ID 재사용 안전성**: standalone이던 in-flight guard를 4x4 전체 top에 실제 연결했다. AER에서 `arrival & ~overrun`인 이벤트만 pose ID별 outstanding에 더하고, 8-lane transform이 입력을 capture한 이벤트를 뺀다. outstanding이 0인 ID만 pose-history write를 commit하며, busy ID write는 `pose_wr_rejected`로 조용히 무시하지 않고 외부에 알린다. 마지막 retire와 같은 edge에는 여전히 reject하고 다음 cycle부터 허용해 마지막 transform lookup과 overwrite가 경합하지 않게 했다. guard의 accepted source 폭도 파라미터화해 16-source 기본과 5-source 비표준 구성 모두 20,000-cycle random PASS.
+
+**확장 E2E**: occurrence timestamp를 0 상수가 아니라 매 event의 실제 비제로 값으로 넣고, 한 bitmap 안 mixed pose와 mixed timestamp가 모두 나타나도록 directed sequence를 추가했다. busy 상태에서 identity pose를 +2 x-translation으로 덮으려는 write가 1회 reject되고 기존 event가 identity로 변환되는 것, drain 뒤 같은 write가 commit되어 새 event부터 +2가 적용되는 것을 함께 확인했다. 결과는 `generated=87`, `accepted=retired=69`, `overrun=18`, `mapped=57`, `missing_pose=1`, `out_of_range=11`, mixed pose/time 각 1회, pose write commit/reject=`6/1`, 최종 모든 pose outstanding 0, accounting error 0.
+
+**재현 자동화**: `scripts/run_stage2_regression.py`를 추가했다. Icarus compile 산출물과 새 affine vector는 OS 임시 폴더에만 만들고, 각 테스트의 PASS marker를 독립 확인하며 실패가 있어도 전체 suite를 끝까지 실행한 뒤 exit code 1을 낸다. 기본 10/10 PASS, `--extended` 12/12 PASS. extended에는 UZH polarity trace와 official full50을 포함하며 full50 합계 `106416/502/105914`를 정확히 재확인한다.
+
+**world memory 경계 보강**: reference `world_time_surface` read port가 2의 거듭제곱이 아닌 grid에서도 인코딩 가능한 범위 밖 주소를 memory index로 쓰지 않도록 range gate를 추가했고 7x6 grid directed test를 통과했다.
+
+- 수정: `rtl/pose_inflight_guard8.v`, `rtl/aer_tx16_pose_affine2d.v`, `rtl/world_time_surface.v`, 관련 TB 3개
+- 신규: `scripts/run_stage2_regression.py`
+- 전체 명령: `python scripts/run_stage2_regression.py --extended`
+

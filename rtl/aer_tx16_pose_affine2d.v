@@ -12,6 +12,7 @@ module aer_tx16_pose_affine2d #(
   parameter OFFSET_W = 24,
   parameter FRAC_W   = 14,
   parameter TIMESTAMP_W = 32,
+  parameter POSE_COUNT_W = 8,
   parameter integer X_MIN = 0,
   parameter integer X_MAX = 255,
   parameter integer Y_MIN = 0,
@@ -33,6 +34,9 @@ module aer_tx16_pose_affine2d #(
   input signed [MATRIX_W-1:0]        pose_wr_m11,
   input signed [OFFSET_W-1:0]        pose_wr_tx,
   input signed [OFFSET_W-1:0]        pose_wr_ty,
+  output                             pose_wr_ready,
+  output                             pose_wr_rejected,
+  output                             pose_accounting_error,
 
   input      [SENSOR_W-1:0]          tile_origin_x,
   input      [SENSOR_W-1:0]          tile_origin_y,
@@ -90,11 +94,27 @@ module aer_tx16_pose_affine2d #(
   wire [7:0] pose_found_c;
   wire [8*MATRIX_W-1:0] m00_flat, m01_flat, m10_flat, m11_flat;
   wire [8*OFFSET_W-1:0] tx_flat, ty_flat;
+  wire pose_wr_commit;
+
+  pose_inflight_guard8 #(
+    .POSE_W(POSE_W), .COUNT_W(POSE_COUNT_W),
+    .RETIRE_LANES(8), .ACCEPT_SOURCES(16)
+  ) u_pose_guard (
+    .clk(clk), .rst(rst),
+    .accepted_mask(arrival & ~overrun),
+    .accepted_pose_version(occurrence_pose_version),
+    .retire_valid(event_valid_c),
+    .retire_pose_version_flat(pose_id_flat),
+    .pose_wr_req(pose_wr_en), .pose_wr_id(pose_wr_id),
+    .pose_wr_ready(pose_wr_ready), .pose_wr_commit(pose_wr_commit),
+    .pose_wr_rejected(pose_wr_rejected),
+    .accounting_error(pose_accounting_error)
+  );
 
   pose_history_affine8 #(
     .POSE_W(POSE_W), .MATRIX_W(MATRIX_W), .OFFSET_W(OFFSET_W), .LANES(8)
   ) u_pose_history (
-    .clk(clk), .rst(rst), .pose_wr_en(pose_wr_en), .pose_wr_id(pose_wr_id),
+    .clk(clk), .rst(rst), .pose_wr_en(pose_wr_commit), .pose_wr_id(pose_wr_id),
     .pose_wr_m00(pose_wr_m00), .pose_wr_m01(pose_wr_m01),
     .pose_wr_m10(pose_wr_m10), .pose_wr_m11(pose_wr_m11),
     .pose_wr_tx(pose_wr_tx), .pose_wr_ty(pose_wr_ty),

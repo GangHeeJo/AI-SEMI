@@ -4,24 +4,31 @@ module tb_pose_inflight_guard8;
   localparam integer POSE_W = 3;
   localparam integer COUNT_W = 5;
   localparam integer RETIRE_LANES = 8;
+`ifdef POSE_GUARD_ACCEPT_SOURCES
+  localparam integer ACCEPT_SOURCES = `POSE_GUARD_ACCEPT_SOURCES;
+`else
+  localparam integer ACCEPT_SOURCES = 16;
+`endif
   localparam integer POSE_IDS = (1 << POSE_W);
   localparam integer MAX_COUNT = (1 << COUNT_W) - 1;
   localparam integer RANDOM_CYCLES = 20000;
 
   reg clk = 0;
   reg rst;
-  reg [15:0] accepted_mask;
+  reg [ACCEPT_SOURCES-1:0] accepted_mask;
   reg [POSE_W-1:0] accepted_pose_version;
   reg [RETIRE_LANES-1:0] retire_valid;
   reg [(RETIRE_LANES*POSE_W)-1:0] retire_pose_version_flat;
   reg pose_wr_req;
   reg [POSE_W-1:0] pose_wr_id;
+  wire pose_wr_ready;
   wire pose_wr_commit;
   wire pose_wr_rejected;
   wire accounting_error;
 
   pose_inflight_guard8 #(
-    .POSE_W(POSE_W), .COUNT_W(COUNT_W), .RETIRE_LANES(RETIRE_LANES)
+    .POSE_W(POSE_W), .COUNT_W(COUNT_W), .RETIRE_LANES(RETIRE_LANES),
+    .ACCEPT_SOURCES(ACCEPT_SOURCES)
   ) dut (
     .clk(clk), .rst(rst),
     .accepted_mask(accepted_mask),
@@ -29,6 +36,7 @@ module tb_pose_inflight_guard8;
     .retire_valid(retire_valid),
     .retire_pose_version_flat(retire_pose_version_flat),
     .pose_wr_req(pose_wr_req), .pose_wr_id(pose_wr_id),
+    .pose_wr_ready(pose_wr_ready),
     .pose_wr_commit(pose_wr_commit), .pose_wr_rejected(pose_wr_rejected),
     .accounting_error(accounting_error)
   );
@@ -62,17 +70,18 @@ module tb_pose_inflight_guard8;
   integer reuse_seen;
   integer previous_accept_valid;
   integer previous_accept_id;
+  integer overflow_round;
   reg [POSE_IDS-1:0] committed_before;
   reg [POSE_IDS-1:0] accepted_id_seen;
   reg [POSE_IDS-1:0] retired_id_seen;
 
-  function integer popcount16;
-    input [15:0] bits;
+  function integer popcount_accepted;
+    input [ACCEPT_SOURCES-1:0] bits;
     integer bit_idx;
     begin
-      popcount16 = 0;
-      for (bit_idx = 0; bit_idx < 16; bit_idx = bit_idx + 1)
-        popcount16 = popcount16 + bits[bit_idx];
+      popcount_accepted = 0;
+      for (bit_idx = 0; bit_idx < ACCEPT_SOURCES; bit_idx = bit_idx + 1)
+        popcount_accepted = popcount_accepted + bits[bit_idx];
     end
   endfunction
 
@@ -123,6 +132,7 @@ module tb_pose_inflight_guard8;
       #1;
       check(pose_wr_commit === 1'b0 && pose_wr_rejected === 1'b0,
         "writes are disabled during reset");
+      check(pose_wr_ready === 1'b0, "write ready is low during reset");
       @(posedge clk);
       #1;
       for (i = 0; i < POSE_IDS; i = i + 1)
@@ -141,6 +151,8 @@ module tb_pose_inflight_guard8;
       #1;
       expected_commit = pose_wr_req && (model[pose_wr_id] == 0);
       expected_reject = pose_wr_req && (model[pose_wr_id] != 0);
+      check(pose_wr_ready === (model[pose_wr_id] == 0),
+        "pose write ready reflects current ID count");
       check(pose_wr_commit === expected_commit[0], "pose write commit decision");
       check(pose_wr_rejected === expected_reject[0], "pose write rejection decision");
       check(!(pose_wr_commit && pose_wr_rejected), "commit and reject are exclusive");
@@ -153,7 +165,7 @@ module tb_pose_inflight_guard8;
 
       for (i = 0; i < POSE_IDS; i = i + 1)
         next_model[i] = model[i];
-      accepted_n = popcount16(accepted_mask);
+      accepted_n = popcount_accepted(accepted_mask);
       next_model[accepted_pose_version] =
         next_model[accepted_pose_version] + accepted_n;
       if (accepted_n != 0) begin
@@ -230,7 +242,10 @@ module tb_pose_inflight_guard8;
 
     // Empty ID: its pose write and first accepted events share the edge safely.
     cycle_no = cycle_no + 1;
-    accepted_mask = 16'h0105; // three accepted events
+    accepted_mask = 0;
+    accepted_mask[0] = 1'b1;
+    accepted_mask[2] = 1'b1;
+    accepted_mask[ACCEPT_SOURCES-1] = 1'b1;
     accepted_pose_version = 3;
     pose_wr_req = 1'b1;
     pose_wr_id = 3;
@@ -322,7 +337,7 @@ module tb_pose_inflight_guard8;
       accepted_mask = $random(seed) & $random(seed) &
         $random(seed) & $random(seed);
       accepted_pose_version = $random(seed);
-      accepted_n = popcount16(accepted_mask);
+      accepted_n = popcount_accepted(accepted_mask);
       if (model[accepted_pose_version] + accepted_n > MAX_COUNT)
         accepted_mask = 16'd0;
 
@@ -363,18 +378,23 @@ module tb_pose_inflight_guard8;
     step();
     check(accounting_error, "underflow error remains sticky");
 
-    // 16+16 exceeds the 5-bit count maximum of 31.
+    // Repeated all-source accepts exceed the count representation.
     reset_guard();
     cycle_no = cycle_no + 1;
-    accepted_mask = 16'hffff;
+    accepted_mask = {ACCEPT_SOURCES{1'b1}};
     accepted_pose_version = 6;
     step();
-    check(model[6] == 16 && !accounting_error, "first sixteen accepts fit");
-    @(negedge clk); clear_inputs();
-    cycle_no = cycle_no + 1;
-    accepted_mask = 16'hffff;
-    accepted_pose_version = 6;
-    step();
+    check(model[6] == ACCEPT_SOURCES && !accounting_error,
+      "first all-source accept fits");
+    for (overflow_round = 1;
+         overflow_round < (MAX_COUNT/ACCEPT_SOURCES)+1;
+         overflow_round = overflow_round + 1) begin
+      @(negedge clk); clear_inputs();
+      cycle_no = cycle_no + 1;
+      accepted_mask = {ACCEPT_SOURCES{1'b1}};
+      accepted_pose_version = 6;
+      step();
+    end
     check(model[6] == MAX_COUNT && accounting_error,
       "count overflow saturates and is detected");
 

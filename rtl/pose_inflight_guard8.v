@@ -6,23 +6,28 @@
 module pose_inflight_guard8 #(
   parameter integer POSE_W = 4,
   parameter integer COUNT_W = 8,
-  parameter integer RETIRE_LANES = 8
+  parameter integer RETIRE_LANES = 8,
+  parameter integer ACCEPT_SOURCES = 16
 ) (
   input                                      clk,
   input                                      rst,
-  input      [15:0]                          accepted_mask,
+  input      [ACCEPT_SOURCES-1:0]            accepted_mask,
   input      [POSE_W-1:0]                    accepted_pose_version,
   input      [RETIRE_LANES-1:0]              retire_valid,
   input      [(RETIRE_LANES*POSE_W)-1:0]     retire_pose_version_flat,
   input                                      pose_wr_req,
   input      [POSE_W-1:0]                    pose_wr_id,
+  output                                     pose_wr_ready,
   output                                     pose_wr_commit,
   output                                     pose_wr_rejected,
   output reg                                 accounting_error
 );
   localparam integer POSE_IDS = (1 << POSE_W);
+  localparam integer ACCEPT_COUNT_W = (ACCEPT_SOURCES < 2)
+    ? 1 : $clog2(ACCEPT_SOURCES + 1);
   localparam integer RETIRE_COUNT_W = (RETIRE_LANES < 2) ? 1 : $clog2(RETIRE_LANES + 1);
-  localparam integer COUNT_OR_ACCEPT_W = (COUNT_W > 5) ? COUNT_W : 5;
+  localparam integer COUNT_OR_ACCEPT_W = (COUNT_W > ACCEPT_COUNT_W)
+    ? COUNT_W : ACCEPT_COUNT_W;
   localparam integer BASE_MATH_W = (COUNT_OR_ACCEPT_W > RETIRE_COUNT_W)
     ? COUNT_OR_ACCEPT_W : RETIRE_COUNT_W;
   localparam integer MATH_W = BASE_MATH_W + 2;
@@ -30,13 +35,13 @@ module pose_inflight_guard8 #(
 
   reg [COUNT_W-1:0] outstanding [0:POSE_IDS-1];
 
-  function [4:0] popcount16;
-    input [15:0] bits;
+  function [ACCEPT_COUNT_W-1:0] popcount_accepted;
+    input [ACCEPT_SOURCES-1:0] bits;
     integer bit_idx;
     begin
-      popcount16 = 5'd0;
-      for (bit_idx = 0; bit_idx < 16; bit_idx = bit_idx + 1)
-        popcount16 = popcount16 + bits[bit_idx];
+      popcount_accepted = 0;
+      for (bit_idx = 0; bit_idx < ACCEPT_SOURCES; bit_idx = bit_idx + 1)
+        popcount_accepted = popcount_accepted + bits[bit_idx];
     end
   endfunction
 
@@ -54,9 +59,10 @@ module pose_inflight_guard8 #(
     end
   endfunction
 
-  wire [4:0] accepted_count = popcount16(accepted_mask);
+  wire [ACCEPT_COUNT_W-1:0] accepted_count = popcount_accepted(accepted_mask);
   wire pose_wr_busy = (outstanding[pose_wr_id] != {COUNT_W{1'b0}});
-  assign pose_wr_commit = pose_wr_req & ~rst & ~pose_wr_busy;
+  assign pose_wr_ready = ~rst & ~pose_wr_busy;
+  assign pose_wr_commit = pose_wr_req & pose_wr_ready;
   assign pose_wr_rejected = pose_wr_req & ~rst & pose_wr_busy;
 
   wire [POSE_IDS-1:0] count_error;
@@ -64,14 +70,14 @@ module pose_inflight_guard8 #(
   generate
     for (pose_id = 0; pose_id < POSE_IDS; pose_id = pose_id + 1) begin: per_pose
       localparam [POSE_W-1:0] THIS_ID = pose_id;
-      wire [4:0] accept_for_id = (accepted_pose_version == THIS_ID)
-        ? accepted_count : 5'd0;
+      wire [ACCEPT_COUNT_W-1:0] accept_for_id =
+        (accepted_pose_version == THIS_ID) ? accepted_count : 0;
       wire [RETIRE_COUNT_W-1:0] retire_for_id = retire_count_for_id(
         THIS_ID, retire_valid, retire_pose_version_flat);
       wire signed [MATH_W-1:0] current_ext = $signed(
         {{(MATH_W-COUNT_W){1'b0}}, outstanding[pose_id]});
       wire signed [MATH_W-1:0] accept_ext = $signed(
-        {{(MATH_W-5){1'b0}}, accept_for_id});
+        {{(MATH_W-ACCEPT_COUNT_W){1'b0}}, accept_for_id});
       wire signed [MATH_W-1:0] retire_ext = $signed(
         {{(MATH_W-RETIRE_COUNT_W){1'b0}}, retire_for_id});
       wire signed [MATH_W-1:0] max_ext = $signed(

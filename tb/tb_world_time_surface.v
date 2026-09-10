@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
 module tb_world_time_surface;
-  localparam GRID_W = 8;
-  localparam GRID_H = 8;
+  localparam GRID_W = 7;
+  localparam GRID_H = 6;
   localparam COORD_W = 16;
   localparam TIMESTAMP_W = 16;
 
@@ -13,7 +13,8 @@ module tb_world_time_surface;
   reg signed [COORD_W-1:0] world_x, world_y;
   reg polarity;
   reg [TIMESTAMP_W-1:0] occurrence_timestamp;
-  reg [2:0] read_x, read_y;
+  reg [$clog2(GRID_W)-1:0] read_x;
+  reg [$clog2(GRID_H)-1:0] read_y;
 
   wire event_ready;
   wire update_applied, equal_time_merged, stale_ignored, range_error;
@@ -63,8 +64,8 @@ module tb_world_time_surface;
     input integer want_time;
     input [1:0] want_polarity;
     begin
-      read_x = x[2:0];
-      read_y = y[2:0];
+      read_x = x[$clog2(GRID_W)-1:0];
+      read_y = y[$clog2(GRID_H)-1:0];
       #1;
       if (read_valid !== want_valid[0] ||
           read_timestamp !== want_time[TIMESTAMP_W-1:0] ||
@@ -142,16 +143,17 @@ module tb_world_time_surface;
     check_read(2, 3, 1, 110, 2'b10);
 
     // Other cells remain independent.
-    send_event(7, 7, 77, 0, 1);
-    check_read(7, 7, 1, 77, 2'b01);
+    send_event(6, 5, 77, 0, 1);
+    check_read(6, 5, 1, 77, 2'b01);
     check_read(2, 3, 1, 110, 2'b10);
     check_read(0, 0, 0, 0, 2'b00);
+    check_read(7, 7, 0, 0, 2'b00);
 
     @(negedge clk);
     rst = 1'b1;
     @(posedge clk); #1;
     check_read(2, 3, 0, 0, 2'b00);
-    check_read(7, 7, 0, 0, 2'b00);
+    check_read(6, 5, 0, 0, 2'b00);
 
     $display("WORLD_TIME_SURFACE_ERRORS=%0d", errors);
     if (errors == 0)
