@@ -2862,3 +2862,19 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규: `scripts/analyze_uzh_full_sensor_traffic.py`, `scripts/test_analyze_uzh_full_sensor_traffic.py`, `STAGE2_FULL_SENSOR_TRAFFIC.md`, `common_traces_uzh/README.md`
 - 수정: `.gitignore`, `STAGE2_PLAN.md`
 
+## 122. 중앙 two-epoch coefficient table + shared affine lane RTL(2026-09-11)
+
+**690개 transform 복제 제거**: §121의 실제 전체센서 traffic envelope에 맞춰, region마다 affine engine과 pose table을 복제하던 확장 방향을 중앙 공유 구조로 바꿨다. `affine_region_coeff_table2`는 loader의 `BEGIN -> 690 WRITE -> PUBLISH`를 두 개의 `690x112-bit` bank에 저장하고 one-outstanding synchronous lookup을 제공한다. coefficient bit는 총 `154,560 bit`다. 첫 write부터 대상 bank 전체를 숨기고 PUBLISH에만 다시 보이게 하며, 같은 pose의 write+lookup은 stale/partial data 대신 `found=0`으로 결정한다. response stall 중 payload는 고정된다. memory reset loop와 per-record valid reset을 없애 SRAM inference에 유리한 1R/1W 형태로 만들었지만, 실제 macro mapping/PPA가 확인됐다는 뜻은 아니다.
+
+**전역 pose 참조 회계**: `pose_epoch_count_guard2`는 한 cycle의 같은 occurrence pose accept 수와 pose0/pose1 retire 수를 원자적으로 더하고 뺀다. 기본 `COUNT_W=18`은 보수적 full-sensor resident reference `129,609`를, `DELTA_W=16`은 한 cycle 최대 43,200 pixel accept를 담는다. same-edge accept, malformed under/overflow, poisoned slot, 마지막 retire edge에는 overwrite를 금지하고 다음 cycle에만 연다. 단위 TB는 directed 경계와 20,000-cycle randomized reference를 **오류 0**으로 통과했다.
+
+**공유 lookup/transform**: `region_affine_shared_lane`은 `{region_id,sensor x/y,polarity,occurrence pose,timestamp}` 한 event를 hold하고 중앙 table response와 함께 기존 affine register에 넣는다. pose retire는 lookup request나 world consume가 아니라 coefficient+event capture handshake에서만 pulse한다. unpublished/missing record도 한 번의 unmapped diagnostic event로 보존하며 lookup/world stall 중 모든 metadata가 고정된다. loader+table+guard 통합 TB에서 두 epoch, partial/unpublished table, 동시 config/event, output stall, old-slot 재사용을 검사해 `12/12` event 보존, 관측 II=`2 cycle`을 확인했다.
+
+**직렬 센서 제품 경계**: `serialized_sensor_region_affine2d`는 이미 직렬화된 240x180 DAVIS-like stream용 별도 top이다. 주소에서 `region_id=(y>>3)*30+(x>>3)`를 만들고 `(239,179)->689`, invalid x/y는 sentinel `690`으로 보내 valid region alias를 막는다. 입력은 수신 시점 active pose를 자동 부착하지 않고 명시적인 occurrence pose tag를 받는다. 첫 PUBLISH 전에는 backpressure하고, 입력 handshake부터 local guard가 count한다. 따라서 인터페이스 밖에 old-tag event backlog가 남을 수 있는 시스템은 slot reuse 전에 별도 upstream barrier/credit이 필요하다. 30x23 table을 세 번 전부 적재한 `2,070 write` 시험에서 publish-edge old/new, pose0/1 invalid sentinel, world stall, last-retire 다음-cycle rewrite와 `11/11` event 보존을 확인했다.
+
+**독립 검증과 회귀**: guard/table은 Verilog-2005/2012, 실제 30x23 table elaboration을 독립 재실행했고 blocker가 없었다. queue/lane wrapper도 두 문법 모드에서 같은 PASS를 냈다. 기본 Stage-2 회귀는 **30/30 PASS**, synthesis-facing Verilog-2005 elaboration은 기존 10 endpoint와 새 4 component를 합쳐 **14/14 PASS**다. 이는 기능·source-list 검증이며 중앙 SRAM 또는 새 구조의 45 nm PPA는 아직 아니다.
+
+- 신규 RTL: `rtl/pose_epoch_count_guard2.v`, `rtl/affine_region_coeff_table2.v`, `rtl/region_affine_shared_lane.v`, `rtl/serialized_sensor_region_affine2d.v`
+- 신규 TB: `tb/tb_pose_epoch_count_guard2.v`, `tb/tb_affine_region_coeff_table2.v`, `tb/tb_region_affine_shared_lane.v`, `tb/tb_serialized_sensor_region_affine2d.v`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+

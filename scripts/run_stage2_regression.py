@@ -472,6 +472,10 @@ def run_synthesis_elaboration(
         "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
         "rtl/affine_region_pose_loader.v",
         "rtl/aer_tx128_region_pose_affine2d_dual.v",
+        "rtl/pose_epoch_count_guard2.v",
+        "rtl/affine_region_coeff_table2.v",
+        "rtl/region_affine_shared_lane.v",
+        "rtl/serialized_sensor_region_affine2d.v",
     )
     configurations = (
         ("k8", "aer_tx16_pose_affine2d", ()),
@@ -493,6 +497,10 @@ def run_synthesis_elaboration(
         ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
         ("region_loader_690", "affine_region_pose_loader", ()),
         ("tx128_dual_region", "aer_tx128_region_pose_affine2d_dual", ()),
+        ("pose_epoch_count_guard2", "pose_epoch_count_guard2", ()),
+        ("region_coeff_table_690", "affine_region_coeff_table2", ()),
+        ("region_shared_lane", "region_affine_shared_lane", ()),
+        ("serialized_sensor_region", "serialized_sensor_region_affine2d", ()),
     )
     failures: list[str] = []
     outputs: list[str] = []
@@ -520,7 +528,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "10/10 Verilog-2005 tops elaborated" if not failures
+        "14/14 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -652,6 +660,50 @@ def regular_tests() -> tuple[HDLTest, ...]:
                 "-Ptb_affine_region_pose_loader.REGION_COLS=30",
                 "-Ptb_affine_region_pose_loader.REGION_ROWS=23",
             ),
+        ),
+        HDLTest(
+            "pose_epoch_count_guard2",
+            "tb_pose_epoch_count_guard2",
+            ("rtl/pose_epoch_count_guard2.v",),
+            "tb/tb_pose_epoch_count_guard2.v",
+            "POSE_EPOCH_COUNT_GUARD2_PASS",
+        ),
+        HDLTest(
+            "affine_region_coeff_table2",
+            "tb_affine_region_coeff_table2",
+            (
+                "rtl/affine_region_pose_loader.v",
+                "rtl/affine_region_coeff_table2.v",
+            ),
+            "tb/tb_affine_region_coeff_table2.v",
+            "AFFINE_REGION_COEFF_TABLE2_PASS",
+        ),
+        HDLTest(
+            "region_affine_shared_lane",
+            "tb_region_affine_shared_lane",
+            (
+                "rtl/affine_region_pose_loader.v",
+                "rtl/affine_region_coeff_table2.v",
+                "rtl/pose_epoch_count_guard2.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/region_affine_shared_lane.v",
+            ),
+            "tb/tb_region_affine_shared_lane.v",
+            "REGION_AFFINE_SHARED_LANE_PASS",
+        ),
+        HDLTest(
+            "serialized_sensor_region_affine",
+            "tb_serialized_sensor_region_affine2d",
+            (
+                "rtl/affine_region_pose_loader.v",
+                "rtl/affine_region_coeff_table2.v",
+                "rtl/pose_epoch_count_guard2.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/region_affine_shared_lane.v",
+                "rtl/serialized_sensor_region_affine2d.v",
+            ),
+            "tb/tb_serialized_sensor_region_affine2d.v",
+            "SERIALIZED_SENSOR_REGION_AFFINE2D_PASS",
         ),
         HDLTest(
             "aer_tx128_dual_region_e2e",

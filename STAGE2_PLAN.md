@@ -347,22 +347,27 @@ M0~M7 완료 뒤에만 진행한다.
   동시 event 최대는 8이고 II=8 공유 server도 다음 timestamp batch와
   겹치지 않았다. 따라서 690개 local transform 복제가 아니라 중앙
   double-buffer coefficient table + shared K=1 transform을 다음 대상으로
-  채택했다. 이는 한 recording의 측정 envelope이며 범용 보장은 아니다.
+  채택했다. 두 epoch 690x112-bit table, global count guard, shared lane과
+  이미 직렬화된 sensor stream용 240x180 endpoint까지 RTL로 완료했다.
+  shared lane의 관측 II는 2 cycle이다. 이는 한 recording의 측정 envelope이며
+  범용 보장은 아니고, parallel-pixel AER merge 경로는 아직 미완성이다.
 
 다음 순서는 다음과 같다.
 
 1. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
    공정하게 비교한다.
-2. 두 epoch 중앙 690x112-bit coefficient table, 전체 outstanding-count
-   guard, shared affine lane을 먼저 단위 및 통합 RTL로 닫는다. generic
-   RTL bit count와 실제 SRAM macro PPA는 분리해서 보고한다.
-3. parallel-pixel 제품 경계는 네 실제 8x8 region부터 merge tree로 shared
-   lane에 연결하고 configuration update와 event traffic이 겹칠 때를
-   검증한다. 이미 serialized DAVIS stream을 받는 경계라면 AER leaf를
-   복제하지 않고 address에서 region_id를 만들어 같은 queue로 진입한다.
+2. parallel-pixel 제품 경계는 transform을 뺀 실제 8x8 AER region stream을
+   먼저 만들고, 네 region(16x16)을 merge/FIFO/중앙 table/shared lane에
+   연결한다. AER overrun, leaf-FIFO drop, affine capture를 pose별 global
+   count에 정확히 한 번씩 반영한다.
+3. 16x16 proof의 world stream을 기존 4-bank SRAM surface에 연결해
+   configuration update, event burst, memory backpressure가 겹칠 때의
+   완전한 보존식을 검증한다. 690-region tree는 이 소규모 proof 다음이다.
 4. full-resolution 원 timestamp stream으로 region merge와 world-bank skew,
    downstream stall을 replay해 K=1/depth-8 채택을 재검증한다. 한 recording의
-   무손실 결과를 다른 센서·장면으로 외삽하지 않는다.
+   무손실 결과를 다른 센서·장면으로 외삽하지 않는다. 직렬 endpoint는
+   upstream old-tag backlog를 포함하는 epoch barrier가 있을 때만 slot reuse가
+   안전하다는 인터페이스 계약도 함께 검증한다.
 5. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
    원 timestamp 순서와 input SHA receipt가 보존된 recording-level held-out
    split에서 constant/IMU-only baseline보다 먼저 이긴 뒤 소프트웨어

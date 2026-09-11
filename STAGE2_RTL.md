@@ -18,6 +18,10 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
 | `affine_region_pose_loader` | 30x23 coefficient regions | control only | ordered region write plus atomic pose publish | full-sensor configuration-plane proof |
 | `aer_tx128_region_pose_affine2d_dual` | 16x8 (two regions) | 1 per region | two independent ready/valid events | real multi-region coefficient/publication proof |
+| `affine_region_coeff_table2` | 30x23 x two epochs | one synchronous lookup | central 690x112-bit coefficient storage | SRAM-friendly central-table proof |
+| `pose_epoch_count_guard2` | two global epochs | count control only | aggregate accept/retire counts | full-path slot-reuse guard |
+| `region_affine_shared_lane` | region-tagged stream | 1 shared | one ready/valid event | central lookup/transform primitive |
+| `serialized_sensor_region_affine2d` | serialized 240x180 | 1 shared | one ready/valid event | COTS-stream central-table endpoint |
 
 The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution. Tile/base origins are static physical configuration and must remain unchanged while reset is deasserted; unlike pose and timestamp, they are not captured per event.
 
@@ -71,6 +75,41 @@ a 690-bit request vector. `aer_tx128_region_pose_affine2d_dual` proves the
 address decode and selected response mux against two real tx64 regions. The
 controller-only RTL still does not include the full 690 AER datapaths,
 coefficient memories, or routing and must not be presented as their PPA.
+
+Full-sensor traffic measurement changed the preferred scale-out target.  The
+central path connects the same loader to `affine_region_coeff_table2`, which
+holds two complete 690x112-bit epochs (154,560 coefficient bits), then uses
+`region_affine_shared_lane` for one synchronous lookup and one affine stage.
+The table has no bulk memory reset or per-record reset-valid array; one
+complete-bank visibility bit per epoch makes it inference-friendly, but only
+a real synthesis/macro report can establish SRAM mapping or PPA.  Its
+PUBLISH port must remain driven by the loader because the table intentionally
+relies on the loader's complete row-major transaction check.
+
+`pose_epoch_count_guard2` replaces a wide per-event guard with aggregate
+accept and per-epoch retire deltas.  Defaults (`COUNT_W=18`, `DELTA_W=16`)
+cover the conservative full-sensor reference envelope and all 43,200 pixels
+arriving in one cycle.  Same-edge accepts and the last-retire edge both keep
+the target slot non-writable; ready rises only on the next cycle.  A malformed
+underflow/overflow poisons that epoch until reset.  Any upstream terminal
+drop must be included in the retire delta exactly once.
+
+The shared lane holds one event while its coefficient is read.  The pose
+reference retires only when response plus event enter the affine register;
+world-output consumption is later and no longer needs the coefficient bank.
+The present simple implementation has measured initiation interval 2, which
+is inside the UZH full-recording II=8 envelope.  It is not claimed as II=1.
+
+`serialized_sensor_region_affine2d` is a separate product boundary for an
+already serialized DAVIS-like stream.  It derives
+`region_id=(sensor_y>>3)*30+(sensor_x>>3)`, maps invalid sensor addresses to
+sentinel 690 so they cannot alias a valid coefficient, and preserves them as
+unmapped diagnostic events.  The input carries an explicit occurrence-time
+pose version; the wrapper never substitutes its current active pose.  Its
+local guard starts at the input handshake, so the upstream source must also
+guarantee that no old-tag backlog remains outside the interface before an
+epoch slot is reused.  This endpoint contains no Stage-1 AER leaves and must
+not be compared as though it did.
 
 The dual wrapper owns occurrence pose tagging. Its pulse-source AER input has
 no backpressure pin, so `sensor_ready=0` before the first complete publication
@@ -221,7 +260,7 @@ for a shared-port memory implementation.
 
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in 1 ms-bin UZH burst stress, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the ten PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the ten existing PPA endpoint tops plus four new central-path components in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis. Only the ten scripts listed below are current Genus entry points.
 
 The default suite includes the region loader at both a 3x2 directed size and
 the full 30x23=690 control count. It checks regional stalls, exact write count,
@@ -250,6 +289,14 @@ Against the exact calibrated spherical oracle, 251/256 land in the identical
 integer cell and the other five differ by one cell; continuous-Q14 maximum is
 0.130578 cell. This is a measured-pose/calibration synthetic pixel probe, not
 a claim that the checked-in 4x4 event crop contains traffic at these regions.
+
+The central-path tests independently check the two-epoch aggregate count
+guard for 20,000 randomized cycles, complete-bank visibility and stalled
+synchronous lookup, then loader/table/guard/shared-lane composition.  The
+serialized 240x180 endpoint loads all 690 records for three epochs (2,070
+writes) and preserves 11 events through edge-region, invalid-coordinate,
+PUBLISH-boundary, output-stall, and old-slot last-retire cases.  The current
+default suite is 30/30 PASS and its Verilog-2005 elaboration set is 14/14.
 
 ## PPA entry points
 
