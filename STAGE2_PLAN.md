@@ -342,18 +342,28 @@ M0~M7 완료 뒤에만 진행한다.
   region을 순서대로 갱신한 뒤 pose version을 원자적으로 publish하는
   controller와 두 개의 실제 tx64 region을 연결한 16x8 proof도 완료.
   두 인접 region의 전 픽셀을 두 measured pose에서 검사한 256-event
-  physical-coefficient replay도 RTL bit-exact로 완료.
-  실제 690개 tx64 연결 wrapper와 대역폭 측정은 미완성
+  physical-coefficient replay도 RTL bit-exact로 완료. 이어서 SHA가 고정된
+  원본 240x180/23,126,288-event stream을 분석한 결과, 200 MHz 5 ns bin의
+  동시 event 최대는 8이고 II=8 공유 server도 다음 timestamp batch와
+  겹치지 않았다. 따라서 690개 local transform 복제가 아니라 중앙
+  double-buffer coefficient table + shared K=1 transform을 다음 대상으로
+  채택했다. 이는 한 recording의 측정 envelope이며 범용 보장은 아니다.
 
 다음 순서는 다음과 같다.
 
 1. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
    공정하게 비교한다.
-2. 중앙 4x4가 아닌 full-resolution ns event stream을 확보한 뒤 region별
-   입력률·world-bank skew를 측정해 690-region 연결의 merge/memory-port
-   계약을 정한다. 현재 identity 중앙 crop 결과를 전체 센서 처리율로
-   외삽하지 않는다.
-3. 그 계약에 맞춰 실제 multi-region wrapper를 소규모에서 확장하고,
-   configuration update와 event traffic이 겹칠 때의 대역폭을 검증한다.
-4. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
-   held-out split과 constant/IMU-only baseline으로 먼저 소프트웨어 검증한다.
+2. 두 epoch 중앙 690x112-bit coefficient table, 전체 outstanding-count
+   guard, shared affine lane을 먼저 단위 및 통합 RTL로 닫는다. generic
+   RTL bit count와 실제 SRAM macro PPA는 분리해서 보고한다.
+3. parallel-pixel 제품 경계는 네 실제 8x8 region부터 merge tree로 shared
+   lane에 연결하고 configuration update와 event traffic이 겹칠 때를
+   검증한다. 이미 serialized DAVIS stream을 받는 경계라면 AER leaf를
+   복제하지 않고 address에서 region_id를 만들어 같은 queue로 진입한다.
+4. full-resolution 원 timestamp stream으로 region merge와 world-bank skew,
+   downstream stall을 replay해 K=1/depth-8 채택을 재검증한다. 한 recording의
+   무손실 결과를 다른 센서·장면으로 외삽하지 않는다.
+5. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
+   원 timestamp 순서와 input SHA receipt가 보존된 recording-level held-out
+   split에서 constant/IMU-only baseline보다 먼저 이긴 뒤 소프트웨어
+   float→fixed 동일 metric을 통과시킨다. 그 전 estimator RTL은 HOLD한다.

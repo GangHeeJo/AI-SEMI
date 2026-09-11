@@ -2837,3 +2837,28 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규: `scripts/gen_uzh_200mhz_trace.py`, `tb/tb_aer_tx16_pose_affine2d_k4_sram_surface_uzh_200mhz.v`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_PLAN.md`
 
+## 120. 최신 main@9a84be1 estimator 정정 독립 감사 — RTL HOLD 강화(2026-09-11)
+
+**격리 확인**: `main`을 수정하거나 우리 브랜치로 병합하지 않고 `origin/main@9a84be1`의 §131 정정과 관련 Bayes/fixed-point 코드를 읽기 전용으로 재실행했다. 이 커밋은 앞선 §128/130의 “강건한 minimax 설정” 수치를 철회했지만, 새 경로도 아직 재현 가능한 estimator RTL 기준선이 되지 못한다.
+
+**재현된 반례**: 4x4 체크인 label의 index 범위는 4..41이고, 전체에서 고른 상수 index 14의 MAE는 `7.119564 deg`, 전반부만으로 고른 index 11의 후반부 MAE도 `10.357038 deg`다. 이는 현재 보고된 고정 Bayes 설정의 20-position 평균 `24.4 deg`보다 강한 단순 baseline이다. Bayes 함수 자체의 반복 실행은 deterministic했지만, 문서의 “최악 94.0/60.8 deg”는 위치별 tail 평균 최대를 뜻하는 반면 커밋된 `validate_positions()`는 event 최대오차를 모아 출력한다. 부분 재실행만으로 `(66,49)` float event max가 `119.5 deg`여서 문서의 전체 최악을 이미 넘었고, avg-tuned 24.4/60.8을 만드는 별도 CLI/receipt도 없다.
+
+**입력·순서 blocker**: estimator가 직접 읽는 원본 `shapes_rotation/events.txt`와 `groundtruth.txt`는 Git 미추적이고 download/hash manifest가 없다. 더 중요하게 `build_uzh_eventmeta_nxn.py`는 event를 `(1 ms bin, source)` 순으로 다시 정렬한다. 생성된 4x4 TSV에서 실제 ns timestamp 역전이 2,670회, 최대 `993 us` 확인됐다. 매 event마다 map과 belief를 갱신하는 순서 민감 알고리즘이므로 이 입력으로 얻은 숫자는 causal sensor replay가 아니다.
+
+**fixed-point 상태**: 일부 위치만 다시 돌려도 `(111,86)`에서 fixed tail/event-max=`81.1/154.7 deg` 대 float `37.2/111.1 deg`, `(131,101)`에서 fixed=`83.4/132.2 deg` 대 float `29.0/83.0 deg`로 양자화 후보가 크게 무너진다. 최신 commit은 estimator RTL을 시작할 근거가 아니라, 기존 HOLD를 강화하는 근거다. 기존 endpoint의 Genus PPA 기록은 이 estimator의 타당성과 별개다.
+
+**재개 gate**: (1) 원 timestamp 순서 보존, (2) immutable input SHA receipt, (3) yaw 또는 SO(3) label과 mapper의 물리적 일치, (4) recording 단위 train/dev/test 분리, (5) constant와 IMU-only baseline 초과, (6) float와 fixed가 동일 metric gate 통과를 모두 요구한다. 그 전에는 supplied-pose affine/world-map RTL과 실제 full-sensor traffic 경계를 계속 닫는다.
+
+## 121. 원본 UZH 240x180 전체센서 traffic envelope와 shared-transform 방향 확정(2026-09-11)
+
+**재현 가능한 입력 경계**: UZH 공식 `shapes_rotation`의 `events.txt`를 Git에는 넣지 않고 `/shapes_rotation/`으로 무시했다. 로컬 원본은 `509,907,771 byte`, `23,126,288 event`, 시간 `0..59.798386001 s`, SHA-256 `d0b66503613354d1d274c56c979dfd89ba80b256c31eaba459a52adb7d03ffda`다. `common_traces_uzh/README.md`에 공식 URL·citation·CC BY-NC-SA 3.0 조건과 이 로컬 추출물 hash의 의미를 기록했다. 새 표준라이브러리-only one-pass analyzer는 raw byte hash, exact decimal→ns, timestamp 단조성, 240x180/polarity 범위와 모든 histogram 보존식을 강제하며 JSON receipt는 로컬 생성물로 남긴다.
+
+**전체센서 측정**: 평균 입력률은 약 `386,738 event/s`다. 5 ns grid에서 active cycle `18,119,595`, 다중-event cycle `4,273,348`, 동시 최대 `8`, 같은 pixel/cycle 충돌 `0`이었다. 1 ms bin은 총 `59,799`개(빈 bin 21), nearest-rank p99 `803`, peak `1,100 @ 41.321 s`다. 기존 중앙 4x4 crop의 8,503 event는 전체의 `0.03677%`; full/crop event 비 `2,719.78`은 pixel 비 2,700과 가깝지만 전체의 동시 multi-region traffic을 표현하지 못한다. 원 timestamp 최소 양의 간격은 `999 ns`라 5 ns 배치는 순서와 equal timestamp를 보존할 뿐 센서가 5 ns 정밀도라는 뜻은 아니다.
+
+**공간·queue envelope**: 2,700개 4x4 leaf의 같은 cycle 내부 동시 최대는 4이고 region별 총 event min/p50/p99/max는 `1,701/8,388/16,505/17,736`이다. 690개 8x8 coefficient region(마지막 row는 8x4)의 동시 최대는 5, 총 event는 `7,243/32,816/65,431/68,511`이다. equal-timestamp batch를 file order로 넣는 공유 server 모델에서 II=1/2/4/8의 start latency p99는 `2/4/8/16 cycle`, max는 `7/14/28/56`, post-dispatch peak waiting은 모두 7이었다. 다음 batch overlap은 모두 0이고 waiting depth 8/16/32 loss도 모두 0이었다. 독립 리뷰가 200/500개 랜덤 schedule의 cycle-reference와 finite/infinite queue 결과를 대조했고, 실제 전체 파일도 별도 실행해 같은 SHA·통계를 재현했다. analyzer 단위시험은 **6/6 PASS**다.
+
+**구조 결정**: 이 recording은 690개 affine datapath 복제를 정당화하지 않는다. parallel pixel pulse를 칩 내부에서 받는 경우 `2,700 leaf -> 690 region stream -> 4-way merge tree -> depth-8 FIFO -> 중앙 two-epoch 690x112-bit table -> shared K=1 affine -> 기존 4-bank surface`를 다음 최소 구조로 삼는다. 이미 직렬화된 DAVIS-like address stream을 입력으로 받는 제품이면 2,700 leaf 자체를 생략하고 주소에서 `region_id`를 만든다. 두 제품 경계의 PPA는 섞지 않는다. 5 ns 단위 timestamp는 현재 half-range 비교 규칙과 59.8 s span을 함께 만족하려면 최소 35 bit가 필요하다.
+
+- 신규: `scripts/analyze_uzh_full_sensor_traffic.py`, `scripts/test_analyze_uzh_full_sensor_traffic.py`, `STAGE2_FULL_SENSOR_TRAFFIC.md`, `common_traces_uzh/README.md`
+- 수정: `.gitignore`, `STAGE2_PLAN.md`
+

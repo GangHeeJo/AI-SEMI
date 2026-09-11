@@ -1,3 +1,4 @@
 sim/
 ~$*.docx
 .claude/settings.local.json
+/shapes_rotation/
