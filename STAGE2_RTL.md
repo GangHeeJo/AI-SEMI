@@ -19,6 +19,15 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 
 The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution. Tile/base origins are static physical configuration and must remain unchanged while reset is deasserted; unlike pose and timestamp, they are not captured per event.
 
+The current 8x8 hierarchy shares one affine coefficient set across its four
+4x4 leaves. That is the intended coefficient region, not an accidental
+full-sensor-global approximation: the measured physical sweep passes the
+geometry gates at 8x8 and first fails the exact-cell-rate gate at 12x12. A
+240x180 implementation therefore needs 30x23 independently addressed 8x8
+coefficient regions (with a four-row partial edge), plus pose-version-safe
+distribution or a calibrated-ray projection stage. The missing piece is that
+distribution/update fabric, not smaller AER leaves.
+
 ## Event lifetime
 
 An accepted leaf record is:
@@ -116,6 +125,15 @@ fixed-point coordinates with the RTL:
 
 ```text
 python scripts/run_stage2_regression.py --physical
+```
+
+Characterize independent 4x4 and implemented-granularity 8x8 affine regions
+over the complete 240x180 image plane at uniform plus trajectory-risk poses,
+while also reporting a deliberately rejected full-sensor-global affine
+baseline:
+
+```text
+python scripts/run_stage2_regression.py --full-sensor-sweep
 ```
 
 `STAGE2_PHYSICAL_MAPPING.md` records the input hashes, quaternion-direction

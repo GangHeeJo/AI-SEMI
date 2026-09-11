@@ -231,6 +231,53 @@ def run_uzh_physical_vectors(
     )
 
 
+def run_full_sensor_affine_sweep(root: Path) -> Result:
+    started = time.perf_counter()
+    marker = "UZH_FULL_SENSOR_SAMPLED_REGION_SWEEP_PASS"
+    outputs: list[str] = []
+    passed_sides: list[int] = []
+    failed_detail = ""
+    for region_side in (4, 8):
+        sweep = run_process(
+            [
+                sys.executable,
+                "scripts/sweep_uzh_full_sensor_affine.py",
+                "--tile-side",
+                str(region_side),
+                *(["--skip-global-baseline"] if region_side == 8 else []),
+            ],
+            root,
+        )
+        outputs.append(process_output(sweep))
+        if sweep.returncode != 0:
+            failed_detail = (
+                f"{region_side}x{region_side} sweep exited "
+                f"{sweep.returncode}"
+            )
+            break
+        if (
+            marker not in sweep.stdout
+            or f"tile={region_side} " not in sweep.stdout
+        ):
+            failed_detail = (
+                f"{region_side}x{region_side} sweep missing identity/PASS marker"
+            )
+            break
+        passed_sides.append(region_side)
+    passed = passed_sides == [4, 8]
+    detail = (
+        "4x4 and 8x8 sampled region sweeps passed"
+        if passed else failed_detail
+    )
+    return Result(
+        "uzh_full_sensor_region_affine_sweep",
+        passed,
+        detail,
+        "\n".join(output for output in outputs if output),
+        time.perf_counter() - started,
+    )
+
+
 def run_synthesis_elaboration(
     root: Path,
     temp_root: Path,
@@ -827,6 +874,13 @@ def parse_args() -> argparse.Namespace:
         help=("also regenerate measured-pose/calibration UZH vectors and "
               "compare all 8,503 events with the affine RTL"),
     )
+    parser.add_argument(
+        "--full-sensor-sweep",
+        action="store_true",
+        help=("also fit every 4x4 and 8x8 region over the 240x180 sensor "
+              "at uniform plus trajectory-risk poses and enforce sampled "
+              "geometry/error gates"),
+    )
     return parser.parse_args()
 
 
@@ -878,6 +932,11 @@ def main() -> int:
             result = run_uzh_physical_vectors(
                 root, temp_root, iverilog, vvp
             )
+            results.append(result)
+            print_result(result)
+
+        if args.full_sensor_sweep:
+            result = run_full_sensor_affine_sweep(root)
             results.append(result)
             print_result(result)
 

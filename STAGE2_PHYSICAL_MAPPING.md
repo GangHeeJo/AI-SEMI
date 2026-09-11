@@ -87,12 +87,70 @@ three input hashes and fails if float max error exceeds 0.01 px, Q14 max error
 exceeds one cell, or exact-cell rate falls below 99%.
 
 This is strong evidence that affine arithmetic is sufficient for this central
-4x4 patch. It is not yet evidence for every tile of a 240x180 sensor. The next
-geometry exit condition is a full-sensor tile sweep across held-out poses; only
-if its p99/max error misses the chosen cell budget should a homography or more
-general projective unit be added. A tile that crosses the periodic longitude
-seam also needs an explicit modulo-X stage or a chosen panorama seam that stays
-outside the active field; the current affine block intentionally does neither.
+4x4 patch. A tile that crosses the periodic longitude seam still needs an
+explicit modulo-X stage or a chosen panorama seam that stays outside the active
+field; the current affine block intentionally does neither.
+
+## Full-sensor local-region characterization
+
+The sweep starts with 32 uniformly spaced poses, then adds high pole-risk poses
+and the endpoints of the largest adjacent quaternion jumps. For this trace that
+is 55 selected poses and 2,376,000 checked pose-pixel samples for each region
+size. The risk prescan uses only nine precomputed sensor rays and all
+ground-truth poses, so it is cheap while still finding the narrow 53.7 s error
+peak missed by uniform sampling alone.
+
+| comparison | mean | p99 | max |
+|---|---:|---:|---:|
+| per-region 4x4 float affine vs exact spherical coordinate | 0.000955 px | 0.005660 px | 0.025968 px |
+| Q14 continuous coordinate vs exact spherical coordinate | 0.003937 cell | 0.010347 cell | 0.030991 cell |
+| integer RTL cell vs exact rounded cell | 0.005074 cell | 0 cell | 1.414214 cells |
+
+The continuous Q14 result measures quantized coefficients before the final
+integer output rounding; its Euclidean maximum is 0.030991 cell (maximum on one
+axis 0.030318), satisfying the pre-existing 0.5-cell geometry budget. After
+integer rounding,
+Q14 is exact for 2,363,952/2,376,000 samples (99.4929%). The maximum error on
+either integer axis is one cell; only 21 samples miss by one cell on both axes,
+which gives the Euclidean `sqrt(2)` maximum. There are no coefficient
+overflows, seam adjustments, X wraps, or Y range failures in the selected
+poses. The enforced gates are continuous-Q14 Euclidean error at most 0.5 cell,
+integer per-axis error at most one cell, exact-cell rate at least 99%, and zero
+coefficient/boundary failures. Unquantized float error is reported separately
+and is not substituted for the fixed-point gate.
+
+The 8x8 hierarchy is one coefficient region: its four 4x4 AER leaves correctly
+share one affine record. The same sampled sweep at the implemented 8x8 sharing
+granularity also passes, with continuous-Q14 maximum 0.132046 cell and
+2,358,565/2,376,000 exact integer cells (99.2662%). Region-size
+characterization locates the current accuracy boundary:
+
+| square coefficient region | regions per pose | continuous-Q14 max | exact integer cells | gates |
+|---:|---:|---:|---:|---|
+| 4x4 | 2,700 | 0.030991 | 99.4929% | pass |
+| 8x8 | 690 | 0.132046 | 99.2662% | pass |
+| 12x12 | 300 | 0.333611 | 98.7188% | fail exact-rate |
+| 16x16 | 180 | 0.555265 | 97.9292% | fail continuous/error rate |
+| 24x24 | 80 | 1.102444 | 95.6706% | fail |
+| 32x32 | 48 | 1.645995 | 92.8128% | fail |
+
+Thus the current 8x8 arithmetic granularity is the largest tested size that
+meets both gates. A full 240x180 sensor would use 30x23 = 690 such regions (the
+last row covers four active rows), and still needs a coefficient
+distribution/update mechanism that selects the region as well as the pose
+version. It does **not** require shrinking the existing hierarchy back to 4x4.
+Fitting one affine over the complete sensor remains a useful rejected baseline:
+float mean/p99/max is `1.356383/7.711730/24.654806 px` and only
+301,659/1,382,400 Q14 cells are exact (21.8214%). A calibrated-ray projection
+stage remains an alternative if distributing region-local coefficients costs
+more than computing the projection.
+
+The 55-pose risk-augmented sweep is a measured-range characterization, not an
+exhaustive guarantee for arbitrary camera trajectories or panorama-seam
+crossings. An independent vectorized audit over all 10,990 ground-truth poses
+in the event span confirmed zero seam crossings and the same 4x4 0.025968 px
+float maximum, but that audit is not part of the dependency-free checked-in
+runner.
 
 The RTL replay injects one fitted coefficient set per event directly into the
 transform. It therefore proves the transform arithmetic, not the feasibility
@@ -104,7 +162,12 @@ whose ns timestamps map to different poses.
 
 ```text
 python scripts/run_stage2_regression.py --physical
+python scripts/run_stage2_regression.py --full-sensor-sweep
 ```
+
+The full-sensor option enforces both the 4x4 reference and the implemented 8x8
+coefficient-sharing granularity. Larger sizes in the table are characterization
+runs of the same script using `--tile-side`.
 
 The vector TSV is generated in a temporary directory and is intentionally not
 committed. This avoids storing a second 8,503-row derivative of the three

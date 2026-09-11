@@ -296,17 +296,28 @@ def fit_affine(
     width: int,
     height: int,
     pixel_center_offset: float,
+    patch_x: Iterable[int] = PATCH_X,
+    patch_y: Iterable[int] = PATCH_Y,
 ) -> tuple[float, float, float, float, float, float, dict[tuple[int, int], tuple[float, float]], int]:
-    mean_u = sum(PATCH_X) / len(PATCH_X)
-    mean_v = sum(PATCH_Y) / len(PATCH_Y)
+    x_values = tuple(patch_x)
+    y_values = tuple(patch_y)
+    if len(x_values) < 2 or len(y_values) < 2:
+        raise ValueError("affine patch axes need at least two coordinates")
+    if (
+        len(set(x_values)) != len(x_values)
+        or len(set(y_values)) != len(y_values)
+    ):
+        raise ValueError("affine patch axes must not contain duplicates")
+    mean_u = sum(x_values) / len(x_values)
+    mean_v = sum(y_values) / len(y_values)
     reference_x, _ = world_coordinate(
         mean_u, mean_v, rotation, calibration, width, height,
         pixel_center_offset,
     )
     samples: dict[tuple[int, int], tuple[float, float]] = {}
     seam_adjustments = 0
-    for v in PATCH_Y:
-        for u in PATCH_X:
+    for v in y_values:
+        for u in x_values:
             raw_x, world_y = world_coordinate(
                 u, v, rotation, calibration, width, height,
                 pixel_center_offset,

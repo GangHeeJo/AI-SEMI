@@ -2725,3 +2725,48 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규 검증/합성 entry: `tb/tb_world_time_surface_sram_banked4.v`, `tb/tb_aer_tx16_pose_affine2d_k4_sram_surface.v`, `syn/run_genus_stage2_tx16_k4_banked_surface.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`
 
+## 114. 최신 `main` 재확인 — PPA 완료값 채택, pose-estimator 주장은 반례로 HOLD(2026-09-11)
+
+**격리 확인**: `main`을 수정·병합하지 않고 `origin/main@d304ec9`까지 fetch해 읽기 전용 감사했다. 새 커밋은 (1) 우리 브랜치의 기존 6개 endpoint 서버 Genus PPA 완료 기록과 (2) Claude 쪽 1-D Bayesian 회전추정 소프트웨어의 20개 patch 위치 결과다.
+
+**PPA 새 정보**: 누락됐던 `aer_tx64_pose_affine2d_serial`은 45 nm/5 ns 조건에서 area `215,929.925 um2`, cells `79,688`, vectorless power `2.562 mW`, 200 MHz slack `0`으로 기록됐다. 4x4 후보보다 면적 2.1~2.8배, vectorless power 2.8~3.1배이고 타이밍 여유가 없다. 다만 `main`에는 raw report/전체 timing path/activity가 아니라 `progress.md` 요약만 커밋됐으므로 provisional evidence로 취급한다. 서버에서 필요했던 `read_hdl -sv` 수정은 우리 브랜치의 모든 해당 Genus entry에 이미 반영돼 있다. 새 K=4+4-bank map-control top은 이 측정 이후 만들어졌으므로 별도 PPA가 여전히 필요하다.
+
+**Bayesian 결과 독립 감사**: 구현은 물리적 SO(3) pose estimator가 아니라 256개 synthetic theta 후보를 매 event마다 확산하고, MAP 추정 하나로 만든 polarity-count map에 대조하는 1-D 자기정합 실험이다. ground truth는 update 안에 직접 들어가지는 않지만 다음 문제가 확인됐다.
+
+- label은 quaternion의 축과 부호를 버린 `2*acos(abs(q_rel.w))`라 실제 yaw/roll이나 SO(3) 오차가 아니며 수학적으로 0~pi뿐이다. 그런데 synthetic mapper는 이 값을 signed full-circle 2-D 회전과 반지름 20 원운동에 동시에 사용한다.
+- 체크인 trace의 label 범위는 theta index 4~41뿐이다. 8,503개 TSV를 직접 재계산하니 전체 데이터에서 고른 상수 index 14의 event-MAE가 **7.1196 deg**로 보고된 단일-patch 최고 10.1 deg보다 좋았다. 첫 절반만으로 고른 상수 index 11도 뒤 절반에서 **10.3570 deg**라 동급이다. 따라서 uniform-random 90 deg baseline으로는 유효성을 입증할 수 없다.
+- coverage N이 커질수록 같은 시간에 event 수가 8,503→135,647로 늘지만 diffusion을 event당 한 번 적용해 process noise도 약 16배 커진다. “큰 FOV가 더 나쁘다”는 결론에 event-rate confound가 남는다.
+- 최신 `run_bayes_filter_proper`에는 실제 caller/test가 없고, 20-position 커밋도 위치·seed·개별 결과·실행 harness 없이 같은 한 recording의 crop들을 요약한 문서뿐이다. 문서의 “worst”는 최대 event 오차가 아니라 위치별 평균의 최악이며, 한 재현 설정은 event 최대오차가 105.469 deg였다.
+- RTL은 여전히 외부 `theta_idx`를 입력받는 mapper와 write-only memory port뿐이고 256-hypothesis belief/count memory/read/normalization/MAP 회로는 존재하지 않는다.
+
+**결정**: 이 estimator를 우리 RTL에 port하지 않는다. 물리적 supplied-pose 파노라마 경로를 먼저 닫고, feedback을 한다면 frozen calibrated map + 외부 IMU 주변의 작은 residual 후보만 train/dev/test가 분리된 software benchmark에서 constant/IMU-only baseline보다 이긴 뒤 RTL을 검토한다.
+
+## 115. 240x180 전체 센서의 local-affine 크기 경계와 8x8 확장 기준 확정(2026-09-11)
+
+**샘플링 보강**: 단순 32개 균등 pose는 53.7 s의 짧은 고곡률 구간을 놓쳐 float max를 `0.014447 px`로 과소평가했다. 9개 sensor anchor ray의 pole-risk local maximum 8개와 adjacent quaternion jump 상위 8개 구간의 양 끝을 자동 추가해 총 55 pose를 선택했다. 이 방식은 문제 pose `53.732373158 s`를 잡는다. 별도 NumPy 벡터화 감사로 event span의 ground-truth 10,990 pose를 모두 훑어 seam=0과 같은 float max `0.0259677 px`도 확인했지만, 체크인 runner는 의존성 없는 risk-augmented characterization으로 유지했다.
+
+**4x4 region 기준**: 240x180을 60x45개의 region으로 나눠 55 pose x 2,700 region = 148,500 fit, 총 2,376,000 pose-pixel을 검사했다.
+
+- unquantized local affine 대 exact calibrated spherical: mean/p99/max=`0.000955/0.005660/0.025968 cell`.
+- Q2.14/Q10.14 계수의 출력반올림 전 연속좌표 대 exact: mean/p99/max=`0.003937/0.010347/0.030991 cell`, max axis `0.030318`; 기존 0.5-cell Euclidean budget 안이다.
+- 최종 integer RTL cell 대 exact rounded cell: 2,363,952/2,376,000 exact=`99.4929%`, mean/p99/max=`0.005074/0/1.414214 cell`; 축별 max 1 cell이고 양축 동시 1-cell mismatch는 21건이다.
+- coefficient overflow, seam adjustment, X wrap, Y out-of-range는 모두 0. SHA receipt, finite gate, degenerate/duplicate fit 입력 거부, continuous-Q14 0.5-cell, integer 축별 1-cell, exact 99% gate를 회귀에 넣었다.
+
+**실제 hierarchy 단위 재검증**: 현재 `aer_tx64_pose_affine2d_serial`은 센서 전체에 한 계수를 공유하는 구조가 아니라, 네 4x4 leaf가 합쳐진 **한 8x8 region 안에서** 계수를 공유한다. 동일 55 pose를 region 크기별로 다시 검사한 결과는 다음과 같다.
+
+| coefficient region | region/pose | continuous-Q14 max | integer exact | gate |
+|---:|---:|---:|---:|---|
+| 4x4 | 2,700 | 0.030991 | 99.4929% | PASS |
+| 8x8 | 690 | 0.132046 | 99.2662% | PASS |
+| 12x12 | 300 | 0.333611 | 98.7188% | exact-rate FAIL |
+| 16x16 | 180 | 0.555265 | 97.9292% | continuous/exact FAIL |
+| 24x24 | 80 | 1.102444 | 95.6706% | FAIL |
+| 32x32 | 48 | 1.645995 | 92.8128% | FAIL |
+
+8x8은 2,358,565/2,376,000 integer cell이 exact이고 coefficient overflow, seam, X wrap, Y out-of-range가 모두 0이다. **현재 hierarchy의 계수 공유 크기가 테스트한 범위에서 가장 큰 PASS 단위**이며, 4x4별 계수까지 쪼갤 필요는 없다. 240x180 전체 구현은 30x23=690개의 8x8 region(마지막 행은 4개 active row)에 `region_id + pose_version` 계수를 배포·조회하면 된다. 반대로 센서 240x180 전체에 affine 하나만 fit한 rejected baseline은 float mean/p99/max=`1.356383/7.711730/24.654806 px`, Q14 exact=`301,659/1,382,400=21.8214%`라 사용할 수 없다.
+
+**회귀**: 기본+물리+전체센서 실행 **25/25 PASS**. 전체센서 option은 4x4 reference와 현재 8x8 공유 단위를 모두 실행하고 각 출력의 region size와 PASS marker를 교차확인한다. 55-pose sampled-range 결과일 뿐 임의 trajectory 전체 보장은 아니며, 계수 배포 RTL 완료를 뜻하지 않는다.
+
+- 신규: `scripts/sweep_uzh_full_sensor_affine.py`
+- 수정: `scripts/gen_uzh_physical_affine_vectors.py`, `scripts/run_stage2_regression.py`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+

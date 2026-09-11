@@ -10,9 +10,15 @@
 
 ## 1. 권장 목표
 
-> 차량 탑재 DVS에서 이벤트가 실제 발생했을 때의 자세를 보존하고, 외부에서 주어진 자세를 이용해 sensor-coordinate 이벤트를 안정된 reference/world-coordinate 이벤트 스트림으로 변환하는 RTL 전처리기를 만든다.
+> 광학 중심이 고정되고 pan/tilt/roll만 하는 DVS에서 이벤트가 실제
+> 발생했을 때의 자세를 보존하고, 외부에서 주어진 자세로
+> sensor-coordinate 이벤트를 구면 world-coordinate 스트림과 파노라마
+> time surface로 변환하는 RTL 전처리기를 만든다.
 
-자동차는 검증 시나리오다. 회로의 외부 계약은 `event + occurrence pose tag + transform parameters -> reference-coordinate event`로 두어 CCTV, 드론, 이동 로봇에도 재사용할 수 있게 한다.
+회전 전용은 과제의 기하 조건이며, 일반 주행 자동차처럼 광학 중심이
+이동하는 경우는 첫 목표가 아니다. 회로의 외부 계약은
+`event + occurrence pose tag + transform parameters -> reference-coordinate
+event`로 유지해, 나중에 depth/plane 변환기를 앞단에 붙일 수 있게 한다.
 
 첫 연구 질문은 다음 하나로 제한한다.
 
@@ -22,12 +28,12 @@
 
 ### 포함
 
-- 차량에 단단히 고정된 전방 DVS
+- 광학 중심이 고정된 pan/tilt/roll DVS
 - 알려진 카메라 내부·외부 보정값
 - 외부 IMU/odometry가 제공하는 pose 또는 transform version
 - ON/OFF polarity 이벤트
-- 도로 평면 또는 알려진 평면 위 이벤트의 2D 기준좌표 변환
-- 온라인 처리를 위한 rolling local world frame
+- calibrated camera ray의 구면/equirectangular world-coordinate 변환
+- occurrence timestamp 기반 파노라마 time surface
 
 ### 제외
 
@@ -35,11 +41,14 @@
 - pose 자체의 최초 추정
 - depth 추정
 - unknown-depth 일반 3D point cloud
+- optical-center translation과 parallax
 - 객체 검출과 주행 판단
 - 전체 해상도 센서 어레이의 즉시 물리 구현
 - 대형 플립플롭 world memory
 
-임의의 3D 장면에서 translation까지 포함한 metric world point를 얻으려면 depth 또는 평면 가정이 필요하다. 따라서 첫 단계는 도로 평면으로 제한한다. 회전-only는 공식 과제 조건으로 가정하지 않으며, 단순 회전은 정답 모델의 기본 sanity test로만 사용한다.
+광학 중심이 이동하면 metric world point를 얻기 위해 depth 또는 알려진
+평면이 필요하다. 그 확장은 별도 문제로 남기고, 첫 단계는 depth 없이도
+정확히 정의되는 rotation-only direction panorama로 제한한다.
 
 ## 3. 크기의 의미
 
@@ -128,7 +137,11 @@ row bitmap을 최대 8개의 독립 event record로 푼다.
 3. world-grid cell로 양자화한다.
 4. 투영 불가와 범위 밖을 별도 상태로 보고한다.
 
-첫 target은 알려진 도로 평면에 대한 homography다. pure rotation은 identity, 90/180도 회전, pan/tilt synthetic vector를 검증하는 데 사용한다.
+첫 target은 calibrated sensor ray에 외부 회전을 적용한 뒤 구면
+direction grid에 투영하는 것이다. 4x4 leaf에서는 이 비선형 투영을
+local affine로 근사하며, full sensor에서는 tile마다 다른 calibration
+계수가 필요하다. identity, 90/180도 회전과 실제 measured pose를 함께
+검증한다.
 
 RTL 연산 구조는 정답 모델과 workload 분석 뒤 다음 후보만 비교한다.
 
@@ -300,7 +313,7 @@ M0~M7 완료 뒤에만 진행한다.
 
 ## 9. 중단·재설계 조건
 
-- road-plane 가정에서 응용 지표가 의미 없으면 memory RTL 전에 시나리오를 재정의한다.
+- rotation-only panorama 지표가 의미 없으면 memory RTL 전에 시나리오를 재정의한다.
 - pose tag PPA가 허용되지 않으면 timestamp/pose encoding만 재검토하고 retire-pose로 되돌아가지 않는다.
 - `K < 8`이 정상 부하에서 overflow를 만들면 FIFO만 계속 키우지 말고 K를 늘린다.
 - full-resolution scaling에서 출력 링크가 병목이면 leaf 수를 더 늘리기 전에 상위 merge와 bandwidth 계약을 다시 정의한다.
@@ -311,16 +324,28 @@ M0~M7 완료 뒤에만 진행한다.
 2026-09-10 독립 브랜치 기준:
 
 - M0: official full50, UZH, random conservation과 latency/skew 재현 완료
-- M1: supplied-pose 2D affine fixed-point contract, vector generator, 122-vector bit-exact RTL 완료
+- M1: supplied-pose 구면 오라클, local affine fixed-point contract,
+  8,503-event RTL bit-exact 및 240x180 sampled 4x4/8x8 region sweep 완료
 - M3: column별 pose/timestamp를 보존하는 4x4 AER와 pose overwrite guard 완료
 - M4: 8-parallel transform 4x4 top 및 ready/valid coordinate stream 완료
-- M5 기능 endpoint: 4x4 K=1/2/4/8과 8x8 K=1 top, synthetic·backpressure·UZH timing 비교 완료; PPA는 진행 중
-- M6 기능 prototype: 작은 reference surface, 외부 SRAM/BRAM handshake writer, 8x8 sensor-to-memory 폐루프 완료; 고처리량 banking과 macro PPA는 미완료
-- M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge, single transform 통합 완료
+- M5 기능 endpoint: 4x4 K=1/2/4/8과 8x8 K=1 top,
+  synthetic·backpressure·UZH timing 및 기존 6개 Genus PPA 완료; 새 K=4
+  banked-map 주변로직 PPA는 미측정
+- M6 기능 prototype: 작은 reference surface, 외부 SRAM/BRAM handshake
+  writer와 주소 기반 4-bank K=4 폐루프 완료; memory macro PPA는 환경상 미측정
+- M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge,
+  single transform 통합 완료. 네 leaf가 공유하는 8x8 coefficient region은
+  measured-pose 전체센서 sweep의 오차 gate를 통과했다. 240x180의 690개
+  region에 계수를 배포하고 pose version과 원자적으로 갱신하는 구조는 미완성
 
 다음 순서는 다음과 같다.
 
-1. pose가 포함된 실제 차량 trace로 world-map application metric과 정상 부하 envelope를 정한다.
-2. 서버에서 UZH 무손실점인 4x4 K=1-d128/K=2-d32/K=4-d8/K=8의 Genus PPA를 얻는다.
-3. K 선택 뒤 8x8 hierarchy와 실제 output-link 대역폭을 같은 trace로 재측정한다.
-4. memory writer backpressure가 실제 trace 병목이면 그때 banking/hazard pipeline을 추가한다.
+1. 8x8 region ID와 pose version으로 690개 region-local affine record를
+   안전하게 배포/조회하는 최소 구조를 만들고 measured-pose oracle과
+   bit-exact 비교한다. 4x4 leaf별 계수로 세분화하지 않는다.
+2. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
+   banked surface의 FIFO loss/p99 latency를 측정한다.
+3. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
+   공정하게 비교한다.
+4. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
+   held-out split과 constant/IMU-only baseline으로 먼저 소프트웨어 검증한다.
