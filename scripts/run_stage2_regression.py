@@ -231,6 +231,72 @@ def run_uzh_physical_vectors(
     )
 
 
+def run_uzh_dual_region_vectors(
+    root: Path,
+    temp_root: Path,
+    iverilog: str,
+    vvp: str,
+) -> Result:
+    started = time.perf_counter()
+    vector_path = temp_root / "tb" / "uzh_dual_region_vectors.tsv"
+    vector_path.parent.mkdir(parents=True, exist_ok=True)
+    generator = run_process(
+        [
+            sys.executable,
+            "scripts/gen_uzh_dual_region_vectors.py",
+            "--output",
+            str(vector_path),
+        ],
+        root,
+    )
+    generator_output = process_output(generator)
+    marker = "UZH_DUAL_REGION_ORACLE_PASS"
+    if generator.returncode != 0 or marker not in generator.stdout:
+        reason = (
+            f"generator exited {generator.returncode}"
+            if generator.returncode != 0
+            else f"missing stdout marker '{marker}'"
+        )
+        return Result(
+            "uzh_dual_region_affine",
+            False,
+            reason,
+            generator_output,
+            time.perf_counter() - started,
+        )
+
+    test = HDLTest(
+        "uzh_dual_region_affine_rtl",
+        "tb_aer_tx128_region_pose_affine2d_dual_uzh",
+        (
+            "rtl/arbiter2.v",
+            "rtl/arbiter4_tree.v",
+            "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+            "rtl/aer_bitmap_to_event8_pose.v",
+            "rtl/event_batch_fifo.v",
+            "rtl/rr_stream_arbiter4.v",
+            "rtl/pose_inflight_guard8.v",
+            "rtl/pose_history_affine8.v",
+            "rtl/coord_transform_affine2d.v",
+            "rtl/aer_tx64_pose_affine2d_serial.v",
+            "rtl/affine_region_pose_loader.v",
+            "rtl/aer_tx128_region_pose_affine2d_dual.v",
+        ),
+        "tb/tb_aer_tx128_region_pose_affine2d_dual_uzh.v",
+        "UZH_DUAL_REGION_RTL_PASS",
+    )
+    rtl_result = run_hdl_test(
+        test, root, temp_root, iverilog, vvp, run_cwd=temp_root
+    )
+    return Result(
+        "uzh_dual_region_affine",
+        rtl_result.passed,
+        rtl_result.detail,
+        f"{generator_output}\n{rtl_result.output}".strip(),
+        time.perf_counter() - started,
+    )
+
+
 def run_full_sensor_affine_sweep(root: Path) -> Result:
     started = time.perf_counter()
     marker = "UZH_FULL_SENSOR_SAMPLED_REGION_SWEEP_PASS"
@@ -913,8 +979,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--physical",
         action="store_true",
-        help=("also regenerate measured-pose/calibration UZH vectors and "
-              "compare all 8,503 events with the affine RTL"),
+        help=("also regenerate measured-pose/calibration UZH vectors, compare "
+              "all 8,503 patch events, and probe two adjacent 8x8 regions"),
     )
     parser.add_argument(
         "--full-sensor-sweep",
@@ -972,6 +1038,11 @@ def main() -> int:
 
         if args.physical:
             result = run_uzh_physical_vectors(
+                root, temp_root, iverilog, vvp
+            )
+            results.append(result)
+            print_result(result)
+            result = run_uzh_dual_region_vectors(
                 root, temp_root, iverilog, vvp
             )
             results.append(result)

@@ -321,7 +321,7 @@ M0~M7 완료 뒤에만 진행한다.
 
 ## 10. 현재 구현 상태와 다음 작업
 
-2026-09-10 독립 브랜치 기준:
+2026-09-11 독립 브랜치 기준:
 
 - M0: official full50, UZH, random conservation과 latency/skew 재현 완료
 - M1: supplied-pose 구면 오라클, local affine fixed-point contract,
@@ -338,15 +338,15 @@ M0~M7 완료 뒤에만 진행한다.
   measured-pose 전체센서 sweep의 오차 gate를 통과했다. 240x180의 690개
   region을 순서대로 갱신한 뒤 pose version을 원자적으로 publish하는
   controller와 두 개의 실제 tx64 region을 연결한 16x8 proof도 완료.
+  두 인접 region의 전 픽셀을 두 measured pose에서 검사한 256-event
+  physical-coefficient replay도 RTL bit-exact로 완료.
   실제 690개 tx64 연결 wrapper와 대역폭 측정은 미완성
 
 다음 순서는 다음과 같다.
 
-1. measured-pose oracle에서 인접한 두 8x8 region의 실제 coefficient를
-   생성해 16x8 wrapper에서 bit-exact replay한다.
-2. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
+1. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
    banked surface의 FIFO loss/p99 latency를 측정한다.
-3. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
+2. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
    공정하게 비교한다.
-4. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
+3. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
    held-out split과 constant/IMU-only baseline으로 먼저 소프트웨어 검증한다.

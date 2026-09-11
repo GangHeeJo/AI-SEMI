@@ -145,8 +145,9 @@ Sweep the banked K=2/K=4 endpoints and the single-output K=4 endpoint on the sam
 python scripts/run_stage2_regression.py --lane-sweep
 ```
 
-Regenerate the measured UZH pose/calibration oracle and compare all 8,503
-fixed-point coordinates with the RTL:
+Regenerate the measured UZH pose/calibration oracle, compare all 8,503 patch
+coordinates with the transform RTL, and probe two adjacent real 8x8 region
+datapaths with independently fitted coefficients:
 
 ```text
 python scripts/run_stage2_regression.py --physical
@@ -191,6 +192,16 @@ events. An event accepted on the second PUBLISH edge retains pose 0 and its
 region-local transform; the following event carries pose 1 and the newly
 published transform. Both independent streams must drain without AER/FIFO loss
 or pose-accounting error.
+
+The physical dual-region test places those datapaths at sensor coordinates
+`x=32..47, y=168..175`. It uses the first checked-in event pose and the
+trajectory-risk pose at 53.732373158 s where the full-sensor sweep found its
+worst 8x8 float error. Every pixel in both regions is probed at both poses:
+256 events match the generated Q14 result bit-for-bit with no AER/FIFO loss.
+Against the exact calibrated spherical oracle, 251/256 land in the identical
+integer cell and the other five differ by one cell; continuous-Q14 maximum is
+0.130578 cell. This is a measured-pose/calibration synthetic pixel probe, not
+a claim that the checked-in 4x4 event crop contains traffic at these regions.
 
 ## PPA entry points
 

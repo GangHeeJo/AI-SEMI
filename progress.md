@@ -2802,3 +2802,16 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규 합성 entry: `syn/run_genus_stage2_tx128_dual_region.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
 
+## 118. measured UZH pose/calibration의 인접 8x8 두 region RTL replay(2026-09-11)
+
+**목적과 데이터 경계**: §117의 임의 identity/offset 계수를 실제 보정값으로 바꿨다. sensor `(32..39,168..175)`와 바로 옆 `(40..47,168..175)`를 선택하고, checked-in trace 첫 event 시각 `4.101324001 s`와 §115 전체센서 sweep에서 8x8 float 오차가 가장 컸던 `53.732373158 s`의 측정 quaternion/calibration으로 region별 affine을 독립 fit했다. 원 UZH eventmeta는 중앙 4x4 crop만 담으므로, 이 시험은 **실측 pose/calibration 기반 전 픽셀 synthetic probe**이지 해당 위치의 실제 event traffic replay가 아니다.
+
+**oracle 결과**: 두 pose x 두 region x 64 pixel = 256개를 검사했다. unquantized local affine max error는 `0.129085 px`, Q2.14/Q10.14 연속좌표 max error는 `0.130578 cell`이다. exact spherical 좌표를 각각 정수 cell로 반올림했을 때 `251/256=98.0469%`가 정확히 같고 나머지 5개도 최대 1 cell 차이다. 일부러 전체 8x8 중 최악 local slice를 포함했으므로 이 98.0469%를 §115의 전체센서 aggregate 99% gate와 혼동하지 않는다. coefficient overflow, panorama seam, world out-of-range는 0이다.
+
+**통합 RTL 결과**: 생성된 네 coefficient record를 실제 `affine_region_pose_loader`의 `BEGIN -> region0 WRITE -> region1 WRITE -> PUBLISH`로 넣고, 각 pose에서 두 tx64의 모든 source를 한 번씩 통과시켰다. AER source의 물리 좌표 순서가 row-major가 아니라 4x4 leaf/tile 순서인 점도 generator가 실제 index로 변환한다. 256/256 event가 생성된 fixed-point 결과와 bit-exact이고 sensor/world coordinate, polarity, 64-bit occurrence timestamp, pose version이 모두 일치했다. blocked/overrun/FIFO overflow/pose write-accounting error는 0이다.
+
+**회귀**: `--physical` 전체 실행 **28/28 PASS**이며 기본 회귀는 계속 **26/26 PASS**, synthesis-facing elaboration은 **10/10 PASS**다. 임시 TSV만 생성하므로 파생 데이터는 저장소에 넣지 않았다.
+
+- 신규: `scripts/gen_uzh_dual_region_vectors.py`, `tb/tb_aer_tx128_region_pose_affine2d_dual_uzh.v`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+

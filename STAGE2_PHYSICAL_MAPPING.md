@@ -152,11 +152,23 @@ in the event span confirmed zero seam crossings and the same 4x4 0.025968 px
 float maximum, but that audit is not part of the dependency-free checked-in
 runner.
 
-The RTL replay injects one fitted coefficient set per event directly into the
-transform. It therefore proves the transform arithmetic, not the feasibility
-of updating pose history at that rate. A later integration test must choose a
-real pose update cadence, quantize versions, and handle events within one cycle
-whose ns timestamps map to different poses.
+The original 8,503-event replay injects one fitted coefficient set per event
+directly into the transform. It therefore proves transform arithmetic, not the
+feasibility of updating pose history at that rate.
+
+The follow-on dual-region integration probe uses the actual loader, local pose
+history/guards, and two complete tx64 datapaths. It places adjacent regions at
+`(32,168)` and `(40,168)`, fits each region independently at the first event
+pose and at the sweep's worst 8x8 float-error pose (`53.732373158 s`), then
+probes every pixel. All 256 events match the generated Q14 RTL coordinates and
+preserve region, pose version, 64-bit occurrence timestamp, and polarity with
+no drop. The calibrated spherical comparison is 251/256 exact integer cells;
+the other five are one-cell rounding-boundary differences, with 0.130578-cell
+maximum continuous-Q14 error and no seam or range failure. This is deliberately
+a measured-pose/calibration synthetic full-pixel probe: the checked-in real
+event crop only covers `x=110..113, y=85..88`, so it is not described as an
+actual two-region traffic replay. Real pose cadence and same-cycle pose bucketing
+remain system-level choices.
 
 ## Run
 
@@ -169,6 +181,6 @@ The full-sensor option enforces both the 4x4 reference and the implemented 8x8
 coefficient-sharing granularity. Larger sizes in the table are characterization
 runs of the same script using `--tile-side`.
 
-The vector TSV is generated in a temporary directory and is intentionally not
-committed. This avoids storing a second 8,503-row derivative of the three
-hashed source files.
+The vector TSVs are generated in a temporary directory and are intentionally
+not committed. This avoids storing duplicate derivatives of the three hashed
+source files.
