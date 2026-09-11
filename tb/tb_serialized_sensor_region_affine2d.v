@@ -35,6 +35,7 @@ module tb_serialized_sensor_region_affine2d;
   wire cfg_awaiting_publish;
   wire cfg_publish_pulse;
   wire cfg_protocol_error;
+  reg [1:0] upstream_epoch_empty;
 
   reg event_valid_in;
   wire event_ready_in;
@@ -119,6 +120,7 @@ module tb_serialized_sensor_region_affine2d;
     .cfg_awaiting_publish(cfg_awaiting_publish),
     .cfg_publish_pulse(cfg_publish_pulse),
     .cfg_protocol_error(cfg_protocol_error),
+    .upstream_epoch_empty(upstream_epoch_empty),
     .event_valid_in(event_valid_in), .event_ready_in(event_ready_in),
     .sensor_x_in(sensor_x_in), .sensor_y_in(sensor_y_in),
     .polarity_in(polarity_in),
@@ -430,6 +432,7 @@ module tb_serialized_sensor_region_affine2d;
     polarity_in = 0;
     occurrence_pose_version_in = 0;
     occurrence_timestamp_in = 0;
+    upstream_epoch_empty = 2'b11;
     world_ready = 1'b1;
     errors = 0;
     expected_count = 0;
@@ -531,6 +534,7 @@ module tb_serialized_sensor_region_affine2d;
                       "world output changed while stalled");
     end
     @(negedge clk);
+    upstream_epoch_empty[0] = 1'b0;
     world_ready = 1'b1;
     wait_for_all_outputs;
 
@@ -582,9 +586,15 @@ module tb_serialized_sensor_region_affine2d;
     @(posedge clk);
     #1;
     check_condition(pose_outstanding0 == 0 &&
-                    pose_overwrite_ready[0] && cfg_ready &&
+                    !pose_overwrite_ready[0] && !cfg_ready &&
+                    !dut.region_wr_req && !dut.region_wr_commit,
+                    "upstream epoch barrier did not hold drained old slot");
+    @(negedge clk);
+    upstream_epoch_empty[0] = 1'b1;
+    #1;
+    check_condition(pose_overwrite_ready[0] && cfg_ready &&
                     dut.region_wr_req && dut.region_wr_commit,
-                    "old slot did not become writable next cycle");
+                    "old slot did not become writable after upstream barrier");
     @(posedge clk);
     #1;
     cfg_valid = 1'b0;

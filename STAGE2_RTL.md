@@ -22,6 +22,9 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `pose_epoch_count_guard2` | two global epochs | count control only | aggregate accept/retire counts | full-path slot-reuse guard |
 | `region_affine_shared_lane` | region-tagged stream | 1 shared | one ready/valid event | central lookup/transform primitive |
 | `serialized_sensor_region_affine2d` | serialized 240x180 | 1 shared | one ready/valid event | COTS-stream central-table endpoint |
+| `aer_region8x8_event_stream` | 8x8 (four Stage-1 leaves) | none | one raw ready/valid event | reusable parallel-pixel region frontend |
+| `aer_tx256_region_shared_affine` | 16x16 (four 8x8 regions) | 1 shared | one ready/valid world event | parallel-pixel central-table proof |
+| `rr_stream_merge16` | 16 raw streams | none | one ready/valid event plus source ID | two-level scale-out merge proof |
 
 The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution. Tile/base origins are static physical configuration and must remain unchanged while reset is deasserted; unlike pose and timestamp, they are not captured per event.
 
@@ -106,10 +109,40 @@ already serialized DAVIS-like stream.  It derives
 sentinel 690 so they cannot alias a valid coefficient, and preserves them as
 unmapped diagnostic events.  The input carries an explicit occurrence-time
 pose version; the wrapper never substitutes its current active pose.  Its
-local guard starts at the input handshake, so the upstream source must also
-guarantee that no old-tag backlog remains outside the interface before an
-epoch slot is reused.  This endpoint contains no Stage-1 AER leaves and must
-not be compared as though it did.
+local guard starts at the input handshake, so `upstream_epoch_empty[1:0]`
+must remain low while any old-tag backlog exists outside the interface.  The
+wrapper ANDs that barrier with local guard readiness before allowing a table
+write; tie it high only when this interface is the occurrence point.  This
+endpoint contains no Stage-1 AER leaves and must not be compared as though it
+did.
+
+The parallel-pixel boundary now has a separate reusable raw frontend.
+`aer_region8x8_event_stream` combines four verified 4x4 leaves, expands their
+two-lane bitmaps into per-event records, buffers each leaf, and fairly merges
+the four streams without duplicating the affine engine.  Its base is static
+and must leave room for eight coordinates; at the physical 240x180 bottom
+edge the unused lower 8x8 inputs are tied low.  The edge test proves the
+`y=176..179` partial region without generating an out-of-raster coordinate.
+
+`aer_tx256_region_shared_affine` arranges four raw frontends as a 16x16 proof,
+adds one lossless handshake-gated shared FIFO, derives the global 8x8 region
+ID, and feeds the same central two-epoch table and shared affine lane.  Pulse
+arrival cannot be backpressured: arrivals before the first publication or
+after accounting poison are explicitly reported by `arrival_blocked`; once
+enabled, downstream stalls do not silently disable admission.  The global
+pose guard counts every admitted pixel and retires it exactly once at either
+leaf-FIFO overflow or affine capture.  AER overrun was never admitted and is
+therefore not retired.  The complete drained invariant is:
+
+```text
+pulses = arrival_blocked + aer_overrun + leaf_fifo_overflow + world_events
+```
+
+The shared FIFO itself is a lossless ready/valid boundary and its overflow is
+a contract error.  `rr_stream_merge16` separately proves a reusable two-level
+4-way tree for the next fan-in step.  Both mergers preserve per-source order
+and fairness, but deliberately do not sort independent streams by timestamp;
+the time surface resolves same-cell stale updates from occurrence timestamps.
 
 The dual wrapper owns occurrence pose tagging. Its pulse-source AER input has
 no backpressure pin, so `sensor_ready=0` before the first complete publication
@@ -260,7 +293,7 @@ for a shared-port memory implementation.
 
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in 1 ms-bin UZH burst stress, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the ten existing PPA endpoint tops plus four new central-path components in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis. Only the ten scripts listed below are current Genus entry points.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates 17 endpoint/component tops in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis. The 14 scripts listed below are the current Genus entry points.
 
 The default suite includes the region loader at both a 3x2 directed size and
 the full 30x23=690 control count. It checks regional stalls, exact write count,
@@ -296,7 +329,13 @@ synchronous lookup, then loader/table/guard/shared-lane composition.  The
 serialized 240x180 endpoint loads all 690 records for three epochs (2,070
 writes) and preserves 11 events through edge-region, invalid-coordinate,
 PUBLISH-boundary, output-stall, and old-slot last-retire cases.  The current
-default suite is 30/30 PASS and its Verilog-2005 elaboration set is 14/14.
+The parallel path adds a 3,000-cycle stressed raw-region test, a physical
+bottom-edge smoke test, a 16-input fair-merge test, and the complete 16x16
+central-table test.  The latter accounts 6,164 pulses through blocked, AER
+overrun, leaf overflow, and 294 world outputs; it fills the shared FIFO to
+eight, stalls the output, exercises both epochs, and rewrites the old slot one
+cycle after its final retire.  The current default suite is 34/34 PASS and its
+Verilog-2005 elaboration set is 17/17.
 
 ## PPA entry points
 
@@ -313,8 +352,12 @@ genus -batch -files syn/run_genus_stage2_tx16_k4_banked_surface.tcl
 genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
 genus -batch -files syn/run_genus_stage2_region_pose_loader.tcl
 genus -batch -files syn/run_genus_stage2_tx128_dual_region.tcl
+genus -batch -files syn/run_genus_stage2_serialized_sensor_region.tcl
+genus -batch -files syn/run_genus_stage2_aer_region8x8_stream.tcl
+genus -batch -files syn/run_genus_stage2_rr_stream_merge16.tcl
+genus -batch -files syn/run_genus_stage2_aer_tx256_region_shared_affine.tcl
 ```
 
 Map storage is deliberately excluded from the logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation. Do not compare the four-output K=4-d8 area directly with a one-port K=1 endpoint as though the downstream map interface were identical; use K4-serial-d32 for a one-port comparison, or include the complete banked map fabric for a multi-port comparison.
 
-These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM. The region-loader script measures only the sequencer, excluding coefficient storage, 690-way routing, and every region datapath. The tx128 script includes two real region datapaths and their local tables, but still excludes a world map and full-sensor merge/routing.
+These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM. The region-loader script measures only the sequencer, excluding coefficient storage, 690-way routing, and every region datapath. The tx128 script includes two real region datapaths and their local tables, but still excludes a world map and full-sensor merge/routing. The serialized and tx256 central-table scripts use a generic RTL array, so their reports cannot be presented as SRAM-macro PPA. The raw 8x8 and 16-input merge entries isolate the main scale-out logic, including the current combinational acceptance/drop reductions that require real STA before a full-sensor tree is frozen.

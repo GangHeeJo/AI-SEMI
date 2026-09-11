@@ -476,6 +476,9 @@ def run_synthesis_elaboration(
         "rtl/affine_region_coeff_table2.v",
         "rtl/region_affine_shared_lane.v",
         "rtl/serialized_sensor_region_affine2d.v",
+        "rtl/aer_region8x8_event_stream.v",
+        "rtl/rr_stream_merge16.v",
+        "rtl/aer_tx256_region_shared_affine.v",
     )
     configurations = (
         ("k8", "aer_tx16_pose_affine2d", ()),
@@ -501,6 +504,9 @@ def run_synthesis_elaboration(
         ("region_coeff_table_690", "affine_region_coeff_table2", ()),
         ("region_shared_lane", "region_affine_shared_lane", ()),
         ("serialized_sensor_region", "serialized_sensor_region_affine2d", ()),
+        ("aer_region8x8_stream", "aer_region8x8_event_stream", ()),
+        ("rr_stream_merge16", "rr_stream_merge16", ()),
+        ("tx256_region_shared", "aer_tx256_region_shared_affine", ()),
     )
     failures: list[str] = []
     outputs: list[str] = []
@@ -528,7 +534,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "14/14 Verilog-2005 tops elaborated" if not failures
+        "17/17 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -704,6 +710,67 @@ def regular_tests() -> tuple[HDLTest, ...]:
             ),
             "tb/tb_serialized_sensor_region_affine2d.v",
             "SERIALIZED_SENSOR_REGION_AFFINE2D_PASS",
+        ),
+        HDLTest(
+            "aer_region8x8_event_stream",
+            "tb_aer_region8x8_event_stream",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/aer_region8x8_event_stream.v",
+            ),
+            "tb/tb_aer_region8x8_event_stream.v",
+            "AER_REGION8X8_EVENT_STREAM_PASS",
+        ),
+        HDLTest(
+            "aer_region8x8_event_stream_edge",
+            "tb_aer_region8x8_event_stream_edge",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/aer_region8x8_event_stream.v",
+            ),
+            "tb/tb_aer_region8x8_event_stream_edge.v",
+            "AER_REGION8X8_EDGE_PASS",
+        ),
+        HDLTest(
+            "rr_stream_merge16",
+            "tb_rr_stream_merge16",
+            (
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/rr_stream_merge16.v",
+            ),
+            "tb/tb_rr_stream_merge16.v",
+            "RR_STREAM_MERGE16_PASS",
+        ),
+        HDLTest(
+            "aer_tx256_region_shared_affine",
+            "tb_aer_tx256_region_shared_affine",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/aer_region8x8_event_stream.v",
+                "rtl/affine_region_pose_loader.v",
+                "rtl/affine_region_coeff_table2.v",
+                "rtl/pose_epoch_count_guard2.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/region_affine_shared_lane.v",
+                "rtl/aer_tx256_region_shared_affine.v",
+            ),
+            "tb/tb_aer_tx256_region_shared_affine.v",
+            "AER_TX256_REGION_SHARED_AFFINE_PASS",
         ),
         HDLTest(
             "aer_tx128_dual_region_e2e",

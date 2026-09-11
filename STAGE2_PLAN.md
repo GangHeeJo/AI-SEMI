@@ -349,25 +349,29 @@ M0~M7 완료 뒤에만 진행한다.
   double-buffer coefficient table + shared K=1 transform을 다음 대상으로
   채택했다. 두 epoch 690x112-bit table, global count guard, shared lane과
   이미 직렬화된 sensor stream용 240x180 endpoint까지 RTL로 완료했다.
-  shared lane의 관측 II는 2 cycle이다. 이는 한 recording의 측정 envelope이며
-  범용 보장은 아니고, parallel-pixel AER merge 경로는 아직 미완성이다.
+  shared lane의 관측 II는 2 cycle이다. 이어서 네 8x8 raw region을 실제
+  Stage-1 leaf로 구성해 16x16 pulse aperture -> fair merge -> depth-8 shared
+  FIFO -> 중앙 table/shared lane까지 닫았다. 6,164개 pulse의 blocked/AER
+  overrun/leaf overflow/world 보존식과 두 pose의 old-slot 재사용을 검증했고,
+  별도 16-input two-level merge도 4,782개 random token 보존과 fairness를
+  통과했다. 이는 한 recording과 소규모 구조 proof이며 범용 보장은 아니다.
 
 다음 순서는 다음과 같다.
 
 1. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
    공정하게 비교한다.
-2. parallel-pixel 제품 경계는 transform을 뺀 실제 8x8 AER region stream을
-   먼저 만들고, 네 region(16x16)을 merge/FIFO/중앙 table/shared lane에
-   연결한다. AER overrun, leaf-FIFO drop, affine capture를 pose별 global
-   count에 정확히 한 번씩 반영한다.
-3. 16x16 proof의 world stream을 기존 4-bank SRAM surface에 연결해
+2. 완료: parallel-pixel 제품 경계의 raw 8x8 region과 네 region(16x16)
+   merge/FIFO/중앙 table/shared lane을 구현했다. AER overrun은 admission
+   제외, leaf-FIFO drop과 affine capture는 pose별 retire로 정확히 한 번
+   반영한다.
+3. 진행: 16x16 proof의 world stream을 기존 4-bank SRAM surface에 연결해
    configuration update, event burst, memory backpressure가 겹칠 때의
    완전한 보존식을 검증한다. 690-region tree는 이 소규모 proof 다음이다.
 4. full-resolution 원 timestamp stream으로 region merge와 world-bank skew,
    downstream stall을 replay해 K=1/depth-8 채택을 재검증한다. 한 recording의
    무손실 결과를 다른 센서·장면으로 외삽하지 않는다. 직렬 endpoint는
-   upstream old-tag backlog를 포함하는 epoch barrier가 있을 때만 slot reuse가
-   안전하다는 인터페이스 계약도 함께 검증한다.
+   `upstream_epoch_empty`로 인터페이스 밖 old-tag backlog까지 table write
+   barrier에 포함했으며, 실제 upstream과 연결해 이 계약도 검증한다.
 5. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
    원 timestamp 순서와 input SHA receipt가 보존된 recording-level held-out
    split에서 constant/IMU-only baseline보다 먼저 이긴 뒤 소프트웨어

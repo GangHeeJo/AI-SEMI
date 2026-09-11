@@ -2870,11 +2870,75 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 
 **공유 lookup/transform**: `region_affine_shared_lane`은 `{region_id,sensor x/y,polarity,occurrence pose,timestamp}` 한 event를 hold하고 중앙 table response와 함께 기존 affine register에 넣는다. pose retire는 lookup request나 world consume가 아니라 coefficient+event capture handshake에서만 pulse한다. unpublished/missing record도 한 번의 unmapped diagnostic event로 보존하며 lookup/world stall 중 모든 metadata가 고정된다. loader+table+guard 통합 TB에서 두 epoch, partial/unpublished table, 동시 config/event, output stall, old-slot 재사용을 검사해 `12/12` event 보존, 관측 II=`2 cycle`을 확인했다.
 
-**직렬 센서 제품 경계**: `serialized_sensor_region_affine2d`는 이미 직렬화된 240x180 DAVIS-like stream용 별도 top이다. 주소에서 `region_id=(y>>3)*30+(x>>3)`를 만들고 `(239,179)->689`, invalid x/y는 sentinel `690`으로 보내 valid region alias를 막는다. 입력은 수신 시점 active pose를 자동 부착하지 않고 명시적인 occurrence pose tag를 받는다. 첫 PUBLISH 전에는 backpressure하고, 입력 handshake부터 local guard가 count한다. 따라서 인터페이스 밖에 old-tag event backlog가 남을 수 있는 시스템은 slot reuse 전에 별도 upstream barrier/credit이 필요하다. 30x23 table을 세 번 전부 적재한 `2,070 write` 시험에서 publish-edge old/new, pose0/1 invalid sentinel, world stall, last-retire 다음-cycle rewrite와 `11/11` event 보존을 확인했다.
+**직렬 센서 제품 경계**: `serialized_sensor_region_affine2d`는 이미 직렬화된 240x180 DAVIS-like stream용 별도 top이다. 주소에서 `region_id=(y>>3)*30+(x>>3)`를 만들고 `(239,179)->689`, invalid x/y는 sentinel `690`으로 보내 valid region alias를 막는다. 입력은 수신 시점 active pose를 자동 부착하지 않고 명시적인 occurrence pose tag를 받는다. 첫 PUBLISH 전에는 backpressure하고, 입력 handshake부터 local guard가 count한다. 인터페이스 밖의 old-tag backlog는 `upstream_epoch_empty[1:0]` barrier로 table write-ready에 직접 포함하며, 이 인터페이스가 occurrence point일 때만 high로 묶을 수 있다. 30x23 table을 세 번 전부 적재한 `2,070 write` 시험에서 publish-edge old/new, pose0/1 invalid sentinel, world stall, local drain 뒤 upstream barrier stall, last-retire 다음-cycle rewrite와 `11/11` event 보존을 확인했다.
 
 **독립 검증과 회귀**: guard/table은 Verilog-2005/2012, 실제 30x23 table elaboration을 독립 재실행했고 blocker가 없었다. queue/lane wrapper도 두 문법 모드에서 같은 PASS를 냈다. 기본 Stage-2 회귀는 **30/30 PASS**, synthesis-facing Verilog-2005 elaboration은 기존 10 endpoint와 새 4 component를 합쳐 **14/14 PASS**다. 이는 기능·source-list 검증이며 중앙 SRAM 또는 새 구조의 45 nm PPA는 아직 아니다.
 
 - 신규 RTL: `rtl/pose_epoch_count_guard2.v`, `rtl/affine_region_coeff_table2.v`, `rtl/region_affine_shared_lane.v`, `rtl/serialized_sensor_region_affine2d.v`
 - 신규 TB: `tb/tb_pose_epoch_count_guard2.v`, `tb/tb_affine_region_coeff_table2.v`, `tb/tb_region_affine_shared_lane.v`, `tb/tb_serialized_sensor_region_affine2d.v`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+
+## 123. Stage-1 AER을 재사용한 16x16 parallel-pixel 중앙변환 경로(2026-09-11)
+
+**raw 8x8 region 분리**: `aer_region8x8_event_stream`은 검증된 Stage-1
+4x4 pose/timestamp leaf 네 개를 2x2로 배치하고, 두 lane bitmap을 event로
+펼친 뒤 leaf별 batch FIFO와 fair rr4로 하나의 raw ready/valid stream을
+만든다. affine/pose table은 넣지 않아 690개 region이 변환기를 복제하지
+않는 구조다. 기본 FIFO는 depth 8이고 sensor/timestamp 기본 폭은 8/35 bit다.
+source별 순서는 보존하지만 독립 stream의 timestamp total order는 만들지
+않는다. 3,000-cycle stress에서 `generated=21,970`, AER overrun `429`, leaf
+FIFO drop `19,746`, stream `1,795`로 보존식을 통과했다. pose별 drop은
+10,000/9,746이고 stall stability, four-leaf fairness, per-source order도
+오류 0이다. 별도 bottom-edge 시험은 base `(232,176)`에서 물리적으로 있는
+상단 8x4만 구동해 `(239,179)` 이내 네 event를 확인했다.
+
+**16x16 central shared path**: `aer_tx256_region_shared_affine`은 위 raw
+region 네 개를 16x16으로 배치하고 fair merge, lossless depth-8 shared FIFO,
+전역 region ID, 기존 two-epoch 690-record table과 shared affine lane을
+연결한다. 입력 pulse는 backpressure할 수 없으므로 첫 PUBLISH 전 또는
+accounting poison 뒤의 pulse를 `arrival_blocked`로 명시한다. admission이
+열린 뒤에는 downstream stall로 이를 숨기지 않는다. guard는 256-source
+admission 합을 9 bit로 정확히 더하고, pose별 leaf overflow와 terminal
+affine capture만 retire한다. shared FIFO 입력은 실제 merge handshake로만
+발생해 full+pop 동시 cycle도 lossless이며 overflow는 contract error다.
+
+통합 TB는 두 epoch의 30x23 coefficient를 적재하고 region별 affine 결과,
+네 region 초기 fairness, publish-edge old/new tag, 장시간 world stall과
+shared FIFO full, 256개 동시 admission, 두 pose 각각의 AER/leaf loss,
+마지막 old-pose retire 바로 다음 cycle의 slot rewrite를 검사했다. 결과는
+`pulses=6,164 = blocked 2 + AER overrun 2,560 + leaf drop 3,308 + world 294`,
+pose별 leaf drop `1,654/1,654`, shared FIFO peak `8`, overflow `0`, rewrite
+retire/commit edge `1770/1771`이다. g2005와 g2012가 같은 PASS를 냈고
+독립 리뷰도 blocker 없이 이를 재현했다. TB clock은 기능검증용 100 MHz라
+200 MHz 만족 여부는 5 ns Genus STA에서 판단해야 한다.
+
+**scale-out merge와 안전 barrier**: `rr_stream_merge16`은 기존 rr4를
+leaf 네 개+root 하나로 묶은 two-level proof다. 16-source full contention과
+stall/random backpressure에서 `4,782/4,782` token, per-source order,
+fairness(max handshake gap 16)를 g2005/g2012 모두 통과했다. timestamp sort는
+의도적으로 하지 않는다. 직렬 COTS wrapper도 local guard만 비었다는 이유로
+upstream backlog가 남은 pose bank를 덮지 않도록 `upstream_epoch_empty`를
+실제 table write-ready에 AND했고, last-retire edge에는 막힌 채 다음 edge에
+열리는 시험을 추가했다.
+
+**회귀/PPA 준비**: 기본 Stage-2 회귀는 **34/34 PASS**, synthesis-facing
+Verilog-2005 top은 **17/17 PASS**다. serialized sensor, raw 8x8, merge16,
+tx256용 Genus entry를 추가했다. coefficient table은 generic RTL array라
+Genus 결과가 나와도 실제 SRAM macro PPA로 부를 수 없고, 64/256-input
+accept/drop popcount와 merge depth는 실제 STA 전 최적화 대상 후보로만
+남긴다. 현 tx256 계약은 16x16 전체가 240x180 내부에 있어야 하므로,
+full-sensor tiler가 마지막 네 행을 tie-off하는 상위 계약은 다음 단계다.
+
+- 신규 RTL: `rtl/aer_region8x8_event_stream.v`,
+  `rtl/rr_stream_merge16.v`, `rtl/aer_tx256_region_shared_affine.v`
+- 신규 TB: `tb/tb_aer_region8x8_event_stream.v`,
+  `tb/tb_aer_region8x8_event_stream_edge.v`, `tb/tb_rr_stream_merge16.v`,
+  `tb/tb_aer_tx256_region_shared_affine.v`
+- 신규 합성 entry: `syn/run_genus_stage2_serialized_sensor_region.tcl`,
+  `syn/run_genus_stage2_aer_region8x8_stream.tcl`,
+  `syn/run_genus_stage2_rr_stream_merge16.tcl`,
+  `syn/run_genus_stage2_aer_tx256_region_shared_affine.tcl`
+- 수정: `rtl/serialized_sensor_region_affine2d.v`,
+  `tb/tb_serialized_sensor_region_affine2d.v`,
+  `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
 

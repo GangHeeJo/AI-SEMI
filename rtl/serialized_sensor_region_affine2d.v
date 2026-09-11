@@ -7,6 +7,7 @@
 // published.  Before reusing an epoch slot, upstream must also have stopped
 // presenting older events for that slot: the local guard can count accepted
 // events, but cannot see a pose-tagged backlog still outside this interface.
+// upstream_epoch_empty makes that external barrier part of table write-ready.
 // Coordinates outside SENSOR_COLS x SENSOR_ROWS use an invalid table sentinel
 // and emerge once as deterministic unmapped diagnostics.
 module serialized_sensor_region_affine2d #(
@@ -56,6 +57,10 @@ module serialized_sensor_region_affine2d #(
   output                                 cfg_awaiting_publish,
   output                                 cfg_publish_pulse,
   output                                 cfg_protocol_error,
+
+  // Assert a bit only when no event with that epoch remains upstream of this
+  // interface.  Tie high when the interface itself is the occurrence point.
+  input      [1:0]                       upstream_epoch_empty,
 
   input                                  event_valid_in,
   output                                 event_ready_in,
@@ -122,6 +127,7 @@ module serialized_sensor_region_affine2d #(
   wire terminal_retire;
   wire [POSE_W-1:0] terminal_retire_pose_version;
   wire [1:0] pose_idle;
+  wire [1:0] local_pose_overwrite_ready;
 
   wire coordinate_valid =
     (sensor_x_in < SENSOR_COLS) && (sensor_y_in < SENSOR_ROWS);
@@ -133,6 +139,8 @@ module serialized_sensor_region_affine2d #(
     coordinate_valid ? valid_region_id : INVALID_REGION_ID;
 
   assign event_ready_in = event_admission_enabled && lane_event_ready;
+  assign pose_overwrite_ready = local_pose_overwrite_ready &
+                                upstream_epoch_empty;
 
   affine_region_pose_loader #(
     .REGION_COLS(REGION_COLS), .REGION_ROWS(REGION_ROWS),
@@ -204,7 +212,7 @@ module serialized_sensor_region_affine2d #(
                    terminal_retire_pose_version),
     .outstanding0(pose_outstanding0),
     .outstanding1(pose_outstanding1),
-    .idle(pose_idle), .overwrite_ready(pose_overwrite_ready),
+    .idle(pose_idle), .overwrite_ready(local_pose_overwrite_ready),
     .accounting_error(pose_accounting_error)
   );
 
