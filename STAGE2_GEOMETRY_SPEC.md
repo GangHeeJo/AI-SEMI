@@ -14,7 +14,40 @@ Each accepted event carries:
 
 Every event in a row bitmap needs its own `pose_version`. Different columns in one transmitted bitmap may have entered their source FIFOs in different cycles, so one tag per output lane is insufficient.
 
-The pose table maps `pose_version` to one record `(a, b, c, d, tx, ty)`. A write may commit only when no accepted event still references that ID; a busy-ID write is explicitly rejected. How coefficients are produced is outside this first contract.
+Inside one coefficient region, the local pose table maps `pose_version` to one
+record `(a, b, c, d, tx, ty)`. At full-sensor level the key is therefore
+`(region_x, region_y, pose_version)`. A local write may commit only when no
+accepted event in that region still references the ID; a busy-ID write is
+backpressured. How coefficients are produced is outside this contract.
+
+## Full-sensor coefficient publication
+
+The measured 240x180 design point divides the sensor into 30x23 coefficient
+regions of at most 8x8 pixels. Each region keeps a local pose table. The
+configuration controller accepts exactly this transaction:
+
+```text
+BEGIN(target pose)
+WRITE(x=0,y=0) ... WRITE(x=29,y=22)  // strict row-major order
+PUBLISH(target pose)
+```
+
+`ABORT` may cancel a partial transaction without changing the active pose.
+Each WRITE advances only on the selected region's `pose_wr_commit`; a busy old
+slot stalls the stream and is not a drop. PUBLISH is legal only after all 690
+writes. It changes a registered `active_pose_version`, so an event accepted on
+the publication edge receives the previous version and events accepted from
+the next cycle receive the new version. BEGIN may never target the active ID.
+An out-of-order command, early publication, impossible commit, or regional
+pose-accounting failure prevents publication and fail-stops configuration
+until reset. The existing active pose remains usable.
+
+The first controller proof defaults to `POSE_W=1`, a two-slot buffer. This is a
+correctness point, not yet a freshness result: the producer must tolerate a
+stall until every region releases the old inactive slot. At 112 coefficient
+bits per region, one complete pose payload is 77,280 bits and takes at least
+690 data cycles. At 200 MHz that lower bound is 3.45 microseconds, excluding
+BEGIN/PUBLISH and any in-flight-event stalls.
 
 ## Fixed-point transform
 

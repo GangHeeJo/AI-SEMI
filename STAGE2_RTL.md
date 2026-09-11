@@ -16,6 +16,7 @@ The implemented path accepts events from the verified Stage-1 AER leaf, keeps th
 | `aer_tx64_pose_affine2d_serial` | 8x8 (four leaves) | 1 shared | one ready/valid event | tile hierarchy and upper-merge proof |
 | `aer_tx64_pose_time_surface` | 8x8 (four leaves) | 1 shared | internal always-ready map writer plus read port | closed sensor-to-map proof |
 | `aer_tx64_pose_sram_surface` | 8x8 (four leaves) | 1 shared | external-memory read/modify/write handshake | large-map integration proof |
+| `affine_region_pose_loader` | 30x23 coefficient regions | control only | ordered region write plus atomic pose publish | full-sensor configuration-plane proof |
 
 The 4x4 size is a leaf, not a 4x4 window that scans a larger image. Larger physical sensors replicate leaves and assign tile origins. World-grid size is an independent parameter determined by physical coverage and cell resolution. Tile/base origins are static physical configuration and must remain unchanged while reset is deasserted; unlike pose and timestamp, they are not captured per event.
 
@@ -53,6 +54,21 @@ Drive the requested pose ID and all six coefficients with `pose_wr_req`. A write
 - `pose_accounting_error=1`: sticky underflow/overflow indicator. The affected pose ID is fail-safe poisoned and cannot be overwritten until reset, because a saturated count no longer proves that all references drained. Treat this as a contract failure and reset/debug it.
 
 The last transform lookup and a rewrite of the same ID are not allowed on the same edge. The rewrite becomes ready on the following cycle. This prevents a retiring event from observing new coefficients.
+
+For a full sensor, `affine_region_pose_loader` sequences these same local write
+ports in strict `(y,x)` raster order. Its ready/valid command operations are
+`BEGIN=0`, `WRITE=1`, `PUBLISH=2`, and `ABORT=3`. BEGIN latches a non-active
+target pose, 690 committed WRITEs complete the default 30x23 raster, and only a
+subsequent PUBLISH changes `active_pose_version`. ABORT discards the incomplete
+transaction while keeping the current active pose. Protocol or regional
+accounting failures are fail-stop until reset; partially written inactive data
+is never published. The wrapper using this controller must own occurrence pose
+tagging and block sensor acceptance while `active_pose_valid=0`.
+
+The loader emits one region address and one local pose-write pulse rather than
+a 690-bit request vector. A later physical wrapper supplies the address decode
+and selected response mux. The controller-only RTL does not include 690 AER
+datapaths or coefficient memories and must not be presented as their PPA.
 
 ## Fixed-point transform
 
@@ -147,9 +163,18 @@ same-bank four-way contention plus independent read/write-port stalls.
 
 The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in UZH timing, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
-On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the eight PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
+On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the nine PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
 
-The default suite includes a same-stimulus K=1/K=8 comparison. Its light profile must be lossless for both endpoints; its deliberately overloaded profile reports the finite K=1 FIFO loss and latency instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random stress is part of `--extended` because it is substantially slower under Icarus.
+The default suite includes the region loader at both a 3x2 directed size and
+the full 30x23=690 control count. It checks regional stalls, exact write count,
+row rollover, complete-generation shadow state, ABORT/restart, early publish,
+out-of-order writes, accounting fail-stop, active-ID reuse rejection, and the
+old/new event tag boundary on PUBLISH. It also includes a same-stimulus K=1/K=8
+comparison. Its light profile must be lossless for both endpoints; its
+deliberately overloaded profile reports the finite K=1 FIFO loss and latency
+instead of treating them as hidden backpressure. The 10,000-cycle 8x8 random
+stress is part of `--extended` because it is substantially slower under
+Icarus.
 
 ## PPA entry points
 
@@ -164,8 +189,9 @@ genus -batch -files syn/run_genus_stage2_tx16_banked_k4_d8.tcl
 genus -batch -files syn/run_genus_stage2_tx16_k4_serial_d32.tcl
 genus -batch -files syn/run_genus_stage2_tx16_k4_banked_surface.tcl
 genus -batch -files syn/run_genus_stage2_tx64_serial.tcl
+genus -batch -files syn/run_genus_stage2_region_pose_loader.tcl
 ```
 
 Map storage is deliberately excluded from the logic comparisons. Report a real SRAM/BRAM macro separately instead of presenting a large resettable flip-flop array as a product memory implementation. Do not compare the four-output K=4-d8 area directly with a one-port K=1 endpoint as though the downstream map interface were identical; use K4-serial-d32 for a one-port comparison, or include the complete banked map fabric for a multi-port comparison.
 
-These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM.
+These scripts produce area/timing reports and a file explicitly named `*_power_vectorless.rpt`. That power number is only a smoke estimate because the scripts do not read switching activity. Final K selection requires a separate trace-driven VCD/SAIF power run and inspection of the mapped FIFO cells; the multi-write batch FIFO is not expected to infer a single-port SRAM. The region-loader script measures only the sequencer, excluding coefficient storage, 690-way routing, and every region datapath.

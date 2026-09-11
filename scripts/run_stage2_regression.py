@@ -302,6 +302,7 @@ def run_synthesis_elaboration(
         "rtl/world_time_surface_sram_writer.v",
         "rtl/world_time_surface_sram_banked4.v",
         "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
+        "rtl/affine_region_pose_loader.v",
     )
     configurations = (
         ("k8", "aer_tx16_pose_affine2d", ()),
@@ -321,6 +322,7 @@ def run_synthesis_elaboration(
         )),
         ("k4_banked_surface", "aer_tx16_pose_affine2d_k4_sram_surface", ()),
         ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
+        ("region_loader_690", "affine_region_pose_loader", ()),
     )
     failures: list[str] = []
     outputs: list[str] = []
@@ -348,7 +350,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "8/8 Verilog-2005 tops elaborated" if not failures
+        "9/9 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -462,6 +464,24 @@ def regular_tests() -> tuple[HDLTest, ...]:
             ("rtl/pose_inflight_guard8.v",),
             "tb/tb_pose_inflight_guard8.v",
             "POSE_INFLIGHT_GUARD8_PASS",
+        ),
+        HDLTest(
+            "region_pose_loader_small",
+            "tb_affine_region_pose_loader",
+            ("rtl/affine_region_pose_loader.v",),
+            "tb/tb_affine_region_pose_loader.v",
+            "AFFINE_REGION_POSE_LOADER_PASS",
+        ),
+        HDLTest(
+            "region_pose_loader_690",
+            "tb_affine_region_pose_loader",
+            ("rtl/affine_region_pose_loader.v",),
+            "tb/tb_affine_region_pose_loader.v",
+            "AFFINE_REGION_POSE_LOADER_PASS",
+            (
+                "-Ptb_affine_region_pose_loader.REGION_COLS=30",
+                "-Ptb_affine_region_pose_loader.REGION_ROWS=23",
+            ),
         ),
         HDLTest(
             "pose_guard_accept5",

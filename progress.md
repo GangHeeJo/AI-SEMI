@@ -2770,3 +2770,19 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규: `scripts/sweep_uzh_full_sensor_affine.py`
 - 수정: `scripts/gen_uzh_physical_affine_vectors.py`, `scripts/run_stage2_regression.py`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
 
+## 116. 690개 8x8 region의 affine 계수 원자적 배포 controller RTL(2026-09-11)
+
+**왜 별도 controller가 필요한가**: §115에서 8x8이 정확도 gate를 통과했지만, 240x180 전체는 30x23=690개 region이 pose마다 서로 다른 affine record를 가져야 한다. coefficient를 event마다 112비트씩 싣거나 690-read-port 중앙 table을 만드는 대신, 각 tx64 region의 기존 local pose history/guard는 그대로 두고 느린 configuration plane 하나가 region write port를 순서대로 방문하도록 범위를 최소화했다.
+
+**원자적 update protocol**: `affine_region_pose_loader`는 ready/valid `BEGIN → 690개 row-major WRITE → PUBLISH`만 허용한다. WRITE는 선택 region의 기존 `pose_wr_ready/commit`이 성립할 때만 한 번 pulse하고, old inactive slot을 아직 참조하는 event가 있으면 그 region에서 그대로 backpressure한다. 690개가 모두 commit되기 전에는 active pose가 바뀌지 않으며, PUBLISH edge에 들어온 event는 old pose, 다음 cycle event부터 new pose를 본다. active ID의 BEGIN, out-of-order WRITE, early PUBLISH, impossible commit, region accounting error는 publish 없이 fail-stop한다. `ABORT`는 partial inactive data를 노출하지 않고 transaction만 취소해 다시 처음부터 쓸 수 있다.
+
+**실제 규모와 정직한 비용 경계**: affine record는 `4x16+2x24=112 bit`, 따라서 한 pose의 전 region payload는 `690x112=77,280 bit=9,660 byte`다. stall이 없으면 data 690 cycle, BEGIN/PUBLISH 포함 692 cycle이라 200 MHz에서 3.46 us가 하한이다. 첫 proof의 `POSE_W=1` double buffer를 실제 local table까지 복제하면 coefficient+valid와 guard metadata 상태량은 약 169,740 bit(20.7 KiB)다. 이 수치는 bit count이지 SRAM area가 아니다. 이번 RTL은 controller만 구현했으며 690개 coefficient memory, AER datapath, address decoder/response mux와 물리 routing fanout은 아직 포함하지 않았다.
+
+**검증**: 동일 testbench를 3x2=6 region과 실제 30x23=690 control count로 각각 실행했다. selected-region stall 동안 주소/pose/6개 coefficient 안정, unrelated-region ready 독립성, row rollover, commit에서만 index 전진, 두 epoch의 complete-generation shadow, old-slot 재사용과 last-retire 다음-cycle commit, ABORT 후 clean restart, 조기 PUBLISH/out-of-order/active-ID reload/accounting-error 차단, publish-edge old/new event pose 경계를 검사했다. 결과는 6-region `PASS regions=6 commits=32`, 690-region `PASS regions=690 commits=3452`다.
+
+**회귀/PPA 준비**: 기본 Stage-2 회귀 **25/25 PASS**, synthesis-facing Verilog-2005 top **9/9 PASS**. `run_genus_stage2_region_pose_loader.tcl`을 추가했지만 이는 controller-only PPA entry이며 전체센서 비용으로 보고하면 안 된다. 다음 checkpoint는 소수의 실제 tx64 region을 이 loader에 연결해 region별 coefficient와 pose publication을 end-to-end로 증명하는 것이다.
+
+- 신규 RTL/검증: `rtl/affine_region_pose_loader.v`, `tb/tb_affine_region_pose_loader.v`
+- 신규 합성 entry: `syn/run_genus_stage2_region_pose_loader.tcl`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_GEOMETRY_SPEC.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+

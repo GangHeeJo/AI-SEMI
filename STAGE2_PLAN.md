@@ -336,13 +336,13 @@ M0~M7 완료 뒤에만 진행한다.
 - M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge,
   single transform 통합 완료. 네 leaf가 공유하는 8x8 coefficient region은
   measured-pose 전체센서 sweep의 오차 gate를 통과했다. 240x180의 690개
-  region에 계수를 배포하고 pose version과 원자적으로 갱신하는 구조는 미완성
+  region을 순서대로 갱신한 뒤 pose version을 원자적으로 publish하는
+  controller도 완료. 실제 690개 tx64 연결 wrapper와 대역폭 측정은 미완성
 
 다음 순서는 다음과 같다.
 
-1. 8x8 region ID와 pose version으로 690개 region-local affine record를
-   안전하게 배포/조회하는 최소 구조를 만들고 measured-pose oracle과
-   bit-exact 비교한다. 4x4 leaf별 계수로 세분화하지 않는다.
+1. 소수의 실제 tx64 region을 loader에 연결한 wrapper로 서로 다른 local
+   coefficient, old-slot busy, publish-edge event tag를 end-to-end 검증한다.
 2. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
    banked surface의 FIFO loss/p99 latency를 측정한다.
 3. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
