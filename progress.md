@@ -2786,3 +2786,19 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 - 신규 합성 entry: `syn/run_genus_stage2_region_pose_loader.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_GEOMETRY_SPEC.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
 
+## 117. 두 개의 실제 8x8 AER region + 원자적 coefficient publish E2E(2026-09-11)
+
+**controller-only에서 실제 datapath로 연결**: `aer_tx128_region_pose_affine2d_dual`은 기존 `aer_tx64_pose_affine2d_serial` 두 개를 X 방향으로 배치해 16x8, 128-source proof를 만든다. §116 loader의 `(region_x,region_y)`를 두 region의 기존 pose write port에 decode하고, 선택된 `pose_wr_ready/commit`만 loader에 되돌린다. 각 region은 자기 pose history와 guard를 그대로 가지므로 같은 pose version에서도 서로 다른 112-bit affine record를 저장한다. 두 world output은 독립 ready/valid로 남겨 아직 검증하지 않은 대형 merge를 끼워 넣지 않았다.
+
+**occurrence pose ownership**: 외부가 임의 pose tag를 우회 주입하지 못하게 loader의 registered `active_pose_version`이 두 AER의 occurrence tag를 직접 구동한다. 첫 epoch가 publish되기 전이나 region accounting error 뒤에는 `sensor_ready=0`이고, 그때 들어온 pulse는 `arrival_blocked`로 명시하면서 leaf에는 넣지 않는다. config protocol error만 난 경우 이미 안전하게 publish된 pose는 계속 사용할 수 있다. reset 중 ready가 잠깐 잘못 올라오는 조합 경로도 독립 리뷰에서 발견해 `!rst`로 막고 시험에 추가했다.
+
+**E2E 검증**: pose 0에 region0/1의 X offset을 각각 0/32 cell, pose 1에는 64/96 cell로 넣었다. publish 전 두 입력은 blocked되고 world event가 되지 않는다. pose 0의 정상 event 두 개, pose 1 PUBLISH와 같은 edge에 들어가 old pose 0/old region coefficient를 사용한 두 개, 다음 cycle에 new pose 1/new coefficient를 사용한 두 개를 독립 world stream에서 확인했다. 총 6개가 sensor coordinate, world coordinate, polarity, timestamp, pose version까지 일치했고 duplicate/phantom, AER overrun, FIFO overflow, pose write rejection/accounting error는 모두 0이었다.
+
+추가로 region1 world output을 막고 old-slot event 두 개를 넣어 하나는 transform output, 하나는 upstream guard에 남겼다. 다른 pose를 publish한 뒤 old slot을 재사용할 때 region0 coefficient WRITE는 즉시 commit되지만 region1 WRITE만 stall하는지 확인했다. world stall을 푼 retire edge에는 아직 rewrite가 금지되고 guard count가 0이 된 다음 edge에 정확히 한 번 commit되어, controller의 response mux와 실제 tx64 last-retire 보호가 함께 맞음을 증명했다.
+
+**회귀/PPA 준비**: 기본 Stage-2 회귀 **26/26 PASS**, synthesis-facing Verilog-2005 top **10/10 PASS**. `run_genus_stage2_tx128_dual_region.tcl`은 두 실제 tx64 datapath와 loader/local pose table을 포함하지만 world memory와 full-sensor merge는 제외한다. 로컬에는 Genus가 없어 실제 area/power/timing은 아직 측정하지 않았다.
+
+- 신규 RTL/검증: `rtl/aer_tx128_region_pose_affine2d_dual.v`, `tb/tb_aer_tx128_region_pose_affine2d_dual.v`
+- 신규 합성 entry: `syn/run_genus_stage2_tx128_dual_region.tcl`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+

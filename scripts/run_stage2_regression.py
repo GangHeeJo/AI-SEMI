@@ -303,6 +303,7 @@ def run_synthesis_elaboration(
         "rtl/world_time_surface_sram_banked4.v",
         "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
         "rtl/affine_region_pose_loader.v",
+        "rtl/aer_tx128_region_pose_affine2d_dual.v",
     )
     configurations = (
         ("k8", "aer_tx16_pose_affine2d", ()),
@@ -323,6 +324,7 @@ def run_synthesis_elaboration(
         ("k4_banked_surface", "aer_tx16_pose_affine2d_k4_sram_surface", ()),
         ("tx64_k1", "aer_tx64_pose_affine2d_serial", ()),
         ("region_loader_690", "affine_region_pose_loader", ()),
+        ("tx128_dual_region", "aer_tx128_region_pose_affine2d_dual", ()),
     )
     failures: list[str] = []
     outputs: list[str] = []
@@ -350,7 +352,7 @@ def run_synthesis_elaboration(
     return Result(
         "synthesis_elaboration",
         not failures,
-        "9/9 Verilog-2005 tops elaborated" if not failures
+        "10/10 Verilog-2005 tops elaborated" if not failures
         else "; ".join(failures),
         "\n".join(outputs),
         time.perf_counter() - started,
@@ -482,6 +484,26 @@ def regular_tests() -> tuple[HDLTest, ...]:
                 "-Ptb_affine_region_pose_loader.REGION_COLS=30",
                 "-Ptb_affine_region_pose_loader.REGION_ROWS=23",
             ),
+        ),
+        HDLTest(
+            "aer_tx128_dual_region_e2e",
+            "tb_aer_tx128_region_pose_affine2d_dual",
+            (
+                "rtl/arbiter2.v",
+                "rtl/arbiter4_tree.v",
+                "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+                "rtl/aer_bitmap_to_event8_pose.v",
+                "rtl/event_batch_fifo.v",
+                "rtl/rr_stream_arbiter4.v",
+                "rtl/pose_inflight_guard8.v",
+                "rtl/pose_history_affine8.v",
+                "rtl/coord_transform_affine2d.v",
+                "rtl/aer_tx64_pose_affine2d_serial.v",
+                "rtl/affine_region_pose_loader.v",
+                "rtl/aer_tx128_region_pose_affine2d_dual.v",
+            ),
+            "tb/tb_aer_tx128_region_pose_affine2d_dual.v",
+            "AER_TX128_REGION_POSE_AFFINE2D_DUAL_PASS",
         ),
         HDLTest(
             "pose_guard_accept5",

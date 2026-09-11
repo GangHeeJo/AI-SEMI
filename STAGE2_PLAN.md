@@ -337,12 +337,13 @@ M0~M7 완료 뒤에만 진행한다.
   single transform 통합 완료. 네 leaf가 공유하는 8x8 coefficient region은
   measured-pose 전체센서 sweep의 오차 gate를 통과했다. 240x180의 690개
   region을 순서대로 갱신한 뒤 pose version을 원자적으로 publish하는
-  controller도 완료. 실제 690개 tx64 연결 wrapper와 대역폭 측정은 미완성
+  controller와 두 개의 실제 tx64 region을 연결한 16x8 proof도 완료.
+  실제 690개 tx64 연결 wrapper와 대역폭 측정은 미완성
 
 다음 순서는 다음과 같다.
 
-1. 소수의 실제 tx64 region을 loader에 연결한 wrapper로 서로 다른 local
-   coefficient, old-slot busy, publish-edge event tag를 end-to-end 검증한다.
+1. measured-pose oracle에서 인접한 두 8x8 region의 실제 coefficient를
+   생성해 16x8 wrapper에서 bit-exact replay한다.
 2. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
    banked surface의 FIFO loss/p99 latency를 측정한다.
 3. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
