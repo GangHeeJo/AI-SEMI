@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// Exact-cycle UZH trace check for the configurable banked 4x4 endpoint.
+// Checked-in 1 ms-bin UZH burst stress for the configurable banked endpoint.
 // The addrpol trace has no pose field, so pose_version is cycle modulo three.
 module tb_stage2_k2_k4_uzh_trace;
   parameter integer K = 2;
@@ -636,7 +636,7 @@ module tb_stage2_k2_k4_uzh_trace;
       fail("latency population is empty");
 
     calculate_percentiles;
-    $display("TRACE_TIMING_MODE=exact_cycle_field trace=%0s rows=%0d first=%0d last=%0d event_cycles=%0d idle_cycles=%0d drain_cycles=%0d",
+    $display("TRACE_TIMING_MODE=input_cycle_field timebase=1ms_bin trace=%0s rows=%0d first=%0d last=%0d event_cycles=%0d idle_cycles=%0d drain_cycles=%0d",
              trace_file_r, trace_rows, first_trace_cycle, last_trace_cycle,
              event_cycles, idle_cycles, drain_cycles);
     $display("TRACE_POSE_MODE=synthetic_cycle_mod_3 (addrpol trace has no pose field)");

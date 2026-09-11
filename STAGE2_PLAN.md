@@ -329,10 +329,13 @@ M0~M7 완료 뒤에만 진행한다.
 - M3: column별 pose/timestamp를 보존하는 4x4 AER와 pose overwrite guard 완료
 - M4: 8-parallel transform 4x4 top 및 ready/valid coordinate stream 완료
 - M5 기능 endpoint: 4x4 K=1/2/4/8과 8x8 K=1 top,
-  synthetic·backpressure·UZH timing 및 기존 6개 Genus PPA 완료; 새 K=4
+  synthetic·backpressure·1 ms-bin UZH burst stress 및 기존 6개 Genus PPA 완료; 새 K=4
   banked-map 주변로직 PPA는 미측정
 - M6 기능 prototype: 작은 reference surface, 외부 SRAM/BRAM handshake
-  writer와 주소 기반 4-bank K=4 폐루프 완료; memory macro PPA는 환경상 미측정
+  writer와 주소 기반 4-bank K=4 폐루프 완료. 실제 eventmeta ns timestamp를
+  5 ns cycle로 양자화한 중앙 4x4 8,503-event replay도 완료했고, added
+  read-response wait 0/2/8/32 cycle에서 모두 무손실이며 commit p99는
+  7/9/15/39 cycle이다. memory macro PPA는 환경상 미측정
 - M7 기능 prototype: 네 4x4 leaf의 tile coordinate, FIFO, upper merge,
   single transform 통합 완료. 네 leaf가 공유하는 8x8 coefficient region은
   measured-pose 전체센서 sweep의 오차 gate를 통과했다. 240x180의 690개
@@ -344,9 +347,13 @@ M0~M7 완료 뒤에만 진행한다.
 
 다음 순서는 다음과 같다.
 
-1. UZH exact-cycle traffic과 external-memory latency를 함께 재생해 K=4
-   banked surface의 FIFO loss/p99 latency를 측정한다.
-2. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
+1. 서버에서 K=4 banked-map 주변로직 PPA를 얻고 기존 단일-port/K 후보와
    공정하게 비교한다.
-3. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
+2. 중앙 4x4가 아닌 full-resolution ns event stream을 확보한 뒤 region별
+   입력률·world-bank skew를 측정해 690-region 연결의 merge/memory-port
+   계약을 정한다. 현재 identity 중앙 crop 결과를 전체 센서 처리율로
+   외삽하지 않는다.
+3. 그 계약에 맞춰 실제 multi-region wrapper를 소규모에서 확장하고,
+   configuration update와 event traffic이 겹칠 때의 대역폭을 검증한다.
+4. supplied-pose map이 닫힌 뒤에만 frozen-map residual pose correction을
    held-out split과 constant/IMU-only baseline으로 먼저 소프트웨어 검증한다.

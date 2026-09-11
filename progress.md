@@ -2594,11 +2594,11 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 - 신규 실행 문서/PPA script: `STAGE2_RTL.md`, `syn/run_genus_stage2_tx16_parallel.tcl`, `syn/run_genus_stage2_tx16_serial.tcl`, `syn/run_genus_stage2_tx64_serial.tcl`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_PLAN.md`
 
-## 107. 실제 UZH cycle 재생 + 외부 SRAM/BRAM world-map 경계(2026-09-10)
+## 107. UZH 1 ms-bin burst 재생 + 외부 SRAM/BRAM world-map 경계(2026-09-10, §119 timebase 정정)
 
-**UZH rotation trace를 압축하지 않고 재생**: `uzh_shapes_rotation_patch.addrpol.txt`의 cycle field 0~59,424를 빈 cycle까지 그대로 재생했다. 원본은 active row 3,259개, event 8,503개, 전체 구간 평균 0.1537 event/cycle지만 active cycle은 평균 2.609개이고 최대 11개가 동시에 온다. 주소와 polarity는 실제 trace 그대로다. 단, 이 파일에는 pose가 없으므로 identity/90도/translation 세 pose를 `cycle mod 3`으로 **합성 부여**했다. 따라서 이 검증은 실제 arrival burst/timing에 대한 throughput·metadata 시험이지 실제 camera pose나 world-map 정확도 평가가 아니다.
+**UZH rotation의 1 ms-bin trace 재생**: `uzh_shapes_rotation_patch.addrpol.txt`는 원 event를 이미 1 ms 단위로 binning한 파일이며, 그 bin field 0~59,424를 빈 bin까지 재생했다. active bin 3,259개, event 8,503개, 전체 구간 평균 0.1537 event/bin이고 active bin에는 평균 2.609개, 최대 11개가 묶인다. 주소와 polarity는 실제 event에서 왔지만, 한 1 ms bin을 RTL 한 cycle로 처리하므로 200 MHz 관점에서는 **200,000배 압축한 burst stress**다. 이 파일에는 pose도 없어 identity/90도/translation 세 pose를 `bin mod 3`으로 합성 부여했다. 따라서 이는 압축 burst와 metadata/accounting 시험이지 실제 5 ns arrival timing이나 camera-pose/world-map 정확도 평가가 아니다.
 
-**K=1 FIFO depth sweep 대 K=8**: 모든 구성에서 AER overrun은 0이고 K=8은 8,503개를 전부 전달했다(latency p50/p99/max=`3/4/5 cycle`). K=1은 depth 8에서 `drop/delivered=3606/4897`, latency `9/12/13`; depth 16은 `2388/6115`, `14/20/21`; depth 32는 `701/7802`, `20/36/36`; depth 64는 `73/8430`, `21/66/68`; 최초 무손실인 depth 128은 `0/8503`, `22/74/94`였다. FIFO를 키우면 평균 처리율 1 event/cycle보다 낮은 이 trace는 결국 drain되지만 burst를 저장한 대가로 tail latency와 storage가 커진다. 이 결과로 K=2/K=4 중간 endpoint를 구현·비교할 근거가 생겼으며, K=1 depth128이나 K=8을 아직 최종 선택하지 않는다.
+**K=1 FIFO depth sweep 대 K=8**: 모든 구성에서 AER overrun은 0이고 K=8은 8,503개를 전부 전달했다(latency p50/p99/max=`3/4/5 stress-cycle`). K=1은 depth 8에서 `drop/delivered=3606/4897`, latency `9/12/13`; depth 16은 `2388/6115`, `14/20/21`; depth 32는 `701/7802`, `20/36/36`; depth 64는 `73/8430`, `21/66/68`; 최초 무손실인 depth 128은 `0/8503`, `22/74/94`였다. 이 수치는 1 ms를 한 RTL cycle로 압축했을 때의 burst-buffer 민감도이며, 실제 200 MHz FIFO 용량이나 latency 요구를 뜻하지 않는다. K=2/K=4 구조를 비교하는 adversarial stress로는 유효하지만 이 결과만으로 K=1 depth128 또는 K=8을 제품 후보로 선택하지 않는다.
 
 **외부 memory용 time-surface writer**: 큰 world grid를 resettable FF array로 복제하지 않도록 `world_time_surface_sram_writer`를 추가했다. cell `{valid,timestamp,polarity_seen}`에 대해 ready/valid read request→response→조건부 write를 수행하고, newer update/equal OR merge/older stale-ignore 규칙을 그대로 지킨다. 7x6 grid에서 event 2,508개, random request stall과 1~8 cycle response latency를 넣어 update/equal/stale/range/mapped-invalid=`1273/474/491/489/255`, 총 18,120 cycle을 검사했고 42셀 전체가 oracle과 일치했다. 현재는 single-outstanding 직렬 writer라 정확성 기준선이며, 고처리량 제품형은 banking 또는 hazard-aware pipeline이 필요하다.
 
@@ -2618,7 +2618,7 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 
 **독립 random backpressure**: K=2와 K=4 각각 4,000-cycle source/FIFO/transform scoreboard를 돌렸다. K=2는 `generated=13258 = AER drop 258 + FIFO drop 8729 + delivered 4271`, K=4는 `13329 = 281 + 4531 + 8517`; 모든 bank에 독립 stall을 넣고 stall 중 sensor/world coordinate, polarity, pose, timestamp, mapped/found/range를 고정 확인했다. lane-mod-K routing, source/bank order, phantom/duplicate, pre-edge FIFO free-space, mixed identity/translation pose, guard drain과 최종 pose rewrite가 모두 PASS했다. 이 숫자는 FIFO_DEPTH=8과 높은 random 부하/정지를 사용한 포화 시험이라 응용 손실률이 아니다.
 
-**UZH exact-cycle lane/depth sweep**:
+**UZH 1 ms-bin lane/depth burst sweep** (§119에서 timebase 정정):
 
 | K | bank당 depth | 총 FIFO slot | FIFO drop | delivered | latency p50/p99/max |
 |---:|---:|---:|---:|---:|---:|
@@ -2633,7 +2633,7 @@ cluster2_buf 단독 대비 결합판은 면적 **+27.6%**, 전력 **+62.4%**, cr
 | 4 | 4 | 16 | 63 | 8,440 | 5/8/9 |
 | 4 | 8 | 32 | 0 | 8,503 | 5/8/10 |
 
-모든 점에서 AER accepted=8,503, AER overrun=0이고 metadata/좌표/보존식/guard drain이 PASS했다. 같은 trace의 무손실점을 비교하면 K=1-d128은 총 FIFO 128칸과 p99/max `74/94`, K=2-d32는 64칸과 `21/29`, K=4-d8은 32칸과 `8/10`, 직접 K=8은 FIFO 없이 `4/5`다. 따라서 기능 지표만 보면 K=4-d8이 현재 가장 균형적인 후보지만, multiplier 네 개의 면적·전력이 포함되므로 **45nm PPA 전에는 최종 선정하지 않는다**.
+모든 점에서 AER accepted=8,503, AER overrun=0이고 metadata/좌표/보존식/guard drain이 PASS했다. 같은 압축 stress의 무손실점을 비교하면 K=1-d128은 총 FIFO 128칸과 p99/max `74/94`, K=2-d32는 64칸과 `21/29`, K=4-d8은 32칸과 `8/10`, 직접 K=8은 FIFO 없이 `4/5`다. K=4-d8은 **이 adversarial 1 ms-bin stress 안에서만** 가장 균형적인 점이며, 실제 200 MHz workload의 K/FIFO 선정 근거로 외삽하지 않는다. 최종 선정에는 ns event timing, full-sensor bank skew와 45 nm PPA가 모두 필요하다.
 
 **PPA/guard 준비**: UZH 무손실 네 점 K=1-d128, K=2-d32, K=4-d8, K=8을 같은 5 ns/45 nm 조건으로 실행할 Genus entry를 준비했다. pose guard 기본 width도 `AER 최대 outstanding + 전체 FIFO capacity`에서 자동 계산되게 바꿨고, 계산이 틀리거나 protocol violation이 생기더라도 §107의 poison fail-safe가 남는다. 로컬에는 Genus가 없어 area/timing/vectorless power는 아직 미측정이다.
 
@@ -2660,7 +2660,7 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 
 **`main` 확인 범위**: `origin/main@d39e457`이 기록한 서버 Genus 결과를 읽기 전용으로 검토했다. 이 결과는 우리 브랜치 후보들을 GPDK045 slow 1.0 V, 5 ns/200 MHz, clock uncertainty 0.1 ns, I/O delay 0.25 ns, output load 0.010, clock-gating enabled 조건에서 실행한 것이다. raw report와 timing slack/Fmax, tx64 완료값은 커밋돼 있지 않고 activity 파일도 사용하지 않은 vectorless power이므로 아래 숫자는 중간 증거다.
 
-| 기존 endpoint | area (um2) | cells | vectorless power (mW) | UZH 결과 |
+| 기존 endpoint | area (um2) | cells | vectorless power (mW) | UZH 1 ms-bin stress 결과 |
 |---|---:|---:|---:|---|
 | K=8 direct | 102,574.333 | 45,373 | 0.886 | 8,503/8,503 |
 | K=1 d32 | 76,750.255 | 28,384 | 0.818 | 7,802/8,503, 701 drop |
@@ -2672,7 +2672,7 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 
 **비교 공정성 문제**: 위 K=4-d8은 네 transform 결과를 네 개의 독립 `ready/valid` 출력으로 동시에 뺄 수 있지만 K=1은 출력 하나뿐이다. 따라서 K=4-d8의 무손실·면적을 단일-port world map 제품점처럼 K=1과 직접 비교하면 downstream 비용과 처리능력을 생략하게 된다. 이를 닫기 위해 기존 K=4 banked top 뒤에 검증된 stall-safe `rr_stream_arbiter4`를 붙인 `aer_tx16_pose_affine2d_k4_serial`을 만들었다. transform 자체가 stall 중 payload를 보존하므로 별도 output FIFO는 추가하지 않았다.
 
-**동일 UZH exact-cycle, 단일 world output 결과**:
+**동일 UZH 1 ms-bin burst, 단일 world output 결과** (§119에서 timebase 정정):
 
 | K=4 bank당 depth | 총 FIFO slot | FIFO drop | delivered | latency p50/p99/max |
 |---:|---:|---:|---:|---:|
@@ -2681,7 +2681,7 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 | 32 | 128 | 0 | 8,503 | 21/78/97 |
 | 64 | 256 | 0 | 8,503 | 21/78/97 |
 
-단일 출력에서는 K=4도 결국 1 event/cycle 병목을 공유하므로 최초 무손실점이 K=1-d128과 똑같이 총 FIFO 128칸이다. K=4-serial-d32의 p50/p99/max `21/78/97`도 K=1-d128의 `22/74/94`와 사실상 같은 범위다. 즉 **K=4의 실제 장점은 transform을 네 개 둔 사실만으로 생기지 않고, downstream world memory도 병렬 retire를 받아야 생긴다**. 현재 선택지는 (A) 작은 단일-port 구현이면 K=1-d128을 유지하거나, (B) 성능형 구현이면 주소 기반 banked map/crossbar 비용까지 포함해 K=4-d8을 다시 평가하는 것이다. K=4-serial-d32 Genus entry를 추가해 단일-port 공정 PPA 기준선을 만들었지만, 이 수치와 banked-map 전체 PPA가 나오기 전에는 최종 K를 선정하지 않는다.
+단일 출력에서는 K=4도 결국 1 event/cycle 병목을 공유하므로 이 압축 stress의 최초 무손실점이 K=1-d128과 똑같이 총 FIFO 128칸이다. K=4-serial-d32의 p50/p99/max `21/78/97`도 K=1-d128의 `22/74/94`와 사실상 같은 범위다. **K=4의 처리량 이점이 필요하려면 downstream world memory도 병렬 retire를 받아야 한다**는 구조적 결론은 유효하지만, depth128이나 K4-d8이라는 수치는 실제 200 MHz 제품 sizing 결론이 아니다. ns timing과 full-sensor bank skew를 측정한 뒤 single-port와 banked map의 PPA를 같은 경계에서 비교해야 한다.
 
 **회귀**: K=4 single-output depth 8/16/32/64 sweep과 depth32 random-ready stall 검증을 `--lane-sweep`에 추가했다. stall 중 `valid`, 전체 payload, 선택 bank가 고정되고 실제 handshake에서만 이벤트를 retire하는지 확인했으며, 기존 기능시험과 합성 smoke를 포함해 **36/36 PASS**했다. 합성 smoke 후보도 K4-serial-d32를 포함한 7개로 확장했다.
 
@@ -2814,4 +2814,26 @@ K=8 direct, K=1 depth 32/128, K=2 depth 32, K=4 depth 8, 8x8 K=1의 수동 6/6 e
 
 - 신규: `scripts/gen_uzh_dual_region_vectors.py`, `tb/tb_aer_tx128_region_pose_affine2d_dual_uzh.v`
 - 수정: `scripts/run_stage2_regression.py`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_RTL.md`, `STAGE2_PLAN.md`
+
+## 119. 실제 UZH ns timing의 200 MHz AER→4-bank SRAM sweep(2026-09-11)
+
+**중요한 timebase 정정**: 기존 `common_traces_uzh/*.addrpol.txt`의 cycle field는 원 event를 **1 ms bin**으로 묶은 값이다(`build_uzh_eventmeta.py`의 `BIN=0.001`과 같은 계약). 그 파일의 한 row를 RTL 한 cycle로 재생한 기존 trace/lane sweep은 같은-bin 충돌을 보존한 유용한 압축 burst stress지만, 5 ns 실제 하드웨어 timing이나 “exact 200 MHz cycle”로 부르면 안 된다. 기존 결과를 폐기하지 않고 용도를 `1ms-bin stress`로 바로잡았다.
+
+**실제 시간축 생성**: `gen_uzh_200mhz_trace.py`는 SHA가 고정된 `uzh_shapes_rotation_patch.eventmeta.tsv`의 ns timestamp를 직접 읽어 절대시간 기준 5 ns bin으로 내린다. 8,503 event가 8,461 active cycle에 들어가며, 같은 cycle 다중 event는 41회, 최대 동시 event는 3개, 첫 event부터 마지막 event까지 span은 `11,064,653,800 cycle = 55.323269 s`다. 같은 5 ns cycle에 동일 source가 두 번 들어가는 collision은 0이고 event 수 보존을 generator가 확인한다.
+
+**전체 경로 검증**: 새 testbench는 기존 RTL을 수정하지 않고 `aer_tx16_pose_affine2d_k4_sram_surface` 전체를 identity pose, depth-8 FIFO, 4개 독립 SRAM bank model에 연결했다. 110억 idle clock을 그대로 시뮬레이션하지 않고 AER/FIFO/transform/pose guard/writer/response model이 모두 빈 때만 다음 event cycle로 fast-forward한다. 현재 RTL은 완전 idle 중 스스로 변하는 상태가 없으므로 이 조건에서는 cycle-equivalent다. source별 accepted→world→write queue로 timestamp/polarity/order/duplicate/phantom을 검사하고, `generated=accepted+AER overrun`, `accepted=FIFO overflow+world`, `world=commit=update`를 drain 뒤 강제한다.
+
+| added read-response wait | generated/commit | AER/FIFO loss | bank 0/1/2/3 commit | mean/p50/p99/max latency (cycle) |
+|---:|---:|---:|---:|---:|
+| 0 | 8,503/8,503 | 0/0 | 2,080/2,113/2,297/2,013 | 7/7/7/11 |
+| 2 | 8,503/8,503 | 0/0 | 2,080/2,113/2,297/2,013 | 9/9/9/15 |
+| 8 | 8,503/8,503 | 0/0 | 2,080/2,113/2,297/2,013 | 15/15/15/27 |
+| 32 | 8,503/8,503 | 0/0 | 2,080/2,113/2,297/2,013 | 39/39/39/75 |
+
+**검토 중 수정**: 독립 리뷰에서 첫 TB clock이 `timescale 1ns/1ps`에 `always #5`라 이름과 달리 100 MHz였음을 발견했다. cycle-level 결과에는 영향이 없지만 waveform과 주장을 일치시키기 위해 `#2.5`로 고쳤고, 그 상태에서 기본 26개+새 sweep을 다시 실행해 **27/27 PASS**, synthesis-facing elaboration **10/10 PASS**를 확인했다.
+
+**정직한 한계**: 이것은 200 MHz cycle을 가정한 기능 workload 검증이지 합성 STA/Fmax 증명이 아니다. `MEM_RESPONSE_DELAY=N`은 최소 synchronous read response 위의 added wait이고 request-ready stall은 이번 sweep에 넣지 않았다. write ready/valid handshake를 commit으로 보는 현 인터페이스라 post-accept write 완료 지연도 표현하지 않는다. 네 독립 port/bank를 가정하며, 중앙 4x4 identity mapping은 X column이 네 bank로 고르게 갈 수 있는 유리한 경우다. 따라서 이 무손실 수치를 전체 240x180 sensor나 shared-port memory 처리율로 외삽하지 않는다. PASS 조건은 loss를 숨기지 않고 보존식으로 회계한다는 뜻이며, latency percentile은 commit된 event 모집단이므로 항상 loss와 함께 읽는다.
+
+- 신규: `scripts/gen_uzh_200mhz_trace.py`, `tb/tb_aer_tx16_pose_affine2d_k4_sram_surface_uzh_200mhz.v`
+- 수정: `scripts/run_stage2_regression.py`, `STAGE2_RTL.md`, `STAGE2_PHYSICAL_MAPPING.md`, `STAGE2_PLAN.md`
 

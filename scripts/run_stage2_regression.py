@@ -297,6 +297,108 @@ def run_uzh_dual_region_vectors(
     )
 
 
+def run_uzh_200mhz_memory_sweep(
+    root: Path,
+    temp_root: Path,
+    iverilog: str,
+    vvp: str,
+) -> Result:
+    started = time.perf_counter()
+    trace_path = temp_root / "tb" / "uzh_200mhz.addrpol.txt"
+    trace_path.parent.mkdir(parents=True, exist_ok=True)
+    generator = run_process(
+        [
+            sys.executable,
+            "scripts/gen_uzh_200mhz_trace.py",
+            "--output",
+            str(trace_path),
+        ],
+        root,
+    )
+    generator_output = process_output(generator)
+    marker = "UZH_200MHZ_TRACE_PASS"
+    if generator.returncode != 0 or marker not in generator.stdout:
+        reason = (
+            f"generator exited {generator.returncode}"
+            if generator.returncode != 0
+            else f"missing stdout marker {marker!r}"
+        )
+        return Result(
+            "uzh_200mhz_memory_sweep",
+            False,
+            reason,
+            generator_output,
+            time.perf_counter() - started,
+        )
+
+    dependencies = (
+        "rtl/arbiter2.v",
+        "rtl/arbiter4_tree.v",
+        "rtl/aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v",
+        "rtl/aer_bitmap_to_event8_pose.v",
+        "rtl/event_batch_fifo.v",
+        "rtl/pose_inflight_guard8.v",
+        "rtl/pose_history_affine8.v",
+        "rtl/coord_transform_affine2d.v",
+        "rtl/aer_tx16_pose_affine2d_banked.v",
+        "rtl/rr_stream_arbiter4.v",
+        "rtl/world_time_surface_sram_writer.v",
+        "rtl/world_time_surface_sram_banked4.v",
+        "rtl/aer_tx16_pose_affine2d_k4_sram_surface.v",
+    )
+    outputs = [generator_output]
+    summaries: list[str] = []
+    failures: list[str] = []
+    for delay in (0, 2, 8, 32):
+        test = HDLTest(
+            f"uzh_200mhz_memory_d{delay}",
+            "tb_aer_tx16_pose_affine2d_k4_sram_surface_uzh_200mhz",
+            dependencies,
+            "tb/tb_aer_tx16_pose_affine2d_k4_sram_surface_uzh_200mhz.v",
+            "STAGE2_K4_SRAM_UZH_200MHZ_PASS",
+            (
+                "-Ptb_aer_tx16_pose_affine2d_k4_sram_surface_uzh_200mhz."
+                f"MEM_RESPONSE_DELAY={delay}",
+            ),
+            (f"+TRACE_FILE={trace_path}",),
+        )
+        result = run_hdl_test(
+            test, root, temp_root, iverilog, vvp, run_cwd=temp_root
+        )
+        outputs.append(f"MEM_RESPONSE_DELAY={delay}\n{result.output}")
+        if not result.passed:
+            failures.append(f"d{delay}: {result.detail}")
+            continue
+        counts = re.search(
+            r"UZH_200MHZ_MEMORY_COUNTS .*aer_overrun=(\d+) "
+            r"fifo_overflow=(\d+)",
+            result.output,
+        )
+        latency = re.search(
+            r"UZH_200MHZ_MEMORY_LATENCY population=\d+ mean=(\d+) "
+            r"p50=(\d+) p99=(\d+) max=(\d+)",
+            result.output,
+        )
+        if counts is None or latency is None:
+            failures.append(f"d{delay}: missing counts/latency receipt")
+        else:
+            summaries.append(
+                f"d{delay}:loss={counts.group(1)}/{counts.group(2)},"
+                f"lat={latency.group(1)}/{latency.group(2)}/"
+                f"{latency.group(3)}/{latency.group(4)}"
+            )
+
+    passed = not failures
+    detail = ", ".join(summaries) if passed else "; ".join(failures)
+    return Result(
+        "uzh_200mhz_memory_sweep",
+        passed,
+        detail,
+        "\n".join(outputs),
+        time.perf_counter() - started,
+    )
+
+
 def run_full_sensor_affine_sweep(root: Path) -> Result:
     started = time.perf_counter()
     marker = "UZH_FULL_SENSOR_SAMPLED_REGION_SWEEP_PASS"
@@ -968,13 +1070,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--trace-sweep",
         action="store_true",
-        help="also compare K=1 FIFO depths 8..128 against K=8 on UZH timing",
+        help=("also compare K=1 FIFO depths 8..128 against K=8 on the "
+              "1 ms-bin UZH burst stress"),
     )
     parser.add_argument(
         "--lane-sweep",
         action="store_true",
         help=("also sweep K=2/K=4 bank depths and the fair single-output "
-              "K=4 endpoint on exact-cycle UZH timing"),
+              "K=4 endpoint on the 1 ms-bin UZH burst stress"),
     )
     parser.add_argument(
         "--physical",
@@ -988,6 +1091,12 @@ def parse_args() -> argparse.Namespace:
         help=("also fit every 4x4 and 8x8 region over the 240x180 sensor "
               "at uniform plus trajectory-risk poses and enforce sampled "
               "geometry/error gates"),
+    )
+    parser.add_argument(
+        "--memory-sweep",
+        action="store_true",
+        help=("also replay eventmeta nanosecond timestamps at 200 MHz "
+              "through the four-bank SRAM surface across read latencies"),
     )
     return parser.parse_args()
 
@@ -1050,6 +1159,13 @@ def main() -> int:
 
         if args.full_sensor_sweep:
             result = run_full_sensor_affine_sweep(root)
+            results.append(result)
+            print_result(result)
+
+        if args.memory_sweep:
+            result = run_uzh_200mhz_memory_sweep(
+                root, temp_root, iverilog, vvp
+            )
             results.append(result)
             print_result(result)
 

@@ -2,7 +2,7 @@
 
 // Trace-driven K=1/K=8 comparison.
 //
-// addrpol.txt supplies exact cycle, address-mask, and polarity-mask fields.
+// addrpol.txt supplies 1 ms-bin index, address-mask, and polarity-mask fields.
 // Empty cycles between rows are replayed, not compressed. The trace has no
 // pose field, so this TB explicitly assigns pose_version = trace_cycle mod 3.
 module tb_stage2_k1_k8_uzh_trace;
@@ -659,7 +659,7 @@ module tb_stage2_k1_k8_uzh_trace;
 
     calculate_percentiles;
 
-    $display("TRACE_TIMING_MODE=exact_cycle_field trace=%0s rows=%0d first=%0d last=%0d event_cycles=%0d idle_cycles=%0d drain_cycles=%0d",
+    $display("TRACE_TIMING_MODE=input_cycle_field timebase=1ms_bin trace=%0s rows=%0d first=%0d last=%0d event_cycles=%0d idle_cycles=%0d drain_cycles=%0d",
              trace_file_r, trace_rows, first_trace_cycle, last_trace_cycle,
              event_cycles, idle_cycles, drain_cycles);
     $display("TRACE_POSE_MODE=synthetic_cycle_mod_3 (addrpol trace has no pose field)");

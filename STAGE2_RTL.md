@@ -133,13 +133,15 @@ Add the original UZH trace and official 50-workload baseline:
 python scripts/run_stage2_regression.py --extended
 ```
 
-Sweep the K=1 FIFO against K=8 while preserving every cycle in the checked-in UZH trace:
+Sweep the K=1 FIFO against K=8 while preserving every 1 ms bin in the
+checked-in UZH stress trace:
 
 ```text
 python scripts/run_stage2_regression.py --trace-sweep
 ```
 
-Sweep the banked K=2/K=4 endpoints and the single-output K=4 endpoint on the same timing:
+Sweep the banked K=2/K=4 endpoints and the single-output K=4 endpoint on the
+same 1 ms-bin timing:
 
 ```text
 python scripts/run_stage2_regression.py --lane-sweep
@@ -162,6 +164,14 @@ baseline:
 python scripts/run_stage2_regression.py --full-sensor-sweep
 ```
 
+Rebuild the central-patch traffic from the checked-in per-event nanosecond
+timestamps, quantize it onto a 5 ns clock, and sweep added external-memory read
+response delay through the complete K=4 banked surface:
+
+```text
+python scripts/run_stage2_regression.py --memory-sweep
+```
+
 `STAGE2_PHYSICAL_MAPPING.md` records the input hashes, quaternion-direction
 validation, exact spherical model, measured affine error, and limitations.
 
@@ -171,7 +181,45 @@ same-cell newer/equal/stale handling, unknown-pose suppression, and final
 AER/FIFO/pose-reference drain accounting. The standalone router test adds
 same-bank four-way contention plus independent read/write-port stalls.
 
-The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in UZH timing, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
+The older `*.addrpol.txt` UZH inputs were made by binning events at 1 ms. A
+runner cycle in the trace/lane sweeps therefore represents one 1 ms bin; when
+clocked directly by the RTL it is a useful 200,000-times-compressed burst
+stress, not a claim about physical 200 MHz arrival timing. `--memory-sweep`
+instead regenerates the schedule from the hashed `eventmeta.tsv`: timestamps
+are floored on the absolute 5 ns grid and the first occupied bin is then
+rebased to cycle zero. The 8,503 events occupy 8,461 active cycles over
+11,064,653,800 hardware cycles; 41
+cycles contain simultaneous events and the maximum is three.
+
+The real-time test fast-forwards a long idle interval only after the AER,
+FIFO, transforms, pose references, SRAM writers, and memory response model are
+all empty. This is cycle-equivalent for the current RTL because it has no
+state that advances during a completely idle interval. With a depth-8 FIFO,
+identity mapping, always-ready requests, and four independent bank ports, the
+measured commit latency in 5 ns cycles is:
+
+| added read-response wait | generated/committed | AER/FIFO loss | mean | p50 | p99 | max |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 8,503/8,503 | 0/0 | 7 | 7 | 7 | 11 |
+| 2 | 8,503/8,503 | 0/0 | 9 | 9 | 9 | 15 |
+| 8 | 8,503/8,503 | 0/0 | 15 | 15 | 15 | 27 |
+| 32 | 8,503/8,503 | 0/0 | 39 | 39 | 39 | 75 |
+
+All four runs commit `2,080/2,113/2,297/2,013` events to banks 0..3. The
+delay parameter is additional wait after the minimum synchronous read
+response; request-ready stalls and post-accept write completion are outside
+this sweep. The writer interface defines a write handshake as commit. The
+latency percentiles cover committed events and must always be read alongside
+the loss counters; the test's PASS condition enforces complete accounting, not
+zero loss for arbitrary future workloads.
+
+This result is a 200 MHz cycle-level functional workload test, not STA proof
+that the synthesized design meets 200 MHz. It also covers only the measured
+central 4x4 crop. Identity mapping distributes its X columns across the four
+banks favorably, so it does not establish full-240x180 throughput or performance
+for a shared-port memory implementation.
+
+The banked endpoint assigns adapter lane `L` to bank `L mod K`. Each bank has its own FIFO and transform, preserves order within that bank, and can be independently backpressured. There is intentionally no total retirement order across banks; consumers use occurrence timestamps for map conflict resolution. The K=4 serialized endpoint adds a stall-safe round-robin merge so its area and loss can be compared fairly with K=1 when the map has only one input port. On the checked-in 1 ms-bin UZH burst stress, it first becomes lossless at depth 32 per bank; K=4 depth 8 is lossless only when all four transform outputs can retire independently.
 
 On a host where `python` is not on `PATH`, invoke any Python 3 interpreter explicitly. The runner requires `iverilog` and `vvp`, creates simulation artifacts only in the OS temporary directory, and returns nonzero if any test fails. Every invocation also elaborates the ten PPA candidate tops below in synthesis-facing Verilog-2005 mode; this catches source-list and parameter regressions but is not a substitute for Genus synthesis.
 

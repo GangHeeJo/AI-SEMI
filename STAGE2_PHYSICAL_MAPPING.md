@@ -27,6 +27,21 @@ UZH `shapes_rotation/calib.txt` download; it was not tracked on `main`, so its
 hash is recorded here. Receipts hash UTF-8 text after canonical LF newline
 normalization, so Git's Windows CRLF checkout policy does not invalidate them.
 
+## Event timebase
+
+The older checked-in `*.addrpol.txt` traces group events into 1 ms bins. They
+remain useful as compressed burst tests, but one such row must not be called a
+5 ns physical hardware cycle. `scripts/gen_uzh_200mhz_trace.py` instead reads
+the hashed per-event ns metadata above, floors them on the absolute 5 ns grid,
+then rebases the first occupied bin to cycle zero. It produces 8,461 active
+cycles containing all 8,503 events across an 11,064,653,800-cycle span, with 41
+simultaneous-event cycles and at most three events in one cycle.
+
+The `--memory-sweep` regression uses that schedule through the complete 4x4
+K=4 banked SRAM-surface endpoint. Long idle gaps are skipped only when all DUT
+and memory-model state has drained. This proves cycle-level behavior under a
+200 MHz timing assumption; it is not a synthesized Fmax/STA result.
+
 ## Geometry and fixed-point contract
 
 For every event `(u,v,t)` the generator:
