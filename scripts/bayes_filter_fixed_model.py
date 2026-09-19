@@ -118,6 +118,37 @@ def build_patch_events(x_center, y_center, n=4, tmpdir=None):
     return load_events(aug_path, n)
 
 
+def grid_search(eps_list, alpha_list, positions=POSITIONS_20):
+    """§128/130의 파라미터 탐색을 커밋된 코드로 재현. run_bayes_filter_proper(float)을
+    positions 전체에 대해 (eps,alpha) 그리드로 돌려, 평균 최소화/최악(minimax) 최소화
+    두 기준 각각의 최선 설정을 찾는다. 이벤트 추출(파일 스캔)은 위치당 한 번만 하고
+    캐시해서 재사용 -- 그리드 크기와 무관하게 위치 수만큼만 스캔한다."""
+    table = build_transform_table(4)
+    deg = 360.0 / N_THETA
+    with tempfile.TemporaryDirectory() as tmp:
+        cached = [(x, y, build_patch_events(x, y, 4, tmp)) for x, y in positions]
+
+    results = []
+    for eps in eps_list:
+        for alpha in alpha_list:
+            means, worsts = [], []
+            for x, y, events in cached:
+                err = run_bayes_filter_proper(events, table, eps, alpha)
+                means.append(tail_mean(err) * deg)
+                worsts.append(max(err) * deg)
+            avg_mean = sum(means) / len(means)
+            worst_max = max(worsts)
+            results.append((eps, alpha, avg_mean, worst_max))
+            print(f"eps={eps:5.3f} alpha={alpha:4.1f}  mean(avg)={avg_mean:5.1f}  worst(max)={worst_max:5.1f}")
+
+    best_avg = min(results, key=lambda r: r[2])
+    best_minimax = min(results, key=lambda r: r[3])
+    print(f"\nN={len(cached)} positions, {len(results)} combos")
+    print(f"best avg-optimized : eps={best_avg[0]}, alpha={best_avg[1]}  mean={best_avg[2]:.1f} worst={best_avg[3]:.1f}")
+    print(f"best minimax        : eps={best_minimax[0]}, alpha={best_minimax[1]}  mean={best_minimax[2]:.1f} worst={best_minimax[3]:.1f}")
+    return results, best_avg, best_minimax
+
+
 def validate_positions(eps_shift, alpha, positions=POSITIONS_20, float_eps=None, float_alpha=None):
     """float 오라클과 고정소수점판을 같은 위치들에서 나란히 비교."""
     table = build_transform_table(4)
@@ -143,6 +174,13 @@ def validate_positions(eps_shift, alpha, positions=POSITIONS_20, float_eps=None,
 
 
 if __name__ == "__main__":
-    # worst-tuned(eps=0.15,alpha=3.0, §128/130)의 하드웨어 근사: eps=1/8=0.125 -> eps_shift=3
-    print("== worst-tuned 근사: eps_shift=3(eps=0.125 vs float 0.15), alpha=3 ==")
-    validate_positions(eps_shift=3, alpha=3, float_eps=0.15, float_alpha=3.0)
+    if "--grid" in sys.argv:
+        # §131 정정: §128/130의 그리드서치 자체가 재현 불가능한 임시 코드로 나온 결과였음.
+        # 같은 조합 수(56 = 7x8)로 커밋된 코드로 재확정한다.
+        eps_list = [0.0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2]
+        alpha_list = [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+        grid_search(eps_list, alpha_list)
+    else:
+        # worst-tuned(eps=0.15,alpha=3.0, §128/130)의 하드웨어 근사: eps=1/8=0.125 -> eps_shift=3
+        print("== worst-tuned 근사: eps_shift=3(eps=0.125 vs float 0.15), alpha=3 ==")
+        validate_positions(eps_shift=3, alpha=3, float_eps=0.15, float_alpha=3.0)
