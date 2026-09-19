@@ -51,9 +51,14 @@ def make_like_lut(alpha):
     return lut
 
 
-def run_bayes_filter_fixed(events, table, eps_shift, alpha):
+def run_bayes_filter_fixed(events, table, eps_shift, alpha, theta_log=None, maxb_log=None,
+                            snapshot_event=None, snapshot_out=None):
     """run_bayes_filter_proper()의 정수 고정소수점판. eps_shift: diffuse_eps ~= 2**-eps_shift.
-    alpha: 정식 사전(합성시점 상수, 정수 -- LUT를 유한하게 만들려면 정수여야 함)."""
+    alpha: 정식 사전(합성시점 상수, 정수 -- LUT를 유한하게 만들려면 정수여야 함).
+    theta_log: 리스트를 넘기면 이벤트마다 map_theta를 append -- RTL 대조용 벡터 생성에 씀
+    (rtl/bayes_filter.v, scripts/dump_bayes_filter_vectors.py).
+    maxb_log: 리스트를 넘기면 이벤트마다 (likelihood 직후 max_b, 적용된 renorm shift)를 append
+    -- RTL과의 divergence 지점을 찾는 디버깅용."""
     like_lut = make_like_lut(alpha)
     world_on = {}
     world_off = {}
@@ -62,7 +67,9 @@ def run_bayes_filter_fixed(events, table, eps_shift, alpha):
     errors = []
     collapsed = 0
 
-    for row, col, pol, gt in events:
+    for ev_i, (row, col, pol, gt) in enumerate(events):
+        if snapshot_event == ev_i and snapshot_out is not None:
+            snapshot_out["pre"] = list(belief)
         new_belief = [0] * N_THETA
         for i in range(N_THETA):
             b, bl, br = belief[i], belief[i - 1], belief[(i + 1) % N_THETA]
@@ -79,6 +86,8 @@ def run_bayes_filter_fixed(events, table, eps_shift, alpha):
             if belief[theta_idx] > max_b:
                 max_b = belief[theta_idx]
 
+        if maxb_log is not None:
+            maxb_log.append(max_b)
         if max_b == 0:
             # 전부 0으로 붕괴 -- 비트폭 부족 신호. 균등분포로 리셋하고 카운트만 남긴다.
             collapsed += 1
@@ -91,6 +100,9 @@ def run_bayes_filter_fixed(events, table, eps_shift, alpha):
             if shift:
                 belief = [b << shift for b in belief]
 
+        if snapshot_event == ev_i and snapshot_out is not None:
+            snapshot_out["post"] = list(belief)
+
         map_theta = max(range(N_THETA), key=lambda t: belief[t])
         X, Y = table[(row, col, map_theta)]
         if pol:
@@ -98,6 +110,8 @@ def run_bayes_filter_fixed(events, table, eps_shift, alpha):
         else:
             world_off[(X, Y)] = min(world_off.get((X, Y), 0) + 1, CNT_MAX)
         errors.append(circular_diff(map_theta, gt))
+        if theta_log is not None:
+            theta_log.append(map_theta)
 
     if collapsed:
         print(f"  ! belief collapsed to 0 {collapsed}x -- BELIEF_BITS/LIKE_BITS 부족 의심", file=sys.stderr)

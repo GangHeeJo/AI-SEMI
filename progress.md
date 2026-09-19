@@ -3100,3 +3100,21 @@ N=4는 정확히 재현됨(17.0°, 검증 성공)이지만 **N=6/8/12/16은 중�
 
 - 다음: eps_shift=8, alpha=2, CNT_MAX=15, LIKE_BITS=8, BELIEF_BITS=32 확정값으로 RTL(`bayes_filter` 모듈) 작성 착수.
 
+## 133. Digital 2차 predictor RTL 작성 -- 진짜 버그 하나 발견·수정, 실측 UZH 8503개 이벤트 전부 PASS(2026-09-20)
+
+**설계**: `rtl/bayes_filter.v`(신규) -- §132에서 확정한 파라미터(eps_shift=8, alpha=2, CNT_MAX=15, LIKE_BITS=8, BELIEF_BITS=32)로 `scripts/bayes_filter_fixed_model.py:run_bayes_filter_fixed()`를 그대로 재현하는 순차 FSM. 이벤트 하나당 ST_DIFFUSE(256사이클, belief 더블버퍼 bank/~bank로 이웃의 옛 값을 안전하게 읽음) -> ST_LIKE(256사이클, `coord_transform_rmcm_lut`로 좌표 얻고 내장 world_mem(cnt_on/cnt_off, 64x64x2x4bit)에서 우도 조회 -> argmax 추적) -> (드물게) ST_COLLAPSE 또는 ST_RENORM_CALC/APPLY -> ST_COMMIT(승자 칸의 카운터 포화증가) 순서. 우도 LUT는 `scripts/gen_bayes_filter_like_lut.py`(신규)가 오라클의 `make_like_lut()`를 그대로 재사용해 `rtl/bayes_filter_like_lut.vh`로 case문 콤비네이셔널 함수 생성(coord_transform 계열 LUT들과 동일 관례).
+
+**검증 인프라**: `scripts/dump_bayes_filter_vectors.py`(신규) -- 오라클을 실제 UZH 패치((112,87), n=8503)에 그대로 돌려 이벤트마다 (row,col,pol,map_theta_expected)를 `tb/bayes_filter_uzh_vectors.txt`로 덤프(`run_bayes_filter_fixed()`에 `theta_log` 파라미터 추가, 부작용 없는 선택적 로깅). `tb/tb_bayes_filter_uzh_trace.v`(신규) -- 이벤트를 하나씩(busy 내려간 뒤) 넣고 `theta_out`을 기대값과 비트 단위로 대조.
+
+**진짜 버그 발견 -- idx=255가 새 최댓값을 세우는 이벤트에서 collapse/renorm 오판단**: 첫 400개 이벤트 검증에서 3건 불일치(ev227/345/347). 원인 추적을 위해 `run_bayes_filter_fixed()`에 `maxb_log`/`snapshot_event` 디버그 훅을 추가(부작용 없음, 선택적 파라미터)하고 RTL은 계층참조(`dut.belief_mem`/`dut.cnt_on` 등)로 매 이벤트 belief 배열·world_mem 전체를 오라클과 이분탐색하듯 대조 -- 벨리프 배열, world_mem 둘 다 이벤트42까지 완전히 일치하는데 이벤트43에서 갑자기 belief 전체가 오라클의 정확히 2048~2049배로 부풀려짐을 발견. 원인: `ST_LIKE`의 `idx==255` 사이클 자체에서 `max_b<=liked`가 논블로킹으로 걸릴 수 있는데, **바로 그 사이클의 collapse/renorm 판단문이 레지스터 `max_b`를 직접 읽어서** 이번 사이클의 갱신(= idx255 자신이 새 최댓값일 때)이 반영되기 *전* 값으로 판단했음 -- idx255가 우승자인 이벤트에서 실제로는 renorm이 필요 없는데도(§132 파라미터로는 `eff_max_b>=RENORM_LOW`) 낡은(더 작은) max_b로 판단해 RENORM_CALC로 잘못 빠지는 경우가 있었음.
+
+**수정**: `eff_max_b = (liked > max_b) ? liked : max_b`(콤비네이셔널, idx==255 사이클 자신의 우도값까지 합친 진짜 최종값)를 새로 두고, collapse/renorm 분기 판단을 `max_b` 대신 `eff_max_b`로 바꿈.
+
+**재검증**: 400개 재실행 -- `checked=400 mismatches=0`, `BAYES_FILTER_UZH_TRACE_PASS`. 신뢰도를 위해 원본 패치 전체 8,503개 이벤트로 확장해서도 재실행 -- **`checked=8503 mismatches=0`, PASS** -- RTL의 매 이벤트 MAP theta가 오라클과 8,503건 전부 한 비트도 안 틀리게 일치.
+
+**참고**: 이번에 잡은 버그는 논블로킹 할당 특유의 "같은 사이클 자기참조" 클래스 버그로, §115(비트연결 순서 오해)·§66/95(overrun을 엣지 후에 읽던 버그)와 같은 계열 -- 이 프로젝트에서 반복적으로 나타나는 RTL 타이밍 실수 패턴.
+
+- 신규: `rtl/bayes_filter.v`, `rtl/bayes_filter_like_lut.vh`, `scripts/gen_bayes_filter_like_lut.py`, `scripts/dump_bayes_filter_vectors.py`, `tb/tb_bayes_filter_uzh_trace.v`, `tb/bayes_filter_uzh_vectors.txt`
+- 수정: `scripts/bayes_filter_fixed_model.py`(`theta_log`/`maxb_log`/`snapshot_event`/`snapshot_out` 디버그 훅 추가, 부작용 없음)
+- 다음: 이 predictor를 `aer_tx16_coord_transform_v1`의 `theta_idx` 입력과 실제로 연결하는 top-level 통합, 이후 Genus PPA 실측(특히 4096칸 world_mem을 레지스터 배열로 합성 중이라 면적이 클 수 있음 -- ponytail 코멘트대로 SRAM 매크로 포트 분리는 PPA 확인 후 결정)
+
