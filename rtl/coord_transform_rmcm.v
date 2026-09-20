@@ -6,8 +6,8 @@
 // 표 생성: scripts/coord_transform_model.py의 export_full_lut_verilog() (baseline transform()의
 // 정확한 값을 그대로 담으므로 CORDIC과 달리 근사오차가 전혀 없음).
 module coord_transform_rmcm #(
-  parameter integer N_THETA_BITS = 8,
-  parameter integer COORD_BITS   = 6
+  parameter integer N_THETA_BITS = 10,  // §134: 1024단계(로봇팔 타겟)
+  parameter integer COORD_BITS   = 10   // §134: 1024x1024 world map
 )(
   input                        clk,
   input                        rst,
@@ -38,7 +38,7 @@ module coord_transform_rmcm #(
     endcase
   end
 
-  wire [11:0] xy = coord_transform_rmcm_lut(row, col, theta_idx);
+  wire [2*COORD_BITS-1:0] xy = coord_transform_rmcm_lut(row, col, theta_idx);
 
   always @(posedge clk) begin
     if (rst) begin
@@ -47,8 +47,8 @@ module coord_transform_rmcm #(
       y_out <= {COORD_BITS{1'b0}};
     end else begin
       valid_out <= valid_in;
-      x_out <= xy[11:6];
-      y_out <= xy[5:0];
+      x_out <= xy[2*COORD_BITS-1 -: COORD_BITS];
+      y_out <= xy[COORD_BITS-1 -: COORD_BITS];
     end
   end
 endmodule

@@ -13,11 +13,13 @@
 
 import math
 
-N = 64                  # world memory 한 변 크기 (6bit)
-N_THETA = 256            # theta LUT 크기 (8bit index, 2π를 256등분)
+N = 1024                 # world memory 한 변 크기 (10bit) -- §134: 로봇팔 타겟 시나리오, 1024x1024
+N_THETA = 1024           # theta LUT 크기 (10bit index, 2π를 1024등분) -- §134: 그립 정밀도 위해 세밀화
 FRAC_BITS = 14           # cos/sin 고정소수점 fractional bits (Q1.14)
 SCALE = 1 << FRAC_BITS
-R = 20                   # 시야 중심이 도는 원호 반지름 (grid cell 단위, world grid 안에 여유있게 들어가도록)
+R = N // 2 - 8           # 시야 중심이 도는 원호 반지름 -- world grid 크기에 비례(패치 여유 8칸 남기고
+                         # 전체 원을 최대한 크게 씀, N에 비례하지 않으면 큰 grid에서 시야가 중앙에
+                         # 몰려 대부분의 world map을 못 씀)
 WC, HC = N // 2, N // 2  # world grid 중심
 
 # cos/sin LUT: RTL ROM에 그대로 옮길 정수 테이블. 정수 반올림으로 한 번만 고정.
@@ -92,13 +94,21 @@ def export_lut_verilog_case(path, func_name, lut):
 
 
 
+N_THETA_BITS = max(1, (N_THETA - 1).bit_length())  # theta_idx 인덱스 폭
+COORD_BITS = max(1, (N - 1).bit_length())           # world 좌표(X,Y) 폭
+
+
 def export_full_lut_verilog(path, func_name):
-    """RMCM을 우리 문제에 적용한 극한형: 로컬좌표(4x4)+theta_idx(256) 전체 입력공간(4096가지,
+    """RMCM을 우리 문제에 적용한 극한형: 로컬좌표(4x4)+theta_idx(N_THETA) 전체 입력공간을
     xc2/yc2 값이 딱 4개뿐이라 애초에 "곱셈"이 아니라 "표 찾기"로 대체 가능하다는 점을 그대로 씀)를
     RTL 합성 안전한 case문 콤비네이셔널 함수 하나로 통째로 사전계산해서 담는다. 곱셈기/덧셈기 자체가
-    아예 없어짐 -- CORDIC이 baseline보다 더 무거웠던 것과 비교하기 위한 세 번째 구현."""
-    lines = [f"function automatic [11:0] {func_name}(input [1:0] row, input [1:0] col, input [7:0] theta_idx);",
-             "  reg [11:0] key;",
+    아예 없어짐 -- 패치가 4x4로 고정인 한(§134: 패치 확장은 AER 전송 인프라 재설계가 선행돼야 해서
+    보류) theta_idx/world 크기가 커져도 표 크기는 4*4*N_THETA로만 늘어나 여전히 감당 가능."""
+    key_bits = 4 + N_THETA_BITS  # row(2)+col(2)+theta_idx
+    out_bits = 2 * COORD_BITS
+    lines = [f"function automatic [{out_bits-1}:0] {func_name}(input [1:0] row, input [1:0] col, "
+             f"input [{N_THETA_BITS-1}:0] theta_idx);",
+             f"  reg [{key_bits-1}:0] key;",
              "  begin",
              "    key = {row, col, theta_idx};",
              "    case (key)"]
@@ -107,9 +117,10 @@ def export_full_lut_verilog(path, func_name):
             xc2, yc2 = local_xy_from_row_col(row, col)
             for theta_idx in range(N_THETA):
                 X, Y = transform(xc2, yc2, theta_idx)
-                key = (row << 10) | (col << 8) | theta_idx
-                lines.append(f"      12'd{key}: {func_name} = {{6'd{X}, 6'd{Y}}};")
-    lines.append(f"      default: {func_name} = 12'd0;")
+                key = (row << (2 + N_THETA_BITS)) | (col << N_THETA_BITS) | theta_idx
+                lines.append(f"      {key_bits}'d{key}: {func_name} = "
+                             f"{{{COORD_BITS}'d{X}, {COORD_BITS}'d{Y}}};")
+    lines.append(f"      default: {func_name} = {out_bits}'d0;")
     lines.append("    endcase")
     lines.append("  end")
     lines.append("endfunction")
@@ -118,9 +129,9 @@ def export_full_lut_verilog(path, func_name):
 
 
 def export_exhaustive_vectors(path):
-    """4(row) x 4(col) x 256(theta_idx) 전수(4096가지) 테스트벡터를 RTL 검증용으로 덤프.
+    """4(row) x 4(col) x N_THETA(theta_idx) 전수 테스트벡터를 RTL 검증용으로 덤프.
     한 줄 = "row col theta_idx X Y" (전부 정수, 공백 구분) -- tb가 $readmemh 대신 그냥
-    라인 단위로 읽어 구동+비교하기 쉽게 텍스트로 둠(테스트벡터가 4096줄뿐이라 부담 없음)."""
+    라인 단위로 읽어 구동+비교하기 쉽게 텍스트로 둠."""
     with open(path, "w") as f:
         for row in range(4):
             for col in range(4):
@@ -133,7 +144,7 @@ def export_exhaustive_vectors(path):
 def demo():
     # theta_idx=0(θ=0): cos=SCALE, sin=0 -> 중심이 (WC+R, HC) 근방, 로컬 회전 없음
     X, Y = transform(*local_xy_from_row_col(0, 0), 0)
-    assert (X, Y) == (51, 31), (X, Y)  # xc=yc=-1.5: X=WC-1.5+R=50.5->51, Y=HC-1.5=30.5->31
+    assert abs(X - (WC - 1.5 + R)) <= 1 and abs(Y - (HC - 1.5)) <= 1, (X, Y)
 
     # theta_idx=N_THETA//4(θ=90°): cos≈0, sin≈1 -> 중심이 (WC, HC+R) 근방
     X, Y = transform(*local_xy_from_row_col(1, 2), N_THETA // 4)

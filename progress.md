@@ -3118,3 +3118,33 @@ N=4는 정확히 재현됨(17.0°, 검증 성공)이지만 **N=6/8/12/16은 중�
 - 수정: `scripts/bayes_filter_fixed_model.py`(`theta_log`/`maxb_log`/`snapshot_event`/`snapshot_out` 디버그 훅 추가, 부작용 없음)
 - 다음: 이 predictor를 `aer_tx16_coord_transform_v1`의 `theta_idx` 입력과 실제로 연결하는 top-level 통합, 이후 Genus PPA 실측(특히 4096칸 world_mem을 레지스터 배열로 합성 중이라 면적이 클 수 있음 -- ponytail 코멘트대로 SRAM 매크로 포트 분리는 PPA 확인 후 결정)
 
+## 134. top-level 통합(v2) + 타겟 시나리오/크기 확정 -- 로봇팔(bin-picking/표면검사), 사용자 결정(2026-09-20)
+
+**top-level 통합**: `rtl/aer_tx16_coord_transform_v2.v`(신규) -- §133의 predictor(`bayes_filter`)와 기존 `aer_tx16_coord_transform_v1`을 실제로 배선. predictor는 이벤트 하나 처리에 ~600~800사이클이 걸려 1단계의 초당 최대 16개/사이클 도착률을 못 따라가므로, 소스 16개마다 1비트 pending 래치(+도착시점 극성 래치)를 둔 프론트엔드가 속도차를 흡수 -- 매 사이클 pending 중 가장 낮은 인덱스 하나를 predictor가 한가할 때만 넘기고, 이미 pending인 소스에 또 도착하면 `pred_overrun`으로 정직하게 집계. `theta_idx_reg`(predictor의 최신 추정치)가 v1의 `theta_idx` 입력을 대체.
+
+**검증**: `tb/tb_aer_tx16_coord_transform_v2_uzh_trace.v`(신규) -- 실제 UZH 트래픽으로 (1) 보존식(generated=consumed+overrun), (2) 프론트엔드가 predictor에 넘긴 시퀀스를 기록해뒀다가 독립 `bayes_filter` 인스턴스에 그대로 재생해 라이브 결과와 일치하는지(배선 자체의 정확성)를 확인 -- 처리량 실측 자체는 진행 중(predictor 병목이 실제로 얼마나 심한지는 별도 보고 예정).
+
+**타겟 시나리오 결정(사용자 지시)**: 여러 산업 응용(PTZ 감시카메라, 산업설비 회전스캐너, 자율주행, 로봇팔)을 검토한 끝에 **로봇팔(bin-picking/표면검사용 손목 카메라)로 확정**. 근거: 우리 설계의 핵심 전제("회전만 하고 이동은 없음", [[project_stage2_qna_specs]] 참고 -- 교수님이 이미 확정 답변한 항목)가 로봇팔의 국소 스캔 동작과 자연스럽게 일치함. 반대로 자율주행은 이동(translation)이 지배적이라 이 전제 자체가 깨져서 기각, PTZ/산업스캐너는 매력적이지만 센서 해상도 확장(세 확장축 중 가장 어려움)을 정면으로 요구해서 후순위로 미룸.
+
+**제안 크기(사용자 검토용, 아직 RTL 미반영)**:
+| 항목 | 현재 RTL(검증용) | 로봇팔 목표(제안) | 근거 |
+|---|---|---|---|
+| 센서 패치 | 4×4 | 256×256 | 근접(30~50cm) 작업에서 부품 디테일 인식 필요, 실물 DVS 센서급 |
+| 월드맵 | 64×64 | 1024×1024 | 회전 180도 이내로 묶여 파노라마처럼 무한히 안 커짐 -- 패치의 2~4배면 충분 |
+| 회전각 단계 | 256 | 1024 | 그립/조작 정밀도 위해 세밀하게(약 0.18도/단계) |
+
+- 신규: `rtl/aer_tx16_coord_transform_v2.v`, `tb/tb_aer_tx16_coord_transform_v2_uzh_trace.v`
+- 다음: (1) v2 처리량 실측 결과 확인 후 progress.md에 정직하게 기록, (2) 제안 크기로 좌표변환 LUT·predictor 비트폭·world_mem 재생성(특히 월드맵 확장은 predictor의 내장 world_mem을 SRAM 외부화하는 리팩터가 선행될 가능성 높음), (3) 확정되면 교수님 QnA 답변(월드맵 크기+근거)으로 정리
+
+## 135. §134 제안 크기로 실제 리사이즈 -- 좌표변환+predictor 검증 완료, 1단계(v1/v2)는 의도적으로 미착수(2026-09-20)
+
+**좌표변환**: `scripts/coord_transform_model.py`를 N=1024/N_THETA=1024로(패치는 4x4 그대로 -- 확장이 제일 어려운 축이라 §134 스코프 밖으로 명시적으로 보류), R을 world 크기에 비례하도록 일반화(`N//2-8`). LUT/벡터 export 함수도 비트폭을 N/N_THETA에서 자동 유도하도록 일반화. `coord_transform_rmcm.v` 파라미터 기본값 10/10으로 갱신 -- **exhaustive 16384/16384 벡터 전부 PASS**.
+
+**predictor**: `rtl/bayes_filter.v`를 새 크기로 재작성. 가장 큰 변화는 world memory(칸별 on/off 관측횟수)가 1,048,576칸이 돼서 §133까지처럼 내부 플립플롭 배열로 못 담음(world_mem_writer.v와 같은 관례로) -- **1-cycle latency 동기 SRAM 포트(mem_addr/we/wdata/rdata)를 모듈 밖에 노출**하도록 리팩터. likelihood 스캔이 주소발급+데이터수신 2단계 파이프라인이 되면서 이벤트당 사이클 수가 늘어남(§133의 조합논리 즉시읽기 대비 후보당 1→2사이클, commit도 read+write 분리) -- ponytail로 표시해둔 대로 나중에 파이프라인화해서 줄일 수 있음. §133에서 잡은 "idx==마지막 후보 자기참조" 버그의 교훈(eff_max_b/eff_map_x/eff_map_y)을 새 코드에도 그대로 적용. 시뮬레이션 전용 SRAM 동작모델(`tb/sync_sram_1rw.v`, 신규) 추가. **실제 UZH 이벤트 300개로 재검증 -- 0/300 mismatch, PASS.**
+
+**1단계(v1/v2)는 의도적으로 미착수**: `aer_tx16_coord_transform_v1.v`가 쓰는 theta 버스가 §92~115에서 이미 깊게 검증된 TX(`aer_tx16_trad_rowcol_fovea_cluster2_steal_buf_polarity_pose.v`)의 pose FIFO까지 관통하고 있어서, predictor 크기 확장을 그대로 반영하려면 이 검증된 모듈까지 다시 손대야 함 -- 시간 대비 리스크가 커서 이번엔 보류. 대신 **옛 크기(256단계/64x64)를 `coord_transform_rmcm_v1.v`+`coord_transform_rmcm_lut_v1.vh`로 이름을 바꿔 얼려두고** v1이 그 얼린 사본을 쓰도록 배선만 바꿔서 v1은 완전히 회귀 없이 그대로 통과(`AER_TX16_COORD_TRANSFORM_V1_UZH_TRACE_PASS`, §113/114와 동일 수치 재확인). **결과적으로 `rtl/aer_tx16_coord_transform_v2.v`(predictor+v1 통합)는 지금 컴파일이 안 되는 stale 상태**임 -- predictor 인터페이스가 바뀌었는데 v1은 옛 크기라 앞으로 (a) v1 자체를 새 크기로 다시 검증하며 키우거나 (b) v2 전용으로 predictor의 축소판을 새로 만들거나 결정 필요.
+
+- 신규: `rtl/coord_transform_rmcm_v1.v`, `rtl/coord_transform_rmcm_lut_v1.vh`, `tb/sync_sram_1rw.v`
+- 수정: `scripts/coord_transform_model.py`(N/N_THETA/R 확장, LUT export 함수 일반화), `rtl/coord_transform_rmcm_lut.vh`(재생성, 16384엔트리), `rtl/coord_transform_rmcm.v`(기본 파라미터 10/10), `rtl/bayes_filter.v`(전면 재작성, 외부 SRAM 포트), `rtl/aer_tx16_coord_transform_v1.v`(coord_transform_rmcm_v1 사용하도록 인스턴스만 변경), `tb/tb_coord_transform_rmcm_correctness.v`, `tb/tb_bayes_filter_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_*.v`(3개, LUT include만 v1으로 repoint), `tb/coord_transform_exhaustive_vectors.txt`(재생성), `tb/bayes_filter_uzh_vectors.txt`(재생성, N_THETA=1024 기준)
+- 다음: v2 stale 상태 해소 방법 결정, v2 처리량(§134에서 만든 tb) 실측, 이후 새 크기로 Genus PPA
+

@@ -12,7 +12,7 @@
 //   (3) 최종 world memory 내용 -- world_we/world_addr/world_pol을 그대로 관찰해서 만든
 //       테스트벤치 쪽 메모리 모델(저장소가 이제 RTL 밖에 있으므로 이게 "진짜" 최종 상태).
 module tb_aer_tx16_coord_transform_v1_uzh_trace;
-  `include "rtl/coord_transform_rmcm_lut.vh"
+  `include "rtl/coord_transform_rmcm_lut_v1.vh"
 
   reg clk = 0;
   reg rst;
@@ -70,13 +70,13 @@ module tb_aer_tx16_coord_transform_v1_uzh_trace;
       if (dut.u_tx.valid0)
         for (c = 0; c < 4; c = c + 1)
           if (dut.u_tx.col_mask0[c]) begin
-            xy = coord_transform_rmcm_lut(dut.u_tx.row0, c[1:0], dut.u_tx.pose_mask0[c*8 +: 8]);
+            xy = coord_transform_rmcm_lut_v1(dut.u_tx.row0, c[1:0], dut.u_tx.pose_mask0[c*8 +: 8]);
             pend_valid[c] = 1'b1; pend_x[c] = xy[11:6]; pend_y[c] = xy[5:0]; pend_pol[c] = dut.u_tx.pol_mask0[c];
           end
       if (dut.u_tx.valid1)
         for (c = 0; c < 4; c = c + 1)
           if (dut.u_tx.col_mask1[c]) begin
-            xy = coord_transform_rmcm_lut(dut.u_tx.row1, c[1:0], dut.u_tx.pose_mask1[c*8 +: 8]);
+            xy = coord_transform_rmcm_lut_v1(dut.u_tx.row1, c[1:0], dut.u_tx.pose_mask1[c*8 +: 8]);
             pend_valid[4+c] = 1'b1; pend_x[4+c] = xy[11:6]; pend_y[4+c] = xy[5:0]; pend_pol[4+c] = dut.u_tx.pol_mask1[c];
           end
 

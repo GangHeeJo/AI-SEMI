@@ -71,7 +71,7 @@ module aer_tx16_coord_transform_v1 (
 
   generate
     for (g = 0; g < 8; g = g + 1) begin : XFORM
-      coord_transform_rmcm u_xf (
+      coord_transform_rmcm_v1 u_xf (
         .clk(clk), .rst(rst),
         .valid_in(ev_valid[g]), .xc2_in(ev_xc2[g]), .yc2_in(ev_yc2[g]),
         .theta_idx(ev_theta[g]),

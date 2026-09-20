@@ -1,4 +1,4 @@
-// coord_transform_rmcm 전수 검사(4x4 x 256 theta = 4096가지 전부).
+// coord_transform_rmcm 전수 검사(4x4 x 1024 theta = 16384가지 전부, §134: 1024단계/1024x1024).
 // scripts/coord_transform_model.py의 export_exhaustive_vectors()가 만든
 // tb/coord_transform_exhaustive_vectors.txt("row col theta_idx X Y" 한 줄씩)를
 // 그대로 읽어 DUT를 구동하고, 소프트웨어 오라클이 낸 기대값과 비트 단위로 비교한다.
@@ -9,9 +9,9 @@ module tb_coord_transform_rmcm_correctness;
   reg valid_in = 0;
   reg signed [3:0] xc2_in = 0;
   reg signed [3:0] yc2_in = 0;
-  reg [7:0] theta_idx = 0;
+  reg [9:0] theta_idx = 0;
   wire valid_out;
-  wire [5:0] x_out, y_out;
+  wire [9:0] x_out, y_out;
 
   coord_transform_rmcm dut(
     .clk(clk), .rst(rst),
@@ -52,7 +52,7 @@ module tb_coord_transform_rmcm_correctness;
       end else begin
         drive_one(row, col, theta_v);
         total = total + 1;
-        if (!valid_out || x_out !== exp_x[5:0] || y_out !== exp_y[5:0]) begin
+        if (!valid_out || x_out !== exp_x[9:0] || y_out !== exp_y[9:0]) begin
           mismatches = mismatches + 1;
           if (mismatches <= 10)
             $display("MISMATCH row=%0d col=%0d theta=%0d expected=(%0d,%0d) got=(%0d,%0d) valid=%0d",
@@ -63,7 +63,7 @@ module tb_coord_transform_rmcm_correctness;
     $fclose(fh);
 
     $display("total=%0d mismatches=%0d", total, mismatches);
-    if (total == 4096 && mismatches == 0)
+    if (total == 16384 && mismatches == 0)
       $display("COORD_TRANSFORM_RMCM_EXHAUSTIVE_PASS");
     else
       $display("COORD_TRANSFORM_RMCM_EXHAUSTIVE_FAIL");
