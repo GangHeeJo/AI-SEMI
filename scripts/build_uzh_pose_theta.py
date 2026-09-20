@@ -11,7 +11,7 @@ import bisect
 import math
 import sys
 
-N_THETA = 256  # coord_transform_model.py와 반드시 같은 값이어야 함
+from coord_transform_model import N_THETA  # §135: 하드코딩하지 않고 항상 동기화
 
 
 def load_groundtruth(path):

@@ -123,12 +123,17 @@ def tail_mean(errors, frac=0.1):
     return sum(errors[-k:]) / k
 
 
-def build_patch_events(x_center, y_center, n=4, tmpdir=None):
+def build_patch_events(x_center, y_center, n=4, tmpdir=None, events_txt=None, groundtruth_txt=None):
+    """events_txt/groundtruth_txt를 넘기면 shapes_rotation 대신 그 데이터셋을 씀 -- UZH와
+    같은 포맷(t x y polarity / t tx ty tz qx qy qz qw)이면 아무 데이터셋이든 그대로 재사용
+    가능(예: scripts/convert_robotevt_bag.py로 변환한 RobotEvt PureRot)."""
+    events_txt = events_txt or EVENTS_TXT
+    groundtruth_txt = groundtruth_txt or GROUNDTRUTH_TXT
     tmpdir = tmpdir or tempfile.gettempdir()
     ev_path = os.path.join(tmpdir, f"fx_{x_center}_{y_center}.tsv")
     aug_path = os.path.join(tmpdir, f"fx_{x_center}_{y_center}_theta.tsv")
-    build_uzh_eventmeta_nxn.build(n, x_center, y_center, EVENTS_TXT, ev_path)
-    build_uzh_pose_theta.augment_eventmeta(ev_path, GROUNDTRUTH_TXT, aug_path)
+    build_uzh_eventmeta_nxn.build(n, x_center, y_center, events_txt, ev_path)
+    build_uzh_pose_theta.augment_eventmeta(ev_path, groundtruth_txt, aug_path)
     return load_events(aug_path, n)
 
 

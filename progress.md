@@ -3148,3 +3148,32 @@ N=4는 정확히 재현됨(17.0°, 검증 성공)이지만 **N=6/8/12/16은 중�
 - 수정: `scripts/coord_transform_model.py`(N/N_THETA/R 확장, LUT export 함수 일반화), `rtl/coord_transform_rmcm_lut.vh`(재생성, 16384엔트리), `rtl/coord_transform_rmcm.v`(기본 파라미터 10/10), `rtl/bayes_filter.v`(전면 재작성, 외부 SRAM 포트), `rtl/aer_tx16_coord_transform_v1.v`(coord_transform_rmcm_v1 사용하도록 인스턴스만 변경), `tb/tb_coord_transform_rmcm_correctness.v`, `tb/tb_bayes_filter_uzh_trace.v`, `tb/tb_aer_tx16_coord_transform_v1_*.v`(3개, LUT include만 v1으로 repoint), `tb/coord_transform_exhaustive_vectors.txt`(재생성), `tb/bayes_filter_uzh_vectors.txt`(재생성, N_THETA=1024 기준)
 - 다음: v2 stale 상태 해소 방법 결정, v2 처리량(§134에서 만든 tb) 실측, 이후 새 크기로 Genus PPA
 
+## 136. 실제 로봇팔 이벤트카메라 데이터(RobotEvt PureRot)로 정확도 재검증 -- UZH보다 평균은 나쁘지만 같은 자릿수(2026-09-20)
+
+**배경**: 지금까지 정확도 검증(§117~132)은 전부 UZH shapes_rotation(손으로 든 채 벽의 도형을 촬영) 하나에만 의존했음 -- 텍스처/장면 내용이 정확도의 핵심 변수임을 이미 확인한 바 있어([[project_digital2_scenario_and_speed_link]]), 로봇팔 타겟 시나리오와 물리적으로 더 가까운 실측 데이터로 재검증이 필요하다는 사용자 지적에 따라 공개 데이터셋을 조사.
+
+**조사 경위**: EventGrasp/DVS-GraspingDataSet(로봇 그리퍼 장착 DVS, 91개 물체)를 실제로 다운로드(416MB)해서 열어봤으나, 파지 사각형(grasp box) 라벨이 붙은 렌더링 이미지(PNG)뿐 원본 이벤트나 회전각 정답이 전혀 없어 **사용 불가로 확인**. DVSMOTION20(짐벌 고정, 회전-only, IMU 정답)도 후보였으나 산업 장면이 아니라 보류(사용자 지시). 최종적으로 **RobotEvt**(Liu/Parra/Chin, CVPR 2021, github.com/liudaqikk/RobotEvt) 채택 -- **UR5 로봇팔 엔드포인트(손목)에 DAVIS240C를 직접 장착**해 촬영한 실제 산업용 로봇팔 데이터, "PureRot"(순수 회전) 모드가 정확히 우리 전제와 일치, 정답은 UR5 자체 기구학(조인트 인코더)에서 나온 회전행렬+이동벡터. `PureRot_Slow_Off` 시퀀스(51MB zip, rosbag+GT텍스트) 다운로드해서 실제로 열어봄 -- 240x180(UZH와 동일 센서급), 694만 이벤트/59.8초, GT 2,492행. rosbag은 pip 설치한 `rosbags`(순수 파이썬)로 문제없이 파싱.
+
+**변환**: `scripts/convert_robotevt_bag.py`(신규) -- rosbag의 `dvs/events`(dvs_msgs/EventArray)를 UZH `events.txt`와 정확히 같은 포맷("t x y polarity")으로, GT 회전행렬을 쿼터니언으로 변환해 UZH `groundtruth.txt` 포맷("t tx ty tz qx qy qz qw")으로 저장 -- 이렇게 포맷을 맞추니 `build_uzh_eventmeta_nxn.py`/`build_uzh_pose_theta.py`를 한 줄도 안 고치고 그대로 재사용 가능(`bayes_filter_fixed_model.build_patch_events()`에 `events_txt`/`groundtruth_txt` 선택 인자만 추가). 변환 결과: 6,940,118 이벤트, 2,492 포즈(`common_traces_robotevt/`, 206MB -- UZH 원본과 같은 이유로 git 미커밋).
+
+**버그 발견+수정(§134/135 자동회귀)**: `build_uzh_pose_theta.py`가 `N_THETA=256`을 하드코딩하고 있어서 §134/135에서 `coord_transform_model.N_THETA`를 1024로 키운 뒤에도 GT theta_idx를 256으로 wrap하고 있었음(추정 알고리즘 입력에는 안 쓰여서 §135의 RTL 대조 결과 자체는 안 틀렸지만, 이번처럼 GT 대비 정확도를 재는 순간 바로 틀린 숫자가 나올 뻔함) -- `coord_transform_model`에서 import하도록 고쳐 항상 동기화되게 함.
+
+**결과**(사분면 밀도가 높은 6곳, §132와 동일 확정 파라미터 eps_shift=8/alpha=2, 재튜닝 없음):
+
+| 위치 | 이벤트수 | mean | worst |
+|---|---:|---:|---:|
+| (146,84) | 5089 | 30.9° | 91.8° |
+| (158,131) | 3686 | 35.0° | 91.4° |
+| (164,126) | 3095 | 33.9° | 91.8° |
+| (120,90) | 2131 | 30.4° | 86.5° |
+| (100,70) | 22(너무 희소, 참고만) | 30.8° | 87.5° |
+| (180,100) | 1787 | 50.1° | 90.7° |
+
+**N=6 평균 35.2° / 최악 91.8°** (희소한 (100,70) 제외해도 비슷함).
+
+**해석**: UZH 기준(§132, 20곳 평균 24.4°/최악106.9°)보다 **평균은 확실히 나쁘지만(35.2 vs 24.4), 최악값은 오히려 더 좋고(91.8 vs 106.9) 위치 간 분산도 작음**(87~92° 좁은 띠, UZH는 위치마다 9.9~64.4°로 훨씬 들쭉날쭉했음) -- 완전히 다른 카메라·장면·회전 역학(UR5 "Slow" 속도)에서도 같은 자릿수(수십 도) 성능이 재현됨은 확인됐지만, UZH 전용으로 고정한 파라미터(eps=0.01,alpha=2.0)가 이 데이터셋 최적은 아닐 가능성이 큼(재튜닝 안 했으므로 당연함). "정확도가 특정 데이터셋에만 맞춰진 우연이 아니다"는 근거는 확보했지만, 로봇팔 배포를 노린다면 이 데이터셋 기준으로 파라미터를 다시 찾아보는 게 다음 단계로 의미 있음.
+
+- 신규: `scripts/convert_robotevt_bag.py`
+- 수정: `scripts/build_uzh_pose_theta.py`(N_THETA 하드코딩 제거), `scripts/bayes_filter_fixed_model.py`(`build_patch_events`에 `events_txt`/`groundtruth_txt` 선택 인자)
+- 다음: 필요하면 RobotEvt 기준 (eps,alpha) 재탐색(§128 방법론 재사용), 또는 이 정도 검증으로 충분하다고 보고 PPA/통합 쪽으로 복귀
+
