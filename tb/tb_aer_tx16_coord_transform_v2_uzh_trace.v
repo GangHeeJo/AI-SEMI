@@ -68,7 +68,7 @@ module tb_aer_tx16_coord_transform_v2_uzh_trace;
   reg  [1:0] replay_row_in, replay_col_in;
   wire replay_busy, replay_valid_out;
   wire [7:0] replay_theta_out;
-  bayes_filter u_replay (
+  bayes_filter_v1 u_replay (
     .clk(clk), .rst(rst),
     .valid_in(replay_valid_in), .row_in(replay_row_in), .col_in(replay_col_in), .pol_in(replay_pol_in),
     .busy(replay_busy), .valid_out(replay_valid_out), .theta_out(replay_theta_out)

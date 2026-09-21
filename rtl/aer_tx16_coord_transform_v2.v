@@ -1,6 +1,8 @@
 // Digital 2차 top-level 통합(v2) -- v1(1단계, theta_idx를 외부 입력으로 받음)에
-// rtl/bayes_filter.v(2단계 predictor, theta_idx를 이벤트만 보고 스스로 추정)를 붙여
-// theta_idx를 외부에서 안 받고 내부에서 만들어 쓰는 완전한 파이프라인으로 만든다.
+// rtl/bayes_filter_v1.v(2단계 predictor의 §133 스냅샷, 256단계/64x64 -- §134/135에서
+// bayes_filter.v 본체를 1024단계/1024x1024 신규 타겟으로 키우면서 이 파일이 깨지지 않도록
+// v1과 짝이 맞는 옛 크기로 얼려둔 사본)를 붙여 theta_idx를 외부에서 안 받고 내부에서 만들어
+// 쓰는 완전한 파이프라인으로 만든다.
 //
 // predictor는 이벤트 하나(row,col,pol)를 받아 처리하는 데 대략 512~768사이클이 걸리는
 // 직렬 필터(rtl/bayes_filter.v 헤더 참고)라, 1단계처럼 사이클당 최대 16개 이벤트를 받는
@@ -59,7 +61,7 @@ module aer_tx16_coord_transform_v2 (
     end
   end
 
-  bayes_filter u_bf (
+  bayes_filter_v1 u_bf (
     .clk(clk), .rst(rst),
     .valid_in(win_valid),
     .row_in(win_idx[3:2]), .col_in(win_idx[1:0]), .pol_in(pending_pol[win_idx]),
