@@ -118,6 +118,68 @@ def run_bayes_filter_fixed(events, table, eps_shift, alpha, theta_log=None, maxb
     return errors
 
 
+def run_bayes_filter_fixed_soft_commit(events, table, eps_shift, alpha, top_k=5, weight_shift=4,
+                                        theta_log=None):
+    """rotation_estimate_model.run_bayes_filter_soft_commit()의 정수 고정소수점판(2026-09-21).
+    float판은 belief를 확률로 정규화해서(합=1) top_k 후보에 "belief값 그 자체"를 가중치로
+    분산 기록했지만, 고정소수점 belief는 합이 1로 정규화 안 돼 있어서(§131의 renorm-shift만
+    있음) 그 방식을 그대로 못 씀. 대신 RTL로 만들기 쉬운 형태로: **argmax 최댓값(max_b) 대비
+    상대적으로 가까운(>= max_b >> weight_shift) 상위 top_k 후보 전부에게 카운터를 똑같이 +1씩**
+    (포화) 준다 -- 크기비례 가중 대신 "근소한 차이의 후보는 동등하게 취급"으로 단순화한 근사.
+    float판과 같은 20곳에서 실측 확인: 거의 같은 효과(평균 그대로, 최악 큰 폭 감소) 재현됨."""
+    like_lut = make_like_lut(alpha)
+    world_on = {}
+    world_off = {}
+    belief = [0] * N_THETA
+    belief[0] = BELIEF_INIT
+    errors = []
+
+    for row, col, pol, gt in events:
+        new_belief = [0] * N_THETA
+        for i in range(N_THETA):
+            b, bl, br = belief[i], belief[i - 1], belief[(i + 1) % N_THETA]
+            new_belief[i] = b - 2 * (b >> eps_shift) + (bl >> eps_shift) + (br >> eps_shift)
+        belief = new_belief
+
+        max_b = 0
+        for theta_idx in range(N_THETA):
+            X, Y = table[(row, col, theta_idx)]
+            n_on = world_on.get((X, Y), 0)
+            n_off = world_off.get((X, Y), 0)
+            like = like_lut[(n_on, n_off, pol)]
+            belief[theta_idx] = (belief[theta_idx] * like) >> LIKE_BITS
+            if belief[theta_idx] > max_b:
+                max_b = belief[theta_idx]
+
+        if max_b == 0:
+            belief = [BELIEF_INIT >> 8] * N_THETA
+            max_b = belief[0]
+        if max_b < RENORM_LOW:
+            shift = 0
+            while (max_b << (shift + 1)) < BELIEF_INIT:
+                shift += 1
+            if shift:
+                belief = [b << shift for b in belief]
+                max_b <<= shift
+
+        ranked = sorted(range(N_THETA), key=lambda t: -belief[t])
+        map_theta = ranked[0]
+        threshold = max_b >> weight_shift
+        for t in ranked[:top_k]:
+            if belief[t] < threshold:
+                break
+            X, Y = table[(row, col, t)]
+            if pol:
+                world_on[(X, Y)] = min(world_on.get((X, Y), 0) + 1, CNT_MAX)
+            else:
+                world_off[(X, Y)] = min(world_off.get((X, Y), 0) + 1, CNT_MAX)
+        errors.append(circular_diff(map_theta, gt))
+        if theta_log is not None:
+            theta_log.append(map_theta)
+
+    return errors
+
+
 def tail_mean(errors, frac=0.1):
     k = max(1, int(len(errors) * frac))
     return sum(errors[-k:]) / k
@@ -137,15 +199,18 @@ def build_patch_events(x_center, y_center, n=4, tmpdir=None, events_txt=None, gr
     return load_events(aug_path, n)
 
 
-def grid_search(eps_list, alpha_list, positions=POSITIONS_20):
+def grid_search(eps_list, alpha_list, positions=POSITIONS_20, events_txt=None, groundtruth_txt=None):
     """§128/130의 파라미터 탐색을 커밋된 코드로 재현. run_bayes_filter_proper(float)을
     positions 전체에 대해 (eps,alpha) 그리드로 돌려, 평균 최소화/최악(minimax) 최소화
     두 기준 각각의 최선 설정을 찾는다. 이벤트 추출(파일 스캔)은 위치당 한 번만 하고
-    캐시해서 재사용 -- 그리드 크기와 무관하게 위치 수만큼만 스캔한다."""
+    캐시해서 재사용 -- 그리드 크기와 무관하게 위치 수만큼만 스캔한다.
+    events_txt/groundtruth_txt를 넘기면 shapes_rotation 대신 그 데이터셋 기준으로 탐색
+    (§136: RobotEvt 등 UZH 포맷으로 변환된 아무 데이터셋이나 가능)."""
     table = build_transform_table(4)
     deg = 360.0 / N_THETA
     with tempfile.TemporaryDirectory() as tmp:
-        cached = [(x, y, build_patch_events(x, y, 4, tmp)) for x, y in positions]
+        cached = [(x, y, build_patch_events(x, y, 4, tmp, events_txt=events_txt, groundtruth_txt=groundtruth_txt))
+                  for x, y in positions]
 
     results = []
     for eps in eps_list:

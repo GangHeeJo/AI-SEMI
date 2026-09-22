@@ -341,6 +341,104 @@ def run_bayes_filter_proper(events, table, diffuse_eps=0.04, prior_alpha=0.5):
     return errors
 
 
+def run_bayes_filter_soft_commit(events, table, diffuse_eps=0.01, prior_alpha=2.0, top_k=5, min_weight=0.01):
+    """run_bayes_filter_proper()의 고착(lock-in) 문제를 고치는 변형(2026-09-21 세션에서 진단).
+    §132 확정 파라미터(eps=0.01,alpha=2.0)로 UZH 20곳을 돌리며 worst 이벤트들을 직접 뜯어보니,
+    전부 같은 패턴이었음 -- belief가 한 theta에 99%대로 쏠린 채 "고착"돼서, 실제로는 계속
+    회전 중인데(gt가 꾸준히 증가) map_theta는 그대로 멈춰있음. 원인은 자기강화 루프: argmax
+    승자만 world_mem에 기록하니, 한번 확신(설사 틀렸어도)이 쌓인 후보는 그 칸들의 히스토리가
+    계속 두꺼워져서 다음 이벤트에서도 계속 이기고, 반대로 "지금 막 맞기 시작한" 진짜 정답
+    후보는 히스토리가 없어 못 따라잡음.
+
+    고침: argmax 승자 1명에게만 몰아주는 대신, belief 상위 top_k 후보에게 **belief 가중치로
+    분산해서** 기록(min_weight 미만은 무시) -- 한 가설이 혼자 증거를 독점 못 하게 막는다.
+    같은 20곳에서 실측: 평균은 그대로(25.7°, 손해 없음), 최악은 106.9°->70.7°로 34% 개선."""
+    world_on = {}
+    world_off = {}
+    belief = [0.0] * N_THETA
+    belief[0] = 1.0
+    errors = []
+
+    for row, col, pol, gt in events:
+        new_belief = [0.0] * N_THETA
+        for i in range(N_THETA):
+            new_belief[i] = ((1 - 2 * diffuse_eps) * belief[i]
+                              + diffuse_eps * belief[i - 1]
+                              + diffuse_eps * belief[(i + 1) % N_THETA])
+        belief = new_belief
+
+        total = 0.0
+        for theta_idx in range(N_THETA):
+            X, Y = table[(row, col, theta_idx)]
+            n_on = world_on.get((X, Y), 0)
+            n_off = world_off.get((X, Y), 0)
+            n_match = n_on if pol else n_off
+            like = (n_match + prior_alpha) / (n_on + n_off + 2 * prior_alpha)
+            belief[theta_idx] *= like
+            total += belief[theta_idx]
+        if total > 0:
+            belief = [b / total for b in belief]
+
+        ranked = sorted(range(N_THETA), key=lambda t: -belief[t])
+        map_theta = ranked[0]
+        for t in ranked[:top_k]:
+            w = belief[t]
+            if w < min_weight:
+                break  # ranked가 belief 내림차순이라 여기서부터는 전부 min_weight 미만
+            X, Y = table[(row, col, t)]
+            if pol:
+                world_on[(X, Y)] = world_on.get((X, Y), 0) + w
+            else:
+                world_off[(X, Y)] = world_off.get((X, Y), 0) + w
+        errors.append(circular_diff(map_theta, gt))
+
+    return errors
+
+
+def run_contrast_max(events, table, window=16, search_radius=None):
+    """2026-09-21 세션: 베이즈필터 계열(위 함수들, 전부 causal world_mem에 의존)과 완전히
+    다른 계열 -- Gallego 2016(RAL)/CMax-SLAM류 "contrast maximization"의 단순화판. 외부 누적
+    상태(world_mem)에 전혀 의존하지 않고, 한 윈도우(W개 이벤트)를 후보 theta로 되돌렸을 때
+    이벤트들이 (X,Y,polarity) 칸에 얼마나 몰리는지(집중도=sum(count^2))만으로 그 윈도우의
+    theta를 고른다 -- 외부 상태가 없어서 §136에서 진단한 "고착(lock-in)" 자체가 구조적으로
+    불가능하다.
+
+    search_radius=None이면 매 윈도우 1024개 후보 전수탐색(전역). 정수를 주면 직전 윈도우의
+    추정치 ±search_radius로 탐색범위를 제한(첫 윈도우만 전역, 부트스트랩) -- 회전이 연속적이라
+    다음 윈도우도 비슷한 각도 근방일 거라는 제약을 준 것.
+
+    UZH 20곳 실측(§137): 전역(window=16) 평균17.8/최악75.6, radius=20~28일 때 평균10.8~12.7/
+    최악59.4~65.7 -- 베이즈필터 소프트커밋(평균25.7/최악70.7)보다 평균이 큰 폭으로 개선됨.
+    다만 radius=10이나 40처럼 스윗스팟을 벗어나면 오히려 141~145까지 튀는 민감한 파라미터."""
+    errs = []
+    n = len(events)
+    prev_theta = 0
+    first = True
+    for start in range(0, n - window + 1, window):
+        chunk = events[start:start + window]
+        gt_mid = chunk[window // 2][3]
+        if search_radius is None or first:
+            candidates = range(N_THETA)
+            first = False
+        else:
+            candidates = [(prev_theta + d) % N_THETA for d in range(-search_radius, search_radius + 1)]
+        best_score = -1
+        best_theta = 0
+        for theta_idx in candidates:
+            hist = {}
+            for row, col, pol, _ in chunk:
+                X, Y = table[(row, col, theta_idx)]
+                key = (X, Y, pol)
+                hist[key] = hist.get(key, 0) + 1
+            score = sum(c * c for c in hist.values())
+            if score > best_score:
+                best_score = score
+                best_theta = theta_idx
+        prev_theta = best_theta
+        errs.append(circular_diff(best_theta, gt_mid))
+    return errs
+
+
 def demo(eventmeta_path=EVENTMETA_PATH, n=PATCH_N):
     events = load_events(eventmeta_path, n)
     table = build_transform_table(n)
