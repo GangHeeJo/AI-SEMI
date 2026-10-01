@@ -14,6 +14,7 @@ CX, CY = W_PX / 2, H_PX / 2
 WIN_MS = 4
 OMEGAS = np.radians(np.arange(-2400, 2401, 40))  # rad/s 후보
 SUB = 30000
+DROP = float(__import__("os").environ.get("DELTA_DROP", "0"))  # §149: 이벤트 무작위 손실 시뮬레이션(견딤 테스트)
 
 
 def warp_score(x, y, dt, omega, cx, cy):
@@ -38,7 +39,8 @@ def estimate(cx=CX, cy=CY, win_ms=WIN_MS, max_win=None, seed=0):
         n = e - s
         if n < 5000:
             out.append((w * win_ms, 0.0, 0.0, 0.0, n)); continue
-        idx = np.sort(rng.choice(n, min(SUB, n), replace=False)) + s
+        pool = np.flatnonzero(rng.random(n) >= DROP)
+        idx = np.sort(rng.choice(pool, min(SUB, len(pool)), replace=False)) + s
         x = f["events/x"][s:e][idx - s].astype(np.float64)
         y = f["events/y"][s:e][idx - s].astype(np.float64)
         t = f["events/t"][s:e][idx - s].astype(np.float64) * 1e-6

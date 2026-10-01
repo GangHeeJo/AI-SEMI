@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 from scipy import ndimage as ndi
 
-from delta_rotation_cmax import CX, CY, H5, WIN_MS
+from delta_rotation_cmax import CX, CY, DROP, H5, WIN_MS
 
 CANVAS = 1200
 SEARCH_DEG = 1.5
@@ -41,7 +41,8 @@ def track(res, seed=0):
         best_d = 0.0
         n = e - s
         if n >= 5000:
-            idx = np.sort(rng.choice(n, min(SUB, n), replace=False))
+            pool = np.flatnonzero(rng.random(n) >= DROP)
+            idx = np.sort(rng.choice(pool, min(SUB, len(pool)), replace=False))
             x = f["events/x"][s:e][idx].astype(np.float64) - CX
             y = f["events/y"][s:e][idx].astype(np.float64) - CY
             t = f["events/t"][s:e][idx].astype(np.float64) * 1e-6
@@ -60,6 +61,8 @@ def track(res, seed=0):
             xa = f["events/x"][s:e].astype(np.float64) - CX
             ya = f["events/y"][s:e].astype(np.float64) - CY
             ta = f["events/t"][s:e].astype(np.float64) * 1e-6
+            keep = rng.random(n) >= DROP
+            xa, ya, ta = xa[keep], ya[keep], ta[keep]
             dta = ta - (w * WIN_MS + WIN_MS / 2) * 1e-3
             xi, yi, ok = project(xa, ya, -(theta_mid + om * dta), off)
             world += np.bincount(yi[ok] * CANVAS + xi[ok], minlength=CANVAS * CANVAS).reshape(CANVAS, CANVAS).astype(np.float32)
