@@ -25,7 +25,7 @@ def project(x, y, a, off):
     return xi, yi, ok
 
 
-def track(res, seed=0):
+def track(res, seed=0, center=(CX, CY)):
     rng = np.random.default_rng(seed)
     f = h5py.File(H5, "r")
     m = f["ms_to_idx"][:].astype(np.int64)
@@ -43,8 +43,8 @@ def track(res, seed=0):
         if n >= 5000:
             pool = np.flatnonzero(rng.random(n) >= DROP)
             idx = np.sort(rng.choice(pool, min(SUB, len(pool)), replace=False))
-            x = f["events/x"][s:e][idx].astype(np.float64) - CX
-            y = f["events/y"][s:e][idx].astype(np.float64) - CY
+            x = f["events/x"][s:e][idx].astype(np.float64) - center[0]
+            y = f["events/y"][s:e][idx].astype(np.float64) - center[1]
             t = f["events/t"][s:e][idx].astype(np.float64) * 1e-6
             dt = t - (w * WIN_MS + WIN_MS / 2) * 1e-3
             if blurred.max() > 0:
@@ -58,8 +58,8 @@ def track(res, seed=0):
         theta_prev = theta_mid + om * WIN_MS * 1e-3 / 2
         thetas.append(theta_mid)
         if n >= 5000:
-            xa = f["events/x"][s:e].astype(np.float64) - CX
-            ya = f["events/y"][s:e].astype(np.float64) - CY
+            xa = f["events/x"][s:e].astype(np.float64) - center[0]
+            ya = f["events/y"][s:e].astype(np.float64) - center[1]
             ta = f["events/t"][s:e].astype(np.float64) * 1e-6
             keep = rng.random(n) >= DROP
             xa, ya, ta = xa[keep], ya[keep], ta[keep]
@@ -71,8 +71,11 @@ def track(res, seed=0):
 
 
 if __name__ == "__main__":
+    import json
     res = np.load(sys.argv[1])
-    th, world = track(res)
+    center = tuple(json.load(open(sys.argv[3]))["center_px"]) if len(sys.argv) > 3 else (CX, CY)  # 보정 JSON의 회전 중심
+    print("rotation center used:", center)
+    th, world = track(res, center=center)
     np.save(sys.argv[2] + "_theta.npy", th)
     np.save(sys.argv[2] + "_world.npy", world)
     pred = np.cumsum(res[:, 1] * WIN_MS * 1e-3) - res[:, 1] * WIN_MS * 1e-3 / 2
