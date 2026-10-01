@@ -17,7 +17,10 @@ from delta_depthwarp2 import chunks, load_cal, sharp_of
 W_PX, H_PX = 960, 720
 
 
-def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4):
+def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=None):
+    import delta_depthwarp2 as dw2
+    if sigma_sharp is not None:
+        dw2.SIGMA_SHARP = sigma_sharp                      # 선명도 평활 폭(px) 민감도 시험용
     e, c0, _, smax = load_cal(cal_json)
     cal = json.load(open(cal_json))
     fwhm = float(cal["fwhm_median_px"])
@@ -98,4 +101,4 @@ def chunks_t(f, th, mids):
 
 if __name__ == "__main__":
     # usage: delta_depthsnap.py <events.h5> <theta.npy> <calibration.json> <out_prefix>
-    run(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    run(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sigma_sharp=float(sys.argv[5]) if len(sys.argv) > 5 else None)
