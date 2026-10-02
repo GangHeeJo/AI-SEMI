@@ -35,14 +35,14 @@ def run(h5_path, out_npy, time_window_us=None):
     prev, pn = img_of(starts[0]); warp = np.eye(2, 3, dtype=np.float32)
     crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 1e-5)
     for k in starts[1:]:
-        im, n = img_of(k); ok, dth = False, np.nan
+        im, n = img_of(k); ok, dth, cc = False, np.nan, np.nan
         if n >= MIN_EV and pn >= MIN_EV:
             try:
                 cc, W = cv2.findTransformECC(prev, im, warp.copy(), cv2.MOTION_EUCLIDEAN, crit, None, 5)
                 dth = np.degrees(np.arctan2(W[1, 0], W[0, 0])); ok = True; warp = W
             except cv2.error:
                 warp = np.eye(2, 3, dtype=np.float32)
-        rows.append((t_frame[k] / 1e3, n, ok, dth)); prev, pn = im, n
+        rows.append((t_frame[k] / 1e3, n, ok, dth, cc)); prev, pn = im, n
     a = np.array(rows, dtype=float); np.save(out_npy, a)
     ok = a[:, 2].astype(bool); th = np.cumsum(np.where(ok, a[:, 3], 0.0))
     print(f"windows {len(a)}, registered {ok.sum()}, total roll {th[-1]:.1f} deg")
