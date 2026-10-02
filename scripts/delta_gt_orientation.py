@@ -8,7 +8,7 @@ import cv2
 import h5py
 import numpy as np
 
-H5 = "Q&A/3차/extracted/2026-09-22-16-42-32-DELTA.h5"
+H5 = __import__("os").environ.get("DELTA_H5", "Q&A/3차/extracted/2026-09-22-16-42-32-DELTA.h5")
 
 
 def frame(f, m, t0, w=20):
@@ -40,7 +40,7 @@ def psi_of(L):
 
 if __name__ == "__main__":
     f = h5py.File(H5, "r"); m = f["ms_to_idx"][:].astype(np.int64)
-    ts = list(range(200, 1560, 20)); rows = []
+    ts = list(range(20, len(m) - 22, 20)); rows = []                  # 기록 전체(움직임 전/후 프레임은 직선이 없어 자동 제외)
     for t0 in ts:
         img, n = frame(f, m, t0); L = lines_of(img); psi, coh = psi_of(L)
         rows.append((t0, n, len(L), np.nan if psi is None else psi, coh))

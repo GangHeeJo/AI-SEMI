@@ -8,7 +8,7 @@ import sys
 import h5py
 import numpy as np
 
-H5 = "Q&A/3차/extracted/2026-09-22-16-42-32-DELTA.h5"
+H5 = __import__("os").environ.get("DELTA_H5", "Q&A/3차/extracted/2026-09-22-16-42-32-DELTA.h5")   # 합성/다른 영상 검증용 override
 W_PX, H_PX = 960, 720
 CX, CY = W_PX / 2, H_PX / 2
 WIN_MS = 4

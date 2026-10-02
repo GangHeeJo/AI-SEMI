@@ -63,13 +63,18 @@ def best_center(x, y, a, c_nom):
     return center, best_f
 
 
-def select_segments(res, n_seg=N_SEG, seg_ms=SEG_MS):
+AGREE_TOL = 0.15      # 두 독립 ω 추정이 구간 평균에서 이 비율 안으로 일치해야 보정에 사용
+
+
+def select_segments(res, n_seg=N_SEG, seg_ms=SEG_MS, omega2=None):
     base = int(res[1, 0] - res[0, 0])
     k = seg_ms // base
     scores = []
     for i in range(0, len(res) - k + 1):
         om = np.abs(res[i:i + k, 1]).mean()
         n = res[i:i + k, 4].sum()
+        if omega2 is not None and abs(omega2[i:i + k].mean() / (res[i:i + k, 1].mean() + 1e-12) - 1) > AGREE_TOL:
+            continue                                  # 두 추정이 불일치하는 구간은 ω를 믿을 수 없어 제외
         scores.append((om * np.sqrt(n), int(res[i, 0])))
     scores.sort(reverse=True)
     chosen = []
@@ -81,15 +86,21 @@ def select_segments(res, n_seg=N_SEG, seg_ms=SEG_MS):
     return sorted(chosen)
 
 
-def run(h5_path, omega_npy, out_json, c_nom=(W_PX / 2, H_PX / 2), seed=0):
+def run(h5_path, omega_npy, out_json, c_nom=(W_PX / 2, H_PX / 2), seed=0, omega2_npy=None):
     rng = np.random.default_rng(seed)
     res = np.load(omega_npy)
+    o2 = None
+    if omega2_npy:                                    # 두 번째 독립 추정(예: 선 방향 합친 theta의 ω): 일치 구간만 선택, ω는 평균 사용
+        o2 = np.load(omega2_npy)[:len(res), 1]
+        sel_res = res.copy(); sel_res[:len(o2), 1] = 0.5 * (res[:len(o2), 1] + o2)
     base = int(res[1, 0] - res[0, 0])
     bounds_ms = np.concatenate([res[:, 0], [res[-1, 0] + base]])
     cum = np.concatenate([[0.0], np.cumsum(res[:, 1] * base * 1e-3)])
     f = h5py.File(h5_path, "r")
     m = f["ms_to_idx"][:].astype(np.int64)
-    segs = select_segments(res)
+    segs = select_segments(res, omega2=o2)
+    if o2 is not None:
+        res = sel_res                                 # 이후 구간 각도는 평균 ω로 적분
     print("selected segments (ms):", segs, flush=True)
     tw, th_ = W_PX // TX, H_PX // TY
     pts = []   # (seg, tx, ty, cx, cy, agree_dist, reliable)
@@ -168,4 +179,4 @@ def run(h5_path, omega_npy, out_json, c_nom=(W_PX / 2, H_PX / 2), seed=0):
 
 if __name__ == "__main__":
     # usage: delta_calibrate.py <events.h5> <omega.npy> <out.json>
-    run(sys.argv[1], sys.argv[2], sys.argv[3], seed=int(sys.argv[4]) if len(sys.argv) > 4 else 0)
+    run(sys.argv[1], sys.argv[2], sys.argv[3], seed=int(sys.argv[4]) if len(sys.argv) > 4 else 0, omega2_npy=sys.argv[5] if len(sys.argv) > 5 else None)
