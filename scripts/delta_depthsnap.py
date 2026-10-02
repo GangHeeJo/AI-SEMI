@@ -15,6 +15,7 @@ import numpy as np
 from delta_depthwarp2 import chunks, load_cal, sharp_of
 
 W_PX, H_PX = 960, 720
+RHO = float(__import__("os").environ.get("DELTA_RHO", "0"))
 
 
 def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=None):
@@ -96,6 +97,7 @@ def chunks_t(f, th, mids):
         sl = slice(s0, s0 + CHUNK * STRIDE, STRIDE)
         x = f["events/x"][sl].astype(np.float64); y = f["events/y"][sl].astype(np.float64)
         t = f["events/t"][sl].astype(np.float64)
+        t = t + (x / 960.0 - 0.5) * RHO * 773.0                # 컬럼 순차 읽기 시각 보정(us): rho=읽기 지속 비율, 0이면 프레임 스탬프 그대로
         yield x, y, -np.interp(t, mids, th), t
 
 

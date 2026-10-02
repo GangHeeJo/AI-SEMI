@@ -15,6 +15,8 @@ import numpy as np
 W_PX, H_PX = 960, 720
 E_DEG, C0 = 125.0, (470.0, 372.0)       # 합성 센서 오프셋(실제 영상과 다르게)
 NOISE_PX, BG_FRAC, SCALE = 0.6, 0.03, 0.3
+SYN_RHO = __import__("os").environ.get("SYN_RHO")      # 설정 시 센서의 프레임 단위 타임스탬프 + 컬럼 순차 읽기 모델 사용(값=읽기 지속 비율 rho)
+FRAME_US = 773.0
 
 
 def build_scene():
@@ -53,12 +55,12 @@ def generate(theta_npy, omega_npy, out_h5, truth_npz, seed=0):
     nseg = len(S)
     win_s = 4e-3
     tt = (np.arange(len(th)) * 4 + 2) * 1e3                      # 창 중앙 시각(us)
-    X, Y, T, P = [], [], [], []
+    X, Y, T, P, SZ = [], [], [], [], []
     for w in range(len(th)):
         target = int(n_win[w])
         if target < 50:
             continue
-        got = 0; xs, ys, ts = [], [], []
+        got = 0; xs, ys, ts, ss_ = [], [], [], []
         while got < target:
             m = max(2 * (target - got), 4000)
             el = rng.choice(len(w_el), size=m, p=w_el)
@@ -82,23 +84,26 @@ def generate(theta_npy, omega_npy, out_h5, truth_npz, seed=0):
             acc = np.where(is_seg, np.minimum(speed_n / 400.0, 1.0), 0.5)
             px += rng.normal(0, NOISE_PX, m); py += rng.normal(0, NOISE_PX, m)
             ok = (rng.random(m) < acc) & (px >= 0) & (px < W_PX) & (py >= 0) & (py < H_PX)
-            xs.append(px[ok]); ys.append(py[ok]); ts.append(t_us[ok]); got += int(ok.sum())
-        xs = np.concatenate(xs)[:target]; ys = np.concatenate(ys)[:target]; ts = np.concatenate(ts)[:target]
+            if SYN_RHO is not None:                       # 이벤트는 참 시각 t_us에 발생, 열 x가 읽히는 시각의 프레임 스탬프로 기록
+                rho = float(SYN_RHO)
+                t_us = FRAME_US * np.ceil((t_us - (px / W_PX) * rho * FRAME_US) / FRAME_US)
+            xs.append(px[ok]); ys.append(py[ok]); ts.append(t_us[ok]); ss_.append(s_el[ok]); got += int(ok.sum())
+        xs = np.concatenate(xs)[:target]; ys = np.concatenate(ys)[:target]; ts = np.concatenate(ts)[:target]; sz = np.concatenate(ss_)[:target].astype(np.float32)
         nbg = int(BG_FRAC * target)                                              # 배경 잡음: 균일
-        xs[:nbg] = rng.random(nbg) * W_PX; ys[:nbg] = rng.random(nbg) * H_PX
+        xs[:nbg] = rng.random(nbg) * W_PX; ys[:nbg] = rng.random(nbg) * H_PX; sz[:nbg] = -1.0   # 잡음 이벤트는 깊이 없음(-1)
         o = np.argsort(ts)
         X.append(np.floor(xs[o]).astype(np.uint16)); Y.append(np.floor(ys[o]).astype(np.uint16)); T.append(ts[o].astype(np.uint32))
-        P.append((rng.random(target) < 0.5).astype(np.uint8))
+        P.append((rng.random(target) < 0.5).astype(np.uint8)); SZ.append(sz[o])
         if w % 50 == 0:
             print(f"window {w}/{len(th)} events so far {sum(len(a) for a in X)}", flush=True)
-    X = np.concatenate(X); Y = np.concatenate(Y); T = np.concatenate(T); P = np.concatenate(P)
-    order = np.argsort(T, kind="stable"); X, Y, T, P = X[order], Y[order], T[order], P[order]
+    X = np.concatenate(X); Y = np.concatenate(Y); T = np.concatenate(T); P = np.concatenate(P); SZ = np.concatenate(SZ)
+    order = np.argsort(T, kind="stable"); X, Y, T, P, SZ = X[order], Y[order], T[order], P[order], SZ[order]
     nms = int(T[-1] // 1000) + 2
     ms_to_idx = np.searchsorted(T, np.arange(nms) * 1000).astype(np.uint64)
     with h5py.File(out_h5, "w") as f:
         g = f.create_group("events"); g.attrs["height"] = H_PX; g.attrs["width"] = W_PX
         g.attrs["polarity_encoding"] = b"1=ON, 0=OFF"; g.attrs["source"] = b"SYNTH"
-        g.create_dataset("x", data=X); g.create_dataset("y", data=Y); g.create_dataset("t", data=T); g.create_dataset("p", data=P)
+        g.create_dataset("x", data=X); g.create_dataset("y", data=Y); g.create_dataset("t", data=T); g.create_dataset("p", data=P); g.create_dataset("s_true", data=SZ)   # 정답 깊이 오프셋(검증 전용, 파이프라인은 읽지 않음)
         f.create_dataset("ms_to_idx", data=ms_to_idx); f.create_dataset("t_offset", data=0)
     np.savez(truth_npz, e_deg=E_DEG, c0=c0, theta=th, segs=S, dots=D, rods=np.array(rods))
     print("events", len(X), "->", out_h5, flush=True)
