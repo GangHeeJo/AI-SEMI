@@ -1,0 +1,17 @@
+{
+ "sensor_px": [
+  960,
+  720
+ ],
+ "frame_period_us": 773,
+ "lens_focal_mm": 6.0,
+ "slide_distances_unit_unstated": {
+  "object1_to_axis": 47.5,
+  "object2_to_axis": 48.5,
+  "object3_to_axis": 50.5,
+  "object4_to_axis": 55,
+  "sensor_to_axis": 4
+ },
+ "scene": "vertical rods standing on a perforated optical breadboard, cage-like mount in the center, dark surface at upper right",
+ "readout": "column-sequential (x 0..959), one timestamp per frame (raw .dvs decode)"
+}
