@@ -4,19 +4,24 @@
 # 출력: 맵(lam=1 기준, 층 선택), 이벤트별 층/위치. 사용: pan_depthsnap.py <events.h5> <track.npy> <out_prefix>
 import sys
 
+import os
+
 import h5py
 import numpy as np
+from scipy import ndimage as ndi
 
 import delta_depthwarp2 as dw2
 from delta_depthwarp2 import sharp_of
 
+NORM = bool(int(os.environ.get("PAN_NORM", "0")))     # 1: 선명도를 지역 밀도^2로 나눠 정규화(지도 압축에 의한 쏠림 제거)
+SPLIT = os.environ.get("PAN_SPLIT", "half")           # half: 앞/뒤 절반(pan에서는 두 절반이 장면의 다른 영역을 봐서 부적합), block: 40ms 블록 번갈아
 LAMS = np.round(np.arange(0.70, 1.3001, 0.01), 3); STRIDE, CH = 4, 1_000_000
 
 
 def run(h5p, trk, out):
     dw2.SIGMA_SHARP = 3.0
     f = h5py.File(h5p, "r"); t = f["events/t"][::STRIDE].astype(np.float64); x = f["events/x"][::STRIDE].astype(np.float64); y = f["events/y"][::STRIDE].astype(np.float64)
-    tr = np.load(trk); px = np.interp(t, tr[:, 0], tr[:, 1]); py = np.interp(t, tr[:, 0], tr[:, 2]); K = len(LAMS); tmid = (t[0] + t[-1]) / 2; isB = t >= tmid
+    tr = np.load(trk); px = np.interp(t, tr[:, 0], tr[:, 1]); py = np.interp(t, tr[:, 0], tr[:, 2]); K = len(LAMS); tmid = (t[0] + t[-1]) / 2; isB = (t >= tmid) if SPLIT == "half" else ((t // 40000).astype(np.int64) % 2 == 1)
     x0 = min((x + l * px).min() for l in LAMS[[0, -1]]) - 1; y0 = min((y + l * py).min() for l in LAMS[[0, -1]]) - 1
     Wd = int(max((x + l * px).max() for l in LAMS[[0, -1]]) - x0) + 3; Hd = int(max((y + l * py).max() for l in LAMS[[0, -1]]) - y0) + 3
     pos = lambda sl, l: np.rint(y[sl] + l * py[sl] - y0).astype(np.int64) * Wd + np.rint(x[sl] + l * px[sl] - x0).astype(np.int64)
@@ -26,7 +31,12 @@ def run(h5p, trk, out):
         sl = slice(s0, s0 + CH); b = isB[sl]
         for k, l in enumerate(LAMS):
             p = pos(sl, l); MA[k] += np.bincount(p[~b], minlength=Hd * Wd); MB[k] += np.bincount(p[b], minlength=Hd * Wd)
-    SA = np.stack([sharp_of(MA[k].reshape(Hd, Wd)).ravel() for k in range(K)]); SB = np.stack([sharp_of(MB[k].reshape(Hd, Wd)).ravel() for k in range(K)]); del MA, MB
+    def sharp(M):
+        S = sharp_of(M.reshape(Hd, Wd))
+        if not NORM: return S.ravel()
+        L = ndi.gaussian_filter(M.reshape(Hd, Wd), dw2.SIGMA_SHARP); ref = np.percentile(L[L > 0], 90)       # 밀도 정규화: 분자(기울기 에너지)와 분모 모두 밀도^2로 변함
+        return np.where(L > 0.01 * ref, S / (L ** 2 + (0.05 * ref) ** 2), 0).astype(np.float32).ravel()
+    SA = np.stack([sharp(MA[k]) for k in range(K)]); SB = np.stack([sharp(MB[k]) for k in range(K)]); del MA, MB
     print("sharpness done", flush=True)
     ks = np.zeros(len(t), np.int16); Fsel = np.zeros(Hd * Wd, np.float32); Fbase = np.zeros(Hd * Wd, np.float32); Xn = np.zeros(len(t), np.float32); Yn = np.zeros(len(t), np.float32)
     i1 = int(np.argmin(abs(LAMS - 1.0)))
