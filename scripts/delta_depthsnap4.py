@@ -48,7 +48,7 @@ def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=3.0, sav
     del M
     print("sharpness maps done", flush=True)
 
-    F_all = np.zeros(C * C, np.float32); F_agree = np.zeros(C * C, np.float32)
+    F_all = np.zeros(C * C, np.float32); F_agree = np.zeros(C * C, np.float32); F_gap = np.zeros((3, C * C), np.float32)   # 불일치 |ka-kb| = 2 / 3~4 / 5이상 별 맵(가중 결합용)
     kept = total = 0; dg_s, dg_a = [], []
     for x, y, a, t in chunks_t(f, th, mids):
         it = thirds(t); P = np.stack([canvas(x, y, a, s) for s in ss]); valid = P >= 0; Pc = np.maximum(P, 0)
@@ -66,10 +66,13 @@ def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=3.0, sav
         s_cont = ss[kc] + off * step; pos = canvas(x, y, a, s_cont); okp = ok & (pos >= 0)
         agree = okp & (np.abs(ka - kb_) <= 1)
         F_all += np.bincount(pos[okp], minlength=C * C).astype(np.float32); F_agree += np.bincount(pos[agree], minlength=C * C).astype(np.float32)
+        gap = np.abs(ka - kb_)
+        for gi, sel in enumerate((gap == 2, (gap >= 3) & (gap <= 4), gap >= 5)):
+            F_gap[gi] += np.bincount(pos[okp & sel], minlength=C * C).astype(np.float32)
         kept += int(agree.sum()); total += len(x)
         if save_diag:
             dg_s.append(np.where(okp, s_cont, np.nan).astype(np.float32)); dg_a.append(agree)
-    np.save(out_prefix + "_all.npy", F_all.reshape(C, C)); np.save(out_prefix + "_agree.npy", F_agree.reshape(C, C))
+    np.save(out_prefix + "_gap.npy", F_gap.reshape(3, C, C)); np.save(out_prefix + "_all.npy", F_all.reshape(C, C)); np.save(out_prefix + "_agree.npy", F_agree.reshape(C, C))
     if save_diag:
         np.save(out_prefix + "_diag_s.npy", np.concatenate(dg_s)); np.save(out_prefix + "_diag_agree.npy", np.concatenate(dg_a)); np.save(out_prefix + "_ss.npy", ss)
     print(f"events kept by two-replicate agreement: {kept}/{total} = {kept / total:.3f}")
