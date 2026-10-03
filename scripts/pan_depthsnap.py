@@ -15,6 +15,7 @@ from delta_depthwarp2 import sharp_of
 
 NORM = bool(int(os.environ.get("PAN_NORM", "0")))     # 1: 선명도를 지역 밀도^2로 나눠 정규화(지도 압축에 의한 쏠림 제거)
 SPLIT = os.environ.get("PAN_SPLIT", "half")           # half: 앞/뒤 절반(pan에서는 두 절반이 장면의 다른 영역을 봐서 부적합), block: 40ms 블록 번갈아
+INTERP = bool(int(os.environ.get("PAN_INTERP", "0")))   # 1: 연속 lambda(포물선 보간)
 LAMS = np.round(np.arange(0.70, 1.3001, 0.01), 3); STRIDE, CH = 4, 1_000_000
 
 
@@ -44,7 +45,15 @@ def run(h5p, trk, out):
         sl = slice(s0, s0 + CH); b = isB[sl]; P = np.stack([pos(sl, l) for l in LAMS])
         V = np.empty(P.shape, np.float32)
         for k in range(K): V[k] = np.where(b, SA[k][P[k]], SB[k][P[k]])
-        kb = V.argmax(0); ks[sl] = kb; pk = np.take_along_axis(P, kb[None], 0)[0]
+        kb = V.argmax(0); ks[sl] = kb
+        if INTERP:                                                       # 층 사이 포물선 보간으로 연속 lambda (층 간격 양자화 줄무늬 제거)
+            km = np.clip(kb, 1, K - 2); vm = np.take_along_axis(V, (km - 1)[None], 0)[0]; v0 = np.take_along_axis(V, km[None], 0)[0]; vp = np.take_along_axis(V, (km + 1)[None], 0)[0]
+            den = vm - 2 * v0 + vp
+            with np.errstate(divide="ignore", invalid="ignore"):
+                off = np.where(np.abs(den) > 1e-30, 0.5 * (vm - vp) / den, 0.0)
+            off = np.clip(np.nan_to_num(off), -0.5, 0.5) * ((kb > 0) & (kb < K - 1)); lc = LAMS[kb] + off * (LAMS[1] - LAMS[0])
+            pk = np.rint(y[sl] + lc * py[sl] - y0).astype(np.int64) * Wd + np.rint(x[sl] + lc * px[sl] - x0).astype(np.int64)
+        else: pk = np.take_along_axis(P, kb[None], 0)[0]
         Fsel += np.bincount(pk, minlength=Hd * Wd); Fbase += np.bincount(P[i1], minlength=Hd * Wd)
         Xn[sl] = (pk % Wd); Yn[sl] = (pk // Wd)
     np.save(out + "_sel.npy", Fsel.reshape(Hd, Wd)); np.save(out + "_base.npy", Fbase.reshape(Hd, Wd)); np.savez(out + "_ev.npz", t=t.astype(np.float32), k=ks, X=Xn, Y=Yn, Xb=(x + px - x0).astype(np.float32), Yb=(y + py - y0).astype(np.float32))
