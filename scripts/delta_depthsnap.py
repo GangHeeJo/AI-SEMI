@@ -65,6 +65,7 @@ def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=None):
     # 2) 이벤트별 층 선택: 자기(SAll) vs 교차(상대 절반 맵)
     F_self = np.zeros(C * C, np.float32); F_cross = np.zeros(C * C, np.float32)
     hist_self = np.zeros(K, np.int64); hist_cross = np.zeros(K, np.int64)
+    save_assign = bool(int(__import__('os').environ.get('DELTA_SAVE_ASSIGN', '0'))); a_self, a_cross = [], []      # 이벤트별 선택 층 저장(진단용)
     for x, y, a, t in chunks_t(f, th, mids):
         isB = t >= t_half
         P = np.stack([canvas(x, y, a, s) for s in ss])            # K x N
@@ -83,6 +84,10 @@ def run(h5_path, theta_npy, cal_json, out_prefix, win_ms=4, sigma_sharp=None):
             ok = (pos >= 0) & (V.max(0) >= 0)
             F += np.bincount(pos[ok], minlength=C * C).astype(np.float32)
             hist += np.bincount(kb[ok], minlength=K)
+            if save_assign:
+                (a_self if name == "self" else a_cross).append(np.where(ok, kb, -1).astype(np.int8))
+    if save_assign:
+        np.save(out_prefix + "_assign_self.npy", np.concatenate(a_self)); np.save(out_prefix + "_assign_cross.npy", np.concatenate(a_cross)); np.save(out_prefix + "_ss.npy", ss)
     np.save(out_prefix + "_self.npy", F_self.reshape(C, C)); np.save(out_prefix + "_cross.npy", F_cross.reshape(C, C))
     print("events per layer (self) :", hist_self.tolist())
     print("events per layer (cross):", hist_cross.tolist())

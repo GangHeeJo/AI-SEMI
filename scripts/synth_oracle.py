@@ -46,11 +46,11 @@ if __name__ == "__main__":
     truth = dict(np.load(sp + "/syn_truth.npz")); th_npy = sp + "/trkcal_theta.npy"
     e_true = np.array([np.cos(np.radians(float(truth["e_deg"]))), np.sin(np.radians(float(truth["e_deg"])))]); c0_true = truth["c0"]
     import json
-    cal = json.load(open(sp + "/calib_syn_ori.json")); e_est = np.array(cal["unit_vector"]); c0_est = np.array(cal["center_px"])
+    cal = json.load(open(sys.argv[2] if len(sys.argv) > 2 else sp + "/calib_syn_ori.json")); e_est = np.array(cal["unit_vector"]); c0_est = np.array(cal["center_px"])
     C = 1806; T = render_truth(truth, C); PT = prep(T, C)
     runs = [("O1  exact calibration, true depth, all events", e_true, c0_true, 1, True),
             ("O1b exact calibration, true depth, half events (=stride 2)", e_true, c0_true, 2, True),
-            ("O2  ESTIMATED calibration, best s per event, half events", e_est, c0_est, 2, True),
+            ("O2  calibration given on command line, best s per event, half events", e_est, c0_est, 2, True),
             ("O3  no depth (s=0), half events", e_true, c0_true, 2, False)]
     print("oracle maps vs truth scene (band-pass NCC); pipeline (estimated calibration + layer selection, half events): self 0.475 / cross 0.448")
     for nm, e, c0, stride, ud in runs:
