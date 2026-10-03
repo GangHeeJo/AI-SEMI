@@ -31,6 +31,7 @@ if __name__ == "__main__":
     tr = np.load(trk); px = np.interp(t, tr[:, 0], tr[:, 1]); py = np.interp(t, tr[:, 0], tr[:, 2])
     speed_t = np.gradient(tr[:, 1], tr[:, 0]) * 773.0                                        # px / 프레임(773us)
     X1 = x + px; Y1 = y + py; X1 -= X1.min(); Y1 -= Y1.min()
+    fr = np.searchsorted(np.unique(t), t)                                                    # 프레임 번호(대조군: 홀/짝 프레임 분할)
     tx = (X1 // TILE).astype(np.int64); ty = (Y1 // TILE).astype(np.int64); nx = tx.max() + 1; tid = ty * nx + tx
     order = np.argsort(tid, kind="stable"); cuts = np.flatnonzero(np.diff(tid[order])) + 1; rows = []
     for g in np.split(order, cuts):
@@ -40,12 +41,15 @@ if __name__ == "__main__":
         ia = img(np.clip((X1[a] - ox).astype(int), 0, TILE - 1), np.clip((Y1[a] - oy).astype(int), 0, TILE - 1))
         ib = img(np.clip((X1[b] - ox).astype(int), 0, TILE - 1), np.clip((Y1[b] - oy).astype(int), 0, TILE - 1))
         (dx, dy), resp = cv2.phaseCorrelate(ia, ib)                                           # ib가 ia 대비 (dx,dy) 이동
+        ea, eb = g[fr[g] % 2 == 0], g[fr[g] % 2 == 1]
+        (cx_, cy_), _ = cv2.phaseCorrelate(img(np.clip((X1[ea] - ox).astype(int), 0, TILE - 1), np.clip((Y1[ea] - oy).astype(int), 0, TILE - 1)),
+                                           img(np.clip((X1[eb] - ox).astype(int), 0, TILE - 1), np.clip((Y1[eb] - oy).astype(int), 0, TILE - 1)))
         before = collide(X1[g], Y1[g])
         Xs = np.concatenate([X1[a], X1[b] - dx]); Ys = np.concatenate([Y1[a], Y1[b] - dy]); after = collide(Xs, Ys)
         tm = t[g].mean(); sp_ = np.interp(tm, tr[:, 0], speed_t)
         rows.append(dict(tile_x=int(tid[g[0]] % nx), tile_y=int(tid[g[0]] // nx), x_scene=ox + TILE / 2, y_scene=oy + TILE / 2, n=len(g), density=len(g) / TILE ** 2,
                          t_mean_ms=tm / 1e3, t_span_ms=(t[g].max() - t[g].min()) / 1e3, speed_px_frame=sp_, x_sensor=x[g].mean(), y_sensor=y[g].mean(),
-                         shift_x=dx, shift_y=dy, shift=float(np.hypot(dx, dy)), gain=after / before, resp=float(resp)))
+                         shift_x=dx, shift_y=dy, shift=float(np.hypot(dx, dy)), shift_ctrl=float(np.hypot(cx_, cy_)), gain=after / before, resp=float(resp)))
     with open(out, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
     print("tiles", len(rows), "->", out)
