@@ -7,9 +7,8 @@ from synth_evaluate import render_truth, prep, ncc_shift
 
 
 def ghost(X, truth, R=330):
-    C = X.shape[0]; T = render_truth(truth, C); PT = prep(T, C); n, dy, dx = ncc_shift(PT, prep(X, C))
-    Xs = np.roll(np.roll(X, -dy, 0), -dx, 1) if False else np.roll(np.roll(X, dy, 0), dx, 1)
-    # ncc_shift는 b를 (dy,dx) 이동해 a와 맞춤 -> 같은 이동 적용
+    C = X.shape[0]; T = render_truth(truth, C); PT = prep(T, C); n, dx, dy = ncc_shift(PT, prep(X, C))        # ncc_shift 반환 순서는 (NCC, dx, dy)
+    Xs = np.roll(np.roll(X, dy, 0), dx, 1)                                                                     # b를 (dy,dx) 이동해 a와 맞춤 -> 같은 이동 적용
     c = C // 2; sl = (slice(c - R, c + R), slice(c - R, c + R))
     near3 = ndi.binary_dilation(T > 0.05 * T.max(), iterations=3)[sl]; near2 = ndi.binary_dilation(T > 0.05 * T.max(), iterations=2)[sl]
     M = Xs[sl]; prec = M[near3].sum() / M.sum()
