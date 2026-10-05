@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # §201: 깊이 정답이 있는 시뮬레이션 시퀀스(UZH simulation_3planes/3walls)로 이벤트 깊이 추정 방식을 비교.
 # EMVS(Rebecq 2018)와 같은 틀: 기준 시점의 깊이 평면 Z_i들에 이벤트 광선을 투영해 시차 공간 영상(DSI, 평면별 이벤트 수)을 만들고 평면별 최댓값으로 깊이를 구함.
-#   A  EMVS 기본: 모든 이벤트로 만든 DSI의 argmax
+#   A  EMVS 기본: 모든 이벤트의 광선이 모든 평면에 투표한 DSI의 argmax
+#   A2 모든 이벤트가 자기 평면(자기 구간 제외 증거의 최선)에만 투표(일치 필터 없음)
 #   B  우리 방식: 시간 G=3 구간. 이벤트는 자기 구간을 제외한 두 구간의 DSI(평활)로 평면을 각각 고르고(자기 이벤트 불참), 두 선택이 +-1평면 안에서 일치하면 채택. 채택 이벤트만으로 DSI 재구성
 #   C  B + 극성: 이벤트가 같은 극성 DSI에서 증거를 얻음
 # 깊이 범위는 넓은 사전값(역깊이 균등 간격, 정답을 보고 정한 것이 아님). 자세 규약(c2w/w2c, 이동 축 부호)은 정답 깊이를 쓰지 않고 DSI 초점(평면별 최댓값 합)이 큰 쪽을 자동 선택.
@@ -18,7 +19,7 @@ from scipy.spatial.transform import Rotation as Rot, Slerp
 
 import OpenEXR
 
-Z_MIN, Z_MAX, NZ = 0.8, 6.0, 96
+Z_MIN, Z_MAX, NZ = 0.8, 10.0, 112
 W, H = 240, 180
 d = sys.argv[1]; T_REF = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0; HW = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
 fx, fy, cx, cy = np.loadtxt(d + "/calib.txt")[:4]; Zs = 1.0 / np.linspace(1 / Z_MAX, 1 / Z_MIN, NZ)
@@ -73,7 +74,7 @@ Dg = {pol: [SM(dsi_of(o, dd, (grp == j) & ((p == pol) if pol is not None else np
 
 
 def vote(use_pol, chunk=100000):
-    keep = np.zeros(len(t), bool)
+    keep = np.zeros(len(t), bool); sel_q = np.full(len(t), -1, np.int64)
     for a in range(0, len(t), chunk):
         ii = np.arange(a, min(a + chunk, len(t))); q = project(o[ii], dd[ii]); qc = np.maximum(q, 0); valid = q >= 0; ev_ = np.full((2, len(ii), NZ), -1.0, np.float32)
         for k, dgap in enumerate((1, 2)):
@@ -85,8 +86,14 @@ def vote(use_pol, chunk=100000):
                         mm = m & (p[ii] == pol); ev_[k][mm] = np.where(valid[mm], Dg[pol][j][qc[mm]], -1)
                 else: ev_[k][m] = np.where(valid[m], Dg[None][j][qc[m]], -1)
         ka, kb = ev_[0].argmax(1), ev_[1].argmax(1); ok = (ev_[0].max(1) > 0) & (ev_[1].max(1) > 0); keep[ii] = ok & (np.abs(ka - kb) <= 1)
-    return keep
+        kc = (ev_[0] + ev_[1]).argmax(1); sel_q[ii] = np.where(ok, q[np.arange(len(ii)), kc], -1)                 # 이벤트가 고른 평면에서의 DSI 위치
+    return keep, sel_q
 
 
-for nm, up in (("B  ours: cross-validated + agreement", False), ("C  ours + polarity-matched evidence", True)):
-    keep = vote(up); Zk, ck, mk = depth_map(dsi_of(o, dd, keep)); print(f"   [{nm.split()[0]}] kept {keep.mean() * 100:.1f}% of events"); evaluate(nm, Zk, ck, mk)
+def assigned_dsi(sel_q): return np.bincount(sel_q[sel_q >= 0], minlength=NZ * H * W).reshape(NZ, H, W).astype(np.float32)
+
+
+keepB, qB = vote(False); keepC, qC = vote(True)
+allq = qB.copy(); a2 = assigned_dsi(allq); Z2, c2, m2 = depth_map(a2); evaluate("A2 every event votes its own plane", Z2, c2, m2)
+for nm, kp, qq in (("B  ours: assigned + agreement", keepB, qB), ("C  ours + polarity-matched evidence", keepC, qC)):
+    qk = np.where(kp, qq, -1); Zk, ck, mk = depth_map(assigned_dsi(qk)); print(f"   [{nm.split()[0]}] kept {kp.mean() * 100:.1f}% of events"); evaluate(nm, Zk, ck, mk)
