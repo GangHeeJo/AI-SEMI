@@ -78,32 +78,20 @@ for conv, sx, sy in itertools.product(("c2w", "w2c"), (1, -1), (1, -1)):
 print(f"pose convention selected by DSI focus (no ground-truth depth used): {best[1]} sx={best[2]:+d} sy={best[3]:+d}"); o, dd = setup(*best[1:])
 
 
-def emvs_extract(D, c=5.0, kern=5, med=5):                                                  # EMVS 후처리
-    conf = D.max(0).astype(np.float32); idx = D.argmax(0).astype(np.uint8); c8 = np.clip(conf / max(float(np.percentile(conf[conf > 0], 99.5)) if (conf > 0).any() else 1.0, 1e-9) * 255, 0, 255).astype(np.float32)          # 99.5 백분위로 8비트 정규화(최댓값 정규화는 이상치 하나가 마스크를 비움)
-    mean = cv2.GaussianBlur(c8, (kern, kern), 0); mask = (c8 > mean + c).astype(np.uint8) * 255; mask = cv2.medianBlur(mask, med) > 0; idx = cv2.medianBlur(idx, med)
-    return Zs[idx], conf, mask & (conf > 0)
+def emvs_extract(D, med=5):                                                                 # 신뢰도 = 평면별 최댓값, 깊이 = argmax 인덱스에 중앙값 필터(EMVS 후처리의 임계 마스크는 쓰지 않음: 임계 하나에 결과가 좌우되어 같은 커버리지 비교로 대체)
+    conf = D.max(0).astype(np.float32); idx = cv2.medianBlur(D.argmax(0).astype(np.uint8), med); return Zs[idx], conf
 
 
 ts = np.loadtxt(d + "/depthmaps.txt", dtype=str); GT = np.array(OpenEXR.File(os.path.join(d, ts[np.argmin(abs(ts[:, 0].astype(float) - T_REF)), 1])).channels()["Z"].pixels)
 
 
-def metrics(Z, conf, m, K=3000):
-    rel = np.abs(Z - GT) / GT; sel = m & (GT > 0); top = np.argsort(np.where(m, conf, -1).ravel())[::-1][:K]; rt = rel.ravel()[top]
-    return int(sel.sum()), (float(np.median(rel[sel]) * 100) if sel.any() else np.nan), (float((rel[sel] < 0.05).mean() * 100) if sel.any() else np.nan), float(np.median(rt) * 100), float((rt < 0.05).mean() * 100)
+def report(nm, D, ks=(1000, 3000, 6000)):                                                  # 각 방법의 자기 신뢰도 상위 K 픽셀에서 정확도(같은 커버리지 비교)
+    Z, conf = emvs_extract(D); order = np.argsort(conf.ravel())[::-1]; rel = (np.abs(Z - GT) / GT).ravel(); out = []
+    for K in ks: r = rel[order[:K]]; out.append(f"K={K}: median {np.median(r) * 100:5.2f}% within5% {(r < 0.05).mean() * 100:5.1f}%")
+    print(f"{nm:44s} " + " | ".join(out), flush=True)
 
 
-def report(nm, D, grid=False):
-    Z, conf, m = emvs_extract(D); r = metrics(Z, conf, m)
-    print(f"{nm:46s} pixels {r[0]:6d} | median rel err {r[1]:5.2f}% | within 5%: {r[2]:5.1f}% | top-3000: median {r[3]:5.2f}%, within 5% {r[4]:5.1f}%", flush=True)
-    if grid:                                                                                # EMVS에 관대한 기준: 임계 상수 c를 정답으로 고른 최선 사례(oracle)
-        bestr = None
-        for c in (0, 2, 5, 10, 20, 40):
-            Z, conf, m = emvs_extract(D, c=c); r = metrics(Z, conf, m)
-            if r[0] >= 3000 and (bestr is None or r[1] < bestr[1][1]): bestr = (c, r)
-        if bestr: print(f"{'   EMVS best case (c chosen with GT, >=3000 px)':46s} c={bestr[0]:<2d}   pixels {bestr[1][0]:6d} | median rel err {bestr[1][1]:5.2f}% | within 5%: {bestr[1][2]:5.1f}%", flush=True)
-
-
-report("A  EMVS, standard (all events, all planes)", dsi_all_planes_bilinear(o, dd), grid=True)
+report("A  EMVS (all events, all planes, bilinear)", dsi_all_planes_bilinear(o, dd))
 G = 3; grp = np.minimum(((t - t[0]) / (t[-1] - t[0] + 1e-9) * G).astype(int), G - 1)
 Dg = {pol: [SM(dsi_of(o, dd, (grp == j) & ((p == pol) if pol is not None else np.ones(len(t), bool)))).ravel() for j in range(G)] for pol in (None, 0, 1)}
 
@@ -126,6 +114,6 @@ def vote(use_pol, chunk=100000):
 
 
 kB, su, sv, skB = vote(False); kC, suC, svC, skC = vote(True)
-report("A2 every event votes its own plane (EMVS post.)", dsi_assigned(su, sv, skB))
-print(f"   [B] kept {kB.mean() * 100:.1f}% of events"); report("B  ours: assigned + agreement (EMVS post.)", dsi_assigned(su, sv, np.where(kB, skB, -1)))
-print(f"   [C] kept {kC.mean() * 100:.1f}% of events"); report("C  ours + polarity-matched (EMVS post.)", dsi_assigned(suC, svC, np.where(kC, skC, -1)))
+report("A2 every event votes its own plane", dsi_assigned(su, sv, skB))
+print(f"   [B] kept {kB.mean() * 100:.1f}% of events"); report("B  ours: assigned + agreement", dsi_assigned(su, sv, np.where(kB, skB, -1)))
+print(f"   [C] kept {kC.mean() * 100:.1f}% of events"); report("C  ours + polarity-matched", dsi_assigned(suC, svC, np.where(kC, skC, -1)))
