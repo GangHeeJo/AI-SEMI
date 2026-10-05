@@ -79,7 +79,7 @@ print(f"pose convention selected by DSI focus (no ground-truth depth used): {bes
 
 
 def emvs_extract(D, c=5.0, kern=5, med=5):                                                  # EMVS 후처리
-    conf = D.max(0).astype(np.float32); idx = D.argmax(0).astype(np.uint8); c8 = (conf / max(float(conf.max()), 1e-9) * 255).astype(np.float32)
+    conf = D.max(0).astype(np.float32); idx = D.argmax(0).astype(np.uint8); c8 = np.clip(conf / max(float(np.percentile(conf[conf > 0], 99.5)) if (conf > 0).any() else 1.0, 1e-9) * 255, 0, 255).astype(np.float32)          # 99.5 백분위로 8비트 정규화(최댓값 정규화는 이상치 하나가 마스크를 비움)
     mean = cv2.GaussianBlur(c8, (kern, kern), 0); mask = (c8 > mean + c).astype(np.uint8) * 255; mask = cv2.medianBlur(mask, med) > 0; idx = cv2.medianBlur(idx, med)
     return Zs[idx], conf, mask & (conf > 0)
 
