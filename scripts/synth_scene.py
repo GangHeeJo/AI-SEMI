@@ -14,7 +14,9 @@ import numpy as np
 
 W_PX, H_PX = 960, 720
 E_DEG, C0 = 125.0, (470.0, 372.0)       # 합성 센서 오프셋(실제 영상과 다르게)
-NOISE_PX, BG_FRAC, SCALE = 0.6, 0.03, 0.3
+NOISE_PX, SCALE = 0.6, 0.3
+BG_FRAC = float(__import__("os").environ.get("SYN_BG", "0.03"))           # 배경 잡음 비율(기본 0.03)
+EXTRA_SEG = int(__import__("os").environ.get("SYN_EXTRA", "0"))          # 질감 밀도 시험용 추가 임의 선분 수(기본 0)
 SYN_RHO = __import__("os").environ.get("SYN_RHO")      # 설정 시 센서의 프레임 단위 타임스탬프 + 컬럼 순차 읽기 모델 사용(값=읽기 지속 비율 rho)
 FRAME_US = 773.0
 
@@ -40,6 +42,10 @@ def build_scene():
     for y in range(150, 331, 30):
         for x in range(-300, 301, 40):
             dots.append((x, y, 120 + 0.6 * (y - 150)))
+    if EXTRA_SEG:                                                                    # 서로 다른 깊이의 임의 방향 짧은 선분을 추가(질감 밀도 시험)
+        rr = np.random.default_rng(123)
+        for _ in range(EXTRA_SEG):
+            a_ = rr.uniform(0, np.pi); L = rr.uniform(30, 150); cx = rr.uniform(-300, 300); cy = rr.uniform(-300, 330); line(cx - L / 2 * np.cos(a_), cy - L / 2 * np.sin(a_), cx + L / 2 * np.cos(a_), cy + L / 2 * np.sin(a_), rr.uniform(0, 230))
     return segs, dots, rods
 
 
