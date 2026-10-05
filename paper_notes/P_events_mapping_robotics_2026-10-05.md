@@ -27,7 +27,7 @@ URL: https://arxiv.org/abs/2107.07200
 - 우리와의 연결: 손목 카메라 + 로봇 자세 활용 시나리오가 우리 타겟(로봇팔)과 같음. 자세를 로봇에서 얻는다는 가정이 실제로 쓰이는 사례. 시간 동기화는 우리가 합성으로 허용 오차를 재 볼 항목.
 
 ## 4. 미정독 후보 [목록]
-- Kim, Handa, Benosman, Ieng, Davison, "Simultaneous Mosaicing and Tracking with an Event Camera" (BMVC 2014): 회전 추적 + 모자이크 동시, 이벤트 단위 확률 필터. https://bmva-archive.org.uk/bmvc/2014/papers/paper066/index.html
+- (이미 정독됨: `D2_01_Kim2014_BMVC_SimultaneousMosaicingTracking.md`, `D2_02_Guo2024_CMaxSLAM.md`) Kim et al. 2014 모자이크+추적, CMax-SLAM은 앞선 노트를 참조. 이 문서의 목록에서는 중복이라 제외.
 - "Event-Based Mosaicing Bundle Adjustment" (ECCV 2024): 모자이크 번들 조정 -> 우리 θ 정밀화(합성에서만 개선)와 직접 비교할 대상. https://link.springer.com/chapter/10.1007/978-3-031-72624-8_27
 - Gallego et al., "A Unifying Contrast Maximization Framework" (CVPR 2018) https://arxiv.org/pdf/1804.01306 / Gallego-Scaramuzza "Accurate Angular Velocity Estimation With an Event Camera" (RA-L 2017)
 - Eventor: FPGA 이벤트 단안 다중시점 스테레오 가속기 https://arxiv.org/pdf/2203.15439
