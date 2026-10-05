@@ -9,6 +9,7 @@
 # EMVS 후처리: 신뢰도 = 평면별 최댓값, 깊이 = argmax, 마스크 = 8비트 정규화한 신뢰도가 가우시안 5x5 국소 평균 + c보다 큰 곳, 깊이 인덱스와 마스크에 5x5 중앙값 필터.
 # (세부 값은 논문 설정에 대한 기억 기반이라 공식 코드와 같다고 장담 못 함 -> A에는 정답으로 c를 고른 최선 사례를 따로 보고하는 관대한 기준도 적용)
 # 깊이 범위는 넓은 사전값(역깊이 균등), 자세 규약은 정답 깊이를 쓰지 않고 DSI 초점으로 자동 선택.
+# 환경변수: SIM_NOISE=0.25 (전체의 25%를 균일 무작위 잡음 이벤트로 주입), SIM_BAF=<tau_ms> (이웃 지지 필터: 3x3 이웃, 앞뒤 1시간칸 안에 다른 이벤트가 없으면 제거; 뉴로모픽 배경 활동 필터)
 # 사용: emvs_depth_experiment2.py <seq_dir> [t_ref=1.0] [half_window_s=0.25]
 import itertools
 import os
@@ -27,6 +28,15 @@ W, H = 240, 180
 d = sys.argv[1]; T_REF = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0; HW = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
 fx, fy, cx, cy = np.loadtxt(d + "/calib.txt")[:4]; Zs = 1.0 / np.linspace(1 / Z_MAX, 1 / Z_MIN, NZ)
 ev = pd.read_csv(d + "/events.txt", sep=" ", header=None, names=["t", "x", "y", "p"]).values; ev = ev[(ev[:, 0] >= T_REF - HW) & (ev[:, 0] < T_REF + HW)]
+NOISE = float(os.environ.get("SIM_NOISE", "0")); BAF_MS = float(os.environ.get("SIM_BAF", "0")); is_noise = np.zeros(len(ev), bool)
+if NOISE > 0:                                                                                # 센서 잡음 주입(시뮬레이터는 잡음이 없음)
+    rng_ = np.random.default_rng(0); n_add = int(len(ev) * NOISE / (1 - NOISE)); add = np.c_[rng_.uniform(T_REF - HW, T_REF + HW, n_add), rng_.integers(0, W, n_add), rng_.integers(0, H, n_add), rng_.integers(0, 2, n_add)]
+    ev = np.vstack([ev, add]); is_noise = np.r_[is_noise, np.ones(n_add, bool)]; o_ = np.argsort(ev[:, 0], kind="stable"); ev, is_noise = ev[o_], is_noise[o_]
+if BAF_MS > 0:                                                                               # 뉴로모픽 이웃 지지 필터
+    tau = BAF_MS * 1e-3; tb = ((ev[:, 0] - (T_REF - HW)) / tau).astype(int); xi = ev[:, 1].astype(int); yi = ev[:, 2].astype(int); grid = np.zeros((tb.max() + 3, H + 2, W + 2), np.float32); np.add.at(grid, (tb + 1, yi + 1, xi + 1), 1)
+    box = ndi.uniform_filter(grid, size=3, mode="constant") * 27; keep_ = box[tb + 1, yi + 1, xi + 1] >= 2 - 1e-3; n_sig = (~is_noise).sum(); n_noi = is_noise.sum()
+    print(f"neighbour-support filter (tau={BAF_MS} ms): kept {keep_[~is_noise].sum() / max(n_sig, 1) * 100:.1f}% of signal events, removed {(~keep_[is_noise]).sum() / max(n_noi, 1) * 100:.1f}% of injected noise events")
+    ev = ev[keep_]
 t, x, y, p = ev[:, 0], ev[:, 1], ev[:, 2], ev[:, 3].astype(int); g = np.loadtxt(d + "/groundtruth.txt"); print(f"{os.path.basename(d)}: {len(t)} events in [{T_REF - HW:.2f}, {T_REF + HW:.2f}] s, {NZ} planes {Z_MIN}-{Z_MAX} m (inverse-depth spacing)")
 SL = Slerp(g[:, 0], Rot.from_quat(g[:, 4:8])); P_all = np.stack([np.interp(t, g[:, 0], g[:, k]) for k in (1, 2, 3)], 1); R_all = SL(t)
 R_ref = SL([T_REF])[0]; P_ref = np.array([np.interp(T_REF, g[:, 0], g[:, k]) for k in (1, 2, 3)]); dc = np.c_[(x - cx) / fx, (y - cy) / fy, np.ones(len(x))]
