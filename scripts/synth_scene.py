@@ -16,6 +16,7 @@ W_PX, H_PX = 960, 720
 E_DEG, C0 = 125.0, (470.0, 372.0)       # 합성 센서 오프셋(실제 영상과 다르게)
 NOISE_PX, SCALE = 0.6, 0.3
 BG_FRAC = float(__import__("os").environ.get("SYN_BG", "0.03"))           # 배경 잡음 비율(기본 0.03)
+SYN_POL = bool(int(__import__("os").environ.get("SYN_POL", "0")))       # 1: 에지 대비 부호 x 이동 방향으로 물리적 극성 부여(기본 0: 무작위 극성, 이전 결과 재현용)
 EXTRA_SEG = int(__import__("os").environ.get("SYN_EXTRA", "0"))          # 질감 밀도 시험용 추가 임의 선분 수(기본 0)
 SYN_RHO = __import__("os").environ.get("SYN_RHO")      # 설정 시 센서의 프레임 단위 타임스탬프 + 컬럼 순차 읽기 모델 사용(값=읽기 지속 비율 rho)
 FRAME_US = 773.0
@@ -61,12 +62,13 @@ def generate(theta_npy, omega_npy, out_h5, truth_npz, seed=0):
     nseg = len(S)
     win_s = 4e-3
     tt = (np.arange(len(th)) * 4 + 2) * 1e3                      # 창 중앙 시각(us)
+    OMEGA = np.gradient(th, 4e-3); CONTRAST = np.random.default_rng(7).choice([-1.0, 1.0], nseg)     # 각속도(rad/s), 선분별 밝기 대비 부호(독립 난수열이라 기존 생성 흐름 불변)
     X, Y, T, P, SZ = [], [], [], [], []
     for w in range(len(th)):
         target = int(n_win[w])
         if target < 50:
             continue
-        got = 0; xs, ys, ts, ss_ = [], [], [], []
+        got = 0; xs, ys, ts, ss_, ps_ = [], [], [], [], []
         while got < target:
             m = max(2 * (target - got), 4000)
             el = rng.choice(len(w_el), size=m, p=w_el)
@@ -88,18 +90,23 @@ def generate(theta_npy, omega_npy, out_h5, truth_npz, seed=0):
             nsx = c * nqx - sn * nqy; nsy = sn * nqx + c * nqy
             speed_n = np.abs((-(py - cpy)) * nsx + (px - cpx) * nsy)
             acc = np.where(is_seg, np.minimum(speed_n / 400.0, 1.0), 0.5)
+            if SYN_POL:                                                                  # dI/dt = -c (n . v), v = omega * perp(p - c')
+                vn_s = (-(py - cpy)) * nsx + (px - cpx) * nsy; c_el = CONTRAST[np.minimum(el, nseg - 1)]; pol = np.where(is_seg, (-c_el * np.interp(t_us, tt, OMEGA) * vn_s) > 0, rng.random(m) < 0.5)
+            else: pol = np.zeros(m, bool)
             px += rng.normal(0, NOISE_PX, m); py += rng.normal(0, NOISE_PX, m)
             ok = (rng.random(m) < acc) & (px >= 0) & (px < W_PX) & (py >= 0) & (py < H_PX)
             if SYN_RHO is not None:                       # 이벤트는 참 시각 t_us에 발생, 열 x가 읽히는 시각의 프레임 스탬프로 기록
                 rho = float(SYN_RHO)
                 t_us = FRAME_US * np.ceil((t_us - (px / W_PX) * rho * FRAME_US) / FRAME_US)
-            xs.append(px[ok]); ys.append(py[ok]); ts.append(t_us[ok]); ss_.append(s_el[ok]); got += int(ok.sum())
+            xs.append(px[ok]); ys.append(py[ok]); ts.append(t_us[ok]); ss_.append(s_el[ok]); ps_.append(pol[ok]); got += int(ok.sum())
         xs = np.concatenate(xs)[:target]; ys = np.concatenate(ys)[:target]; ts = np.concatenate(ts)[:target]; sz = np.concatenate(ss_)[:target].astype(np.float32)
+        pl = np.concatenate(ps_)[:target]
         nbg = int(BG_FRAC * target)                                              # 배경 잡음: 균일
         xs[:nbg] = rng.random(nbg) * W_PX; ys[:nbg] = rng.random(nbg) * H_PX; sz[:nbg] = -1.0   # 잡음 이벤트는 깊이 없음(-1)
+        if SYN_POL: pl[:nbg] = rng.random(nbg) < 0.5                                       # 잡음 극성은 무작위
         o = np.argsort(ts)
         X.append(np.floor(xs[o]).astype(np.uint16)); Y.append(np.floor(ys[o]).astype(np.uint16)); T.append(ts[o].astype(np.uint32))
-        P.append((rng.random(target) < 0.5).astype(np.uint8)); SZ.append(sz[o])
+        P.append(pl[o].astype(np.uint8) if SYN_POL else (rng.random(target) < 0.5).astype(np.uint8)); SZ.append(sz[o])
         if w % 50 == 0:
             print(f"window {w}/{len(th)} events so far {sum(len(a) for a in X)}", flush=True)
     X = np.concatenate(X); Y = np.concatenate(Y); T = np.concatenate(T); P = np.concatenate(P); SZ = np.concatenate(SZ)
