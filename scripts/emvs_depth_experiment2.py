@@ -92,6 +92,8 @@ def report(nm, D, ks=(1000, 3000, 6000)):                                       
 
 
 report("A  EMVS (all events, all planes, bilinear)", dsi_all_planes_bilinear(o, dd))
+D_on = dsi_all_planes_bilinear(o[p == 1], dd[p == 1]); D_off = dsi_all_planes_bilinear(o[p == 0], dd[p == 0])
+report("A+pol EMVS with per-polarity DSI (sqrt of sum sq)", np.sqrt(D_on ** 2 + D_off ** 2))                  # 극성별로 따로 투표한 DSI의 제곱합 제곱근: 같은 극성끼리 모일수록 높음(EMVS 틀 안에서 극성만 추가)
 G = 3; grp = np.minimum(((t - t[0]) / (t[-1] - t[0] + 1e-9) * G).astype(int), G - 1)
 Dg = {pol: [SM(dsi_of(o, dd, (grp == j) & ((p == pol) if pol is not None else np.ones(len(t), bool)))).ravel() for j in range(G)] for pol in (None, 0, 1)}
 
