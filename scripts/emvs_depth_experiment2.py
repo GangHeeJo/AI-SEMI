@@ -76,7 +76,8 @@ sub = np.zeros(len(t), bool); sub[::15] = True; best = None
 for conv, sx, sy in itertools.product(("c2w", "w2c"), (1, -1), (1, -1)):
     o_, dd_ = setup(conv, sx, sy); f_ = float(SM(dsi_of(o_, dd_, sub)).max(0).sum() / sub.sum())
     if best is None or f_ > best[0]: best = (f_, conv, sx, sy)
-print(f"pose convention selected by DSI focus (no ground-truth depth used): {best[1]} sx={best[2]:+d} sy={best[3]:+d}"); o, dd = setup(*best[1:])
+if len(sys.argv) > 4: cv_, sx_, sy_ = sys.argv[4].split(","); best = (0.0, cv_, int(sx_), int(sy_)); print("pose convention fixed from the command line (a dataset property, selected GT-free once per sequence):", sys.argv[4])
+print(f"pose convention used: {best[1]} sx={best[2]:+d} sy={best[3]:+d}"); o, dd = setup(*best[1:])
 
 
 def emvs_extract(D, med=5):                                                                 # 신뢰도 = 평면별 최댓값, 깊이 = argmax 인덱스에 중앙값 필터(EMVS 후처리의 임계 마스크는 쓰지 않음: 임계 하나에 결과가 좌우되어 같은 커버리지 비교로 대체)
