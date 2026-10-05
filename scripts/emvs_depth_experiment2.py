@@ -5,6 +5,7 @@
 #   A2  모든 이벤트가 자기 구간을 제외한 두 시간 구간의 증거로 평면 하나를 골라 그 평면에만 투표(일치 필터 없음)
 #   B   A2 + 두 복제본이 +-1평면 안에서 일치한 이벤트만
 #   C   B + 같은 극성 DSI에서 증거를 얻음
+#   +coop  위 DSI에 협동 네트워크(Marr-Poggio식, 뉴로모픽 차용): 같은 깊이의 이웃 픽셀에서 흥분, 같은 시선의 다른 깊이에서 억제를 반복 적용
 # EMVS 후처리: 신뢰도 = 평면별 최댓값, 깊이 = argmax, 마스크 = 8비트 정규화한 신뢰도가 가우시안 5x5 국소 평균 + c보다 큰 곳, 깊이 인덱스와 마스크에 5x5 중앙값 필터.
 # (세부 값은 논문 설정에 대한 기억 기반이라 공식 코드와 같다고 장담 못 함 -> A에는 정답으로 c를 고른 최선 사례를 따로 보고하는 관대한 기준도 적용)
 # 깊이 범위는 넓은 사전값(역깊이 균등), 자세 규약은 정답 깊이를 쓰지 않고 DSI 초점으로 자동 선택.
@@ -93,7 +94,20 @@ def report(nm, D, ks=(1000, 3000, 6000)):                                       
 
 report("A  EMVS (all events, all planes, bilinear)", dsi_all_planes_bilinear(o, dd))
 D_on = dsi_all_planes_bilinear(o[p == 1], dd[p == 1]); D_off = dsi_all_planes_bilinear(o[p == 0], dd[p == 0])
-report("A+pol EMVS with per-polarity DSI (sqrt of sum sq)", np.sqrt(D_on ** 2 + D_off ** 2))                  # 극성별로 따로 투표한 DSI의 제곱합 제곱근: 같은 극성끼리 모일수록 높음(EMVS 틀 안에서 극성만 추가)
+D_apol = np.sqrt(D_on ** 2 + D_off ** 2); report("A+pol EMVS with per-polarity DSI (sqrt of sum sq)", D_apol)                  # 극성별로 따로 투표한 DSI의 제곱합 제곱근: 같은 극성끼리 모일수록 높음(EMVS 틀 안에서 극성만 추가)
+def coop(D, a=1.0, b=0.5, sig=1.5, iters=6):                                                # 협동 네트워크: S <- relu(L0 + a*흥분(같은 깊이 이웃) - b*억제(같은 시선의 다른 깊이)), 반복마다 정규화
+    L0 = D / max(float(np.percentile(D[D > 0], 99.5)) if (D > 0).any() else 1.0, 1e-9); S = L0.copy()
+    for _ in range(iters):
+        E = ndi.gaussian_filter(S, (0.7, sig, sig)); near = ndi.uniform_filter1d(S, size=5, axis=0) * 5; I = np.maximum(S.sum(0, keepdims=True) - near, 0) / max(NZ - 5, 1) * 10     # 같은 시선에서 +-2평면 밖의 지지도 평균(x10로 스케일)
+        S = np.maximum(L0 + a * E - b * I, 0); S = S / max(float(np.percentile(S[S > 0], 99.5)) if (S > 0).any() else 1.0, 1e-9)
+    return S
+
+
+def report_coop(nm, D):
+    for b in (0.25, 0.5, 1.0): report(f"{nm} + coop(b={b})", coop(D, b=b))
+
+
+
 G = 3; grp = np.minimum(((t - t[0]) / (t[-1] - t[0] + 1e-9) * G).astype(int), G - 1)
 Dg = {pol: [SM(dsi_of(o, dd, (grp == j) & ((p == pol) if pol is not None else np.ones(len(t), bool)))).ravel() for j in range(G)] for pol in (None, 0, 1)}
 
@@ -118,4 +132,6 @@ def vote(use_pol, chunk=100000):
 kB, su, sv, skB = vote(False); kC, suC, svC, skC = vote(True)
 report("A2 every event votes its own plane", dsi_assigned(su, sv, skB))
 print(f"   [B] kept {kB.mean() * 100:.1f}% of events"); report("B  ours: assigned + agreement", dsi_assigned(su, sv, np.where(kB, skB, -1)))
-print(f"   [C] kept {kC.mean() * 100:.1f}% of events"); report("C  ours + polarity-matched", dsi_assigned(suC, svC, np.where(kC, skC, -1)))
+print(f"   [C] kept {kC.mean() * 100:.1f}% of events"); DC = dsi_assigned(suC, svC, np.where(kC, skC, -1)); report("C  ours + polarity-matched", DC)
+print("--- cooperative network (excitation of same-depth neighbours, inhibition across depths on the same line of sight)")
+report_coop("A+pol", D_apol); report_coop("C", DC)
