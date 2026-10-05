@@ -19,6 +19,13 @@ from delta_depthwarp2 import load_cal, sharp_of  # noqa: E402
 from ghost_metric import ghost  # noqa: E402
 
 W_PX, H_PX, G = 960, 720, 3
+WTA = float(os.environ.get("POL_WTA", "0"))        # >0: 층 사이 승자독식(같은 지도 위치에서 가장 선명한 층만 살리고 다른 층 지지도를 b배만큼 억제; 뉴로모픽 협동 네트워크 차용)
+
+
+def wta_inplace(X, b):                                                                      # X: (K, 위치). S'_k = relu(S_k - b * max_{|k'-k|>1} S_k')
+    K_ = X.shape[0]; a1 = X.argmax(0); m1 = X[a1, np.arange(X.shape[1])]; Y = X.copy(); ar = np.arange(K_)[:, None]
+    Y[np.abs(ar - a1[None, :]) <= 1] = -np.inf; m2 = np.maximum(Y.max(0), 0)                # a1 +-1층을 뺀 최고 층
+    inh = np.where(np.abs(ar - a1[None, :]) > 1, m1[None, :], m2[None, :]); np.maximum(X - b * inh, 0, out=X)
 
 
 def chunks_tp(f, th, mids):
@@ -57,6 +64,10 @@ def run(h5p, th_npy, cal_json, truth_npz):
         for k in range(K):
             So[j, k] = sharp_of(M[1, j, k].reshape(C, C)).ravel(); Sf[j, k] = sharp_of(M[0, j, k].reshape(C, C)).ravel(); St[j, k] = sharp_of((M[0, j, k] + M[1, j, k]).reshape(C, C)).ravel()
     del M; print("sharpness done", flush=True)
+    if WTA > 0:
+        for arr in (St, So, Sf):
+            for j in range(G): wta_inplace(arr[j], WTA)
+        print(f"layer winner-take-all applied (b={WTA})", flush=True)
     methods = ["A", "P1", "P2"]; maps = {m: np.zeros(C * C, np.float32) for m in methods}; mall = {m: np.zeros(C * C, np.float32) for m in methods}
     kept = dict.fromkeys(methods, 0); correct = dict.fromkeys(methods, 0); denom = dict.fromkeys(methods, 0); correct_all = dict.fromkeys(methods, 0); denom_all = dict.fromkeys(methods, 0); total = 0; n_off = 0; hist = {m: np.zeros(K, np.int64) for m in methods}
     for x, y, a, t, p in chunks_tp(f, th, mids):
