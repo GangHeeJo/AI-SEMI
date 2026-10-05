@@ -2,6 +2,7 @@
 # §169: UZH shapes_rotation(DAVIS240, 모션캡처 정답)에서 우리 ECC θ 추정기를 진짜 정답으로 채점.
 # 정답 = 쿼터니언 증분의 광축(z) 둘레 회전 성분 (3축 회전 중 영상 평면 회전만 비교; pan/tilt는 ECC의 병진이 흡수).
 # 지표 = 1초 구간별 |Δθ_est - Δθ_gt| (구간마다 기준 재설정; 누적 표류가 아니라 순간 정확도).
+import os
 import sys
 
 import cv2
@@ -11,6 +12,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.spatial.transform import Rotation as Rot
 
 W, H = 240, 180
+GT_SHIFT = float(os.environ.get("GT_SHIFT", "0"))       # 정답 자세 시간 보정(초): 이벤트 시각 t에는 정답 자세 roll(t + GT_SHIFT)를 대응(uzh_diag_validity.py로 추정, 약 +0.008)
 
 
 def gt_roll(path):
@@ -47,7 +49,7 @@ if __name__ == "__main__":
             for t0 in np.arange(2.0, 58.0, 1.0):
                 m = (te >= t0) & (te < t0 + 1.0)
                 est = sgn * th[m][-1] - sgn * th[m][0] if m.sum() > 5 else np.nan
-                gt = np.interp(t0 + 1, tg, roll) - np.interp(t0, tg, roll)
+                gt = np.interp(t0 + 1 + GT_SHIFT, tg, roll) - np.interp(t0 + GT_SHIFT, tg, roll)
                 res.append((est, gt, ok[m].mean() if m.any() else 0))
             r = np.array(res); v = ~np.isnan(r[:, 0]); e = r[v, 0] - r[v, 1]
             print(f"win {win*1e3:4.0f}ms sign {sgn:+d}: 1s-block error RMS {np.sqrt((e**2).mean()):6.2f} deg  (gt roll per-1s RMS {np.sqrt((r[v,1]**2).mean()):5.2f}, corr {np.corrcoef(r[v,0], r[v,1])[0,1]:+.2f}, slope {np.polyfit(r[v,1], r[v,0], 1)[0]:+.2f}, ok-frac {r[v,2].mean():.2f})")

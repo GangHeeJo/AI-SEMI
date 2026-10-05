@@ -47,3 +47,11 @@ print(f"{'rotation error (deg RMS)':26s}{'sharpness':>11s}{'replicate NCC':>15s}
 for level in (0, 0.25, 0.5, 1, 2, 4):
     u, v = world(level); M = counts(u, v); sharp = float((M ** 2).sum() / len(u) ** 2 * 1e6); A = counts(u, v, ~blk); B = counts(u, v, blk); pu, pc, nc = purity(u, v, p)
     print(f"{level:<26.2f}{sharp:11.2f}{ncc(band(A), band(B)):15.3f}{pu:17.3f}{pc:15.3f}", flush=True)
+
+
+# 정답 자세의 시간 어긋남 시험: rot(t + dt)로 되돌렸을 때 진단이 어디서 최대인가(정답에 지연/오프셋이 있으면 0이 아닌 곳에서 최대)
+SL = Slerp(g[m, 0], Rot.from_quat(g[m, 4:8])); print(f"\n{'GT time offset (ms)':22s}{'sharpness':>11s}{'replicate NCC':>15s}{'polarity purity':>17s}")
+for dt in (0.0, 0.008, 0.012, 0.016, 0.020, 0.025, 0.030, 0.040, 0.060):
+    r2 = SL(np.clip(t + dt, g[m, 0][0], g[m, 0][-1])); dd = (R0.inv() * r2).apply(ray); az = np.arctan2(dd[:, 0], dd[:, 2]); el = np.arctan2(dd[:, 1], np.hypot(dd[:, 0], dd[:, 2])); u, v = az * fx, el * fy
+    M = counts(u, v); sharp = float((M ** 2).sum() / len(u) ** 2 * 1e6); A = counts(u, v, ~blk); B = counts(u, v, blk); pu, pc, nc = purity(u, v, p)
+    print(f"{dt * 1000:<22.1f}{sharp:11.2f}{ncc(band(A), band(B)):15.3f}{pu:17.3f}", flush=True)
