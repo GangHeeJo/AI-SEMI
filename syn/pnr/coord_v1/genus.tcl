@@ -2,6 +2,7 @@
 #   cd ~/redred-faer && genus -batch -files syn/pnr/coord_v1/genus.tcl
 set DESIGN   aer_tx16_coord_transform_v1
 set RTL_LIST {
+  rtl/arbiter2.v
   rtl/arbiter4_tree.v
   rtl/arbiter8.v
   rtl/small_fifo.v
