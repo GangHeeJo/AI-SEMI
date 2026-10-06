@@ -1,4 +1,10 @@
 `timescale 1ns/1ps
+`ifndef FDA
+ `define FDA 32
+`endif
+`ifndef FDB
+ `define FDB 32
+`endif
 // §212: 과부하에서 기존 world_mem_writer(가득 차면 버림)와 world_mem_writer_gain(이득 조절)을 같은 입력으로 비교.
 // 프레임마다 640개 이벤트를 열(x) 순서로 8개/사이클 속도로 쏘고, 프레임 주기 T사이클(쓰기 포트는 1건/사이클)로 쓰기 용량 비율 f = T/640을 만든다.
 // 장면: x=y 대각선 띠(열마다 8개 띠 이벤트 + 2개 무작위). 지표: 정답(들어온 전부)과 쓰인 이벤트의 칸별 개수 지도의 NCC, x 사분위별 남은 비율, 손실/솎아냄 개수.
@@ -8,8 +14,8 @@ module tb_gain_overload;
   reg clk = 0, rst = 1; always #2.5 clk = ~clk;
   reg [NL-1:0] valid = 0; reg [NL*AB-1:0] wx = 0, wy = 0; reg [NL-1:0] wp = 0;
   wire [NL-1:0] ov_a, ov_b, shed_b; wire stall_a, stall_b, we_a, we_b, pol_a, pol_b; wire [2*AB-1:0] ad_a, ad_b;
-  world_mem_writer      #(.N_LANES(NL), .ADDR_BITS(AB), .FIFO_DEPTH(32)) A (.clk(clk), .rst(rst), .wr_valid(valid), .wr_x(wx), .wr_y(wy), .wr_pol(wp), .wr_overrun(ov_a), .stall(stall_a), .world_we(we_a), .world_addr(ad_a), .world_pol(pol_a));
-  world_mem_writer_gain #(.N_LANES(NL), .ADDR_BITS(AB), .FIFO_DEPTH(32)) B (.clk(clk), .rst(rst), .wr_valid(valid), .wr_x(wx), .wr_y(wy), .wr_pol(wp), .wr_overrun(ov_b), .wr_shed(shed_b), .stall(stall_b), .world_we(we_b), .world_addr(ad_b), .world_pol(pol_b));
+  world_mem_writer      #(.N_LANES(NL), .ADDR_BITS(AB), .FIFO_DEPTH(`FDA)) A (.clk(clk), .rst(rst), .wr_valid(valid), .wr_x(wx), .wr_y(wy), .wr_pol(wp), .wr_overrun(ov_a), .stall(stall_a), .world_we(we_a), .world_addr(ad_a), .world_pol(pol_a));
+  world_mem_writer_gain #(.N_LANES(NL), .ADDR_BITS(AB), .FIFO_DEPTH(`FDB)) B (.clk(clk), .rst(rst), .wr_valid(valid), .wr_x(wx), .wr_y(wy), .wr_pol(wp), .wr_overrun(ov_b), .wr_shed(shed_b), .stall(stall_b), .world_we(we_b), .world_addr(ad_b), .world_pol(pol_b));
 
   integer full_m [0:4095]; integer ma [0:4095]; integer mb [0:4095];
   integer qa [0:3]; integer qb [0:3]; integer qf [0:3];
