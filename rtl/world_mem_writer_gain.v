@@ -7,6 +7,7 @@ module world_mem_writer_gain #(
   parameter integer N_LANES    = 8,
   parameter integer ADDR_BITS  = 6,
   parameter integer FIFO_DEPTH = 32,
+  parameter integer GAIN_EN    = 1,                   // 0: 이득 조절 끔(§215: 실제 프레임 버스트에서 이득 없음) -> 캐시만 쓸 때
   parameter integer CACHE_N    = 0,                   // >0: 쓰기 포트 출력단 공용 직접사상 캐시(항목 수, 2의 거듭제곱). 같은 칸·같은 극성이 이미 쓰였으면 메모리 쓰기를 생략(무손실, §214)
   parameter integer WIN_BITS   = 11                  // 추정 창 W = 2^WIN_BITS 사이클; 버스트 주기(프레임)보다 몇 배 길어야 k가 안 흔들림
 )(
@@ -59,7 +60,7 @@ module world_mem_writer_gain #(
   genvar g;
   generate
     for (g = 0; g < N_LANES; g = g + 1) begin : LANE
-      assign accept[g] = (k_cur == 4'd1) || (lfsr[g +: 8] < thr);
+      assign accept[g] = (GAIN_EN == 0) || (k_cur == 4'd1) || (lfsr[g +: 8] < thr);
       small_fifo #(.WIDTH(FIFO_W), .DEPTH(FIFO_DEPTH), .MARGIN(2)) u_fifo (
         .clk(clk), .rst(rst),
         .push(wr_valid[g] & accept[g]),
