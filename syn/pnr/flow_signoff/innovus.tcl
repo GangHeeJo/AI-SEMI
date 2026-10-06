@@ -43,7 +43,7 @@ saveDesign pnr/route.enc
 }
 # --- (우리 추가, 현수 원본 흐름과 다른 부분) 내부 추출과 signoff 추출의 hold 차이(약 20 ps)를 흡수할 여유를 두고 hold 재최적화, DRC 위반은 삭제 후 재배선 반복
 setAnalysisMode -analysisType onChipVariation -cppr both
-setOptMode -holdTargetSlack 0.050 -setupTargetSlack 0.030
+setOptMode -holdTargetSlack 0.080 -setupTargetSlack 0.030
 catch {optDesign -postRoute -hold}
 for {set it 0} {$it < 3} {incr it} {
   catch {verify_drc -limit 1000 -report pnr/drc_iter$it.rpt}
