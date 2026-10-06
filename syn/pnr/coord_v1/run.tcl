@@ -21,6 +21,7 @@ clock_opt_design
 routeDesign
 setExtractRCMode -engine postRoute
 extractRC
+setAnalysisMode -analysisType onChipVariation -cppr both
 optDesign -postRoute -setup -hold
 extractRC
 report_area  > $OUT_DIR/${DESIGN}_pnr_area.rpt
