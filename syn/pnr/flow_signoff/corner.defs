@@ -1,0 +1,3 @@
+DEFINE typical /tools/config/GPDK/gpdk045_v_6_0/qrc/typical
+DEFINE rcworst /tools/config/GPDK/gpdk045_v_6_0/qrc/rcworst
+DEFINE rcbest /tools/config/GPDK/gpdk045_v_6_0/qrc/rcbest

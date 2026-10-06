@@ -1,0 +1,18 @@
+# Standalone Quantus (signoff) SPEF extraction from Innovus DEF. Placeholders: @TOP@ @G@
+input_db -type def \
+  -design_file pnr/@TOP@.def \
+  -lef_file_list @G@/lef/gsclib045_tech.lef @G@/lef/gsclib045_macro.lef @EXTRA_LEF@
+process_technology \
+  -technology_library_file @FLOW@/pvtech.lib \
+  -technology_name gpdk045_qrc \
+  -technology_corner typical \
+  -temperature 25
+extraction_setup \
+  -technology_layer_map \
+    Metal1 metal1_conn Metal2 metal2_conn Metal3 metal3_conn Metal4 metal4_conn Metal5 metal5_conn \
+    Metal6 metal6_conn Metal7 metal7_conn Metal8 metal8_conn Metal9 metal9_conn Metal10 metal10_conn Metal11 metal11_conn \
+    Cont cont_poly Via1 Via1 Via2 Via2 Via3 Via3 Via4 Via4 Via5 Via5 Via6 Via6 Via7 Via7 Via8 Via8 Via9 Via9 Via10 via10_nocap
+extract -selection all -type rc_coupled
+filter_coupling_cap -total_cap_threshold 0.0 -coupling_cap_threshold_absolute 0.01 -coupling_cap_threshold_relative 1.0
+output_setup -file_name pnr/@TOP@_quantus -compressed false
+output_db -type spef -hierarchy_delimiter "/"
