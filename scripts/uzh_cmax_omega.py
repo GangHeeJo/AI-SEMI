@@ -3,6 +3,7 @@
 # 창(WIN_S)마다 이벤트를 창 중심 시각으로 순수 회전 흐름(Longuet-Higgins)으로 되돌린 뒤 이벤트 영상의 겹침 점수 sum c^2를 최대화하는 ω를 Nelder-Mead로 구한다(이전 창 값에서 시작).
 # 정답 ω = 쿼터니언 유한 차분(5ms, 몸체 좌표). 부호/축 규약은 개발 구간 회귀로 고정(규약이지 상수 조정이 아님). 개발 = 앞 절반, 검증 = 뒤 절반.
 # 사용: uzh_cmax_omega.py <uzh_dir> [gt_shift_s=0.008] [win_s=0.01]
+import os
 import sys
 
 import cv2
@@ -16,7 +17,29 @@ DIST = np.array([-0.368436311798, 0.150947243557, -0.000296130534385, -0.0007594
 OM_MAX = 600.0           # deg/s, 물리적으로 가능한 각속도 상한(손으로 흔드는 운동 기준의 일반적 범위; 정답 최대값을 보고 정한 것이 아님)
 OUT = sys.argv[4] if len(sys.argv) > 4 else "cmax_est"
 d = sys.argv[1]; SHIFT = float(sys.argv[2]) if len(sys.argv) > 2 else 0.008; WIN = float(sys.argv[3]) if len(sys.argv) > 3 else 0.01
-ev = pd.read_csv(d + "/events.txt", sep=" ", header=None, names=["t", "x", "y", "p"]).values; t = ev[:, 0]
+ev = pd.read_csv(d + "/events.txt", sep=" ", header=None, names=["t", "x", "y", "p"]).values
+n_all_events = len(ev)
+POLICY = os.environ.get("POLICY", "all")      # 이벤트 선택 정책(생체 모방 시험, §213): all | uni | on | off | fovea | periph | refr -- 모두 약 50%로 맞춤(예산 일치는 정확도를 보고 정한 것이 아님)
+if POLICY != "all":
+    rng = np.random.default_rng(0); rr = np.hypot(ev[:, 1] - 119.5, ev[:, 2] - 89.5); r0 = 40.0
+    def match(w, target=0.5):                                         # 평균 수용 확률이 target이 되도록 a를 이분탐색(keep = min(1, a*w))
+        lo, hi = 0.0, 1e4
+        for _ in range(60):
+            a = 0.5 * (lo + hi); lo, hi = (a, hi) if np.minimum(1, a * w).mean() < target else (lo, a)
+        return np.minimum(1, 0.5 * (lo + hi) * w)
+    if POLICY == "uni": keep = rng.random(len(ev)) < 0.5
+    elif POLICY == "on": keep = ev[:, 3] == 1
+    elif POLICY == "off": keep = ev[:, 3] == 0
+    elif POLICY == "fovea": keep = rng.random(len(ev)) < match(1.0 / (1.0 + (rr / r0) ** 2))
+    elif POLICY == "periph": keep = rng.random(len(ev)) < match((rr / r0) ** 2 / (1.0 + (rr / r0) ** 2))
+    elif POLICY == "refr":                                             # 픽셀 불응기: 같은 픽셀의 직전 이벤트(전체 스트림 기준)와 tau 이내면 무시. tau는 수용 비율이 50%에 가장 가까운 값
+        pix = (ev[:, 2].astype(np.int64) * W + ev[:, 1].astype(np.int64)); o = np.lexsort((ev[:, 0], pix)); best = None
+        for tau in (0.5e-3, 1e-3, 2e-3, 3e-3, 5e-3, 8e-3, 12e-3, 20e-3, 40e-3, 80e-3):
+            gap = np.full(len(ev), np.inf); dd = np.diff(ev[o, 0]); same = np.diff(pix[o]) == 0; gap[o[1:]] = np.where(same, dd, np.inf); kk = gap > tau
+            if best is None or abs(kk.mean() - 0.5) < abs(best[1].mean() - 0.5): best = (tau, kk)
+        keep = best[1]; print(f"refractory tau {best[0] * 1e3:.1f} ms")
+    ev = ev[keep]; print(f"policy {POLICY}: kept {keep.mean() * 100:.1f}% of events", flush=True)
+t = ev[:, 0]
 xy = cv2.undistortPoints(np.stack([ev[:, 1], ev[:, 2]], 1).reshape(-1, 1, 2), K, DIST).reshape(-1, 2); xn, yn = xy[:, 0], xy[:, 1]
 g = np.loadtxt(d + "/groundtruth.txt"); tg = g[:, 0]; Rg = Rot.from_quat(g[:, 4:8]); k5 = 1                                                      # 정답 200 Hz, 한 샘플 차분(5 ms)
 om_gt = np.degrees((Rg[:-k5].inv() * Rg[k5:]).as_rotvec() / np.diff(tg)[:, None]); tgm = 0.5 * (tg[:-1] + tg[1:])                              # 몸체 좌표 각속도(deg/s)
@@ -29,7 +52,8 @@ def contrast(om, dt):
     c = np.bincount(py[ok] * W + px[ok], minlength=W * H).astype(np.float64); return -float((c * c).sum() / len(X) ** 2 * 1e4) + 1e3 * float(np.maximum(np.abs(om) - OM_MAX, 0).sum())          # 창 전체 이벤트 수로 정규화(화면 밖으로 밀어낸 이벤트가 점수를 희석: 퇴화 해법 방지) + 각속도 범위 제한
 
 
-EVN = int(sys.argv[5]) if len(sys.argv) > 5 else 0                                                                          # 0이면 고정 시간 창, 양수면 고정 이벤트 수 창
+EVN = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+if EVN and POLICY != "all": EVN = int(EVN * len(ev) / n_all_events)       # 남긴 비율만큼 창 이벤트 수를 줄여 창의 시간 길이를 같게 유지                                                                          # 0이면 고정 시간 창, 양수면 고정 이벤트 수 창
 if EVN: i0 = np.arange(0, len(t) - EVN, EVN); i1 = i0 + EVN
 else: edges = np.arange(t[0], t[-1], WIN); idx = np.searchsorted(t, edges); i0 = idx[:-1]; i1 = idx[1:]
 tc = np.array([0.5 * (t[a] + t[b - 1]) if b > a else np.nan for a, b in zip(i0, i1)]); dur = np.array([t[b - 1] - t[a] if b > a else 0.0 for a, b in zip(i0, i1)])
