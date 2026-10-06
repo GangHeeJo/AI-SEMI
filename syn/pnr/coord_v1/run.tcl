@@ -22,7 +22,11 @@ routeDesign
 setExtractRCMode -engine postRoute
 extractRC
 setAnalysisMode -analysisType onChipVariation -cppr both
+setOptMode -holdTargetSlack 0.020 -setupTargetSlack 0.030
 optDesign -postRoute -setup -hold
+catch {ecoRoute -fix_drc}
+extractRC
+optDesign -postRoute -hold
 extractRC
 report_area  > $OUT_DIR/${DESIGN}_pnr_area.rpt
 report_power > $OUT_DIR/${DESIGN}_pnr_power.rpt
@@ -33,7 +37,7 @@ catch {check_timing -verbose > $OUT_DIR/${DESIGN}_check_timing.rpt}
 catch {verify_drc -report $OUT_DIR/${DESIGN}_drc.rpt}
 catch {verify_connectivity -report $OUT_DIR/${DESIGN}_conn.rpt}
 catch {verify_process_antenna -report $OUT_DIR/${DESIGN}_antenna.rpt}
-catch {write_db $OUT_DIR/${DESIGN}_db}
+catch {saveDesign $OUT_DIR/${DESIGN}.enc -mmmc2}
 catch {streamOut $OUT_DIR/${DESIGN}.gds -mapFile /tools/config/GPDK/gpdk045_v_6_0/soce/streamOut.map -libName DesignLib -merge {/home/aiasic26911/gsclib045_all_v4.7/gsclib045/gds/gsclib045.gds}}
 catch {write_sdf $OUT_DIR/${DESIGN}.sdf}
 exit
