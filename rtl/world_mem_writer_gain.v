@@ -25,6 +25,7 @@ module world_mem_writer_gain #(
   localparam integer FIFO_W = 2 * ADDR_BITS + 1;
   wire [N_LANES-1:0] fifo_empty, fifo_full, fifo_near_full, gnt;
   wire [FIFO_W-1:0]  fifo_pop_data [0:N_LANES-1];
+  reg  [3:0]         k_cur;                           // 현재 수용 간격(확률 1/k)
   reg  [15:0]        lfsr;                            // 공용 16비트 LFSR, 레인 g는 비트 [g+7:g]를 씀
   reg  [7:0]         thr;                             // 수용 문턱 = 256/k
   always @(*) case (k_cur)
@@ -36,7 +37,6 @@ module world_mem_writer_gain #(
     if (rst) lfsr <= 16'hACE1;
     else lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10]};
   end
-  reg  [3:0]         k_cur;
   reg  [WIN_BITS-1:0] win_cnt;
   reg  [WIN_BITS+3:0] arr_cnt;                         // 창 안 도착 이벤트 수(최대 8*W)
   integer pc;
