@@ -7,6 +7,7 @@ module world_mem_writer_gain #(
   parameter integer N_LANES    = 8,
   parameter integer ADDR_BITS  = 6,
   parameter integer FIFO_DEPTH = 32,
+  parameter integer CACHE_N    = 0,                   // >0: 쓰기 포트 출력단 공용 직접사상 캐시(항목 수, 2의 거듭제곱). 같은 칸·같은 극성이 이미 쓰였으면 메모리 쓰기를 생략(무손실, §214)
   parameter integer WIN_BITS   = 11                  // 추정 창 W = 2^WIN_BITS 사이클; 버스트 주기(프레임)보다 몇 배 길어야 k가 안 흔들림
 )(
   input                             clk,
@@ -17,6 +18,7 @@ module world_mem_writer_gain #(
   input  [N_LANES-1:0]              wr_pol,
   output [N_LANES-1:0]              wr_overrun,
   output [N_LANES-1:0]              wr_shed,
+  output                            wr_dedup,       // 캐시 적중으로 생략한 쓰기(펄스)
   output                            stall,
   output                            world_we,
   output [2*ADDR_BITS-1:0]          world_addr,
@@ -80,7 +82,29 @@ module world_mem_writer_gain #(
     sel_data = {FIFO_W{1'b0}};
     for (k = 0; k < N_LANES; k = k + 1) if (gnt[k]) sel_data = fifo_pop_data[k];
   end
-  assign world_we   = any_gnt;
-  assign world_addr = {sel_data[FIFO_W-1 -: ADDR_BITS], sel_data[ADDR_BITS -: ADDR_BITS]};
-  assign world_pol  = sel_data[0];
+  // --- 출력단 공용 캐시: 모든 쓰기가 이 한 포트를 지나므로 캐시가 항상 메모리와 일치(레인별 캐시는 다른 레인의 반대 극성 쓰기로 낡을 수 있어 손실이 생김)
+  wire [2*ADDR_BITS-1:0] sel_addr = {sel_data[FIFO_W-1 -: ADDR_BITS], sel_data[ADDR_BITS -: ADDR_BITS]};
+  wire                   sel_pol  = sel_data[0];
+  generate
+    if (CACHE_N > 0) begin : CACHE
+      localparam integer IDX = $clog2(CACHE_N);
+      localparam integer TAGB = 2*ADDR_BITS - IDX;
+      reg [CACHE_N-1:0] c_valid, c_pol;
+      reg [TAGB-1:0]    c_tag [0:CACHE_N-1];
+      wire [IDX-1:0]    idx = sel_addr[IDX-1:0];
+      wire [TAGB-1:0]   tag = sel_addr[2*ADDR_BITS-1:IDX];
+      wire hit = any_gnt && c_valid[idx] && (c_tag[idx] == tag) && (c_pol[idx] == sel_pol);
+      always @(posedge clk) begin
+        if (rst) begin c_valid <= {CACHE_N{1'b0}}; c_pol <= {CACHE_N{1'b0}}; end
+        else if (any_gnt && !hit) begin c_valid[idx] <= 1'b1; c_pol[idx] <= sel_pol; c_tag[idx] <= tag; end
+      end
+      assign world_we = any_gnt & ~hit;
+      assign wr_dedup = hit;
+    end else begin : NOCACHE
+      assign world_we = any_gnt;
+      assign wr_dedup = 1'b0;
+    end
+  endgenerate
+  assign world_addr = sel_addr;
+  assign world_pol  = sel_pol;
 endmodule
