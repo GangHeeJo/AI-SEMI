@@ -12,6 +12,7 @@ foreach p $DBL { foreach c [get_db lib_cells */$p] { set_db $c .dont_use true } 
 # CG=1 -> Genus inserts clock gating (row-enable ICGs for memory banks)
 set_db lp_insert_clock_gating [expr {[info exists ::env(CG)] && $::env(CG) eq "1"}]
 set_db use_scan_seqs_for_non_dft false
+set_db init_hdl_search_path /home/aiasic26911/redred-faer
 read_hdl -sv $::env(RTL)
 elaborate $TOP
 check_design -unresolved
