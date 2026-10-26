@@ -39,8 +39,8 @@ for r in top.references:
         groups["logic"].append(rect)
 print({k: len(v) for k, v in groups.items()})
 fig, ax = plt.subplots(figsize=(7, 6.3), dpi=140)
-ax.set_facecolor("#10181E")
-for k, col, a in (("fill", "#2A3A44", 1.0), ("logic", "#7FA8B5", 0.9), ("ff", "#E09F3E", 0.95), ("icg", "#E0443A", 1.0)):
+ax.set_facecolor("#1D1D1F")
+for k, col, a in (("fill", "#2A2A2C", 1.0), ("logic", "#5A5A5E", 0.9), ("ff", "#C7C7CC", 0.95), ("icg", "#2997FF", 1.0)):
     if groups[k]:
         ax.add_collection(PatchCollection(groups[k], facecolor=col, edgecolor="none", alpha=a))
 allr = [r for g in groups.values() for r in g]
@@ -49,5 +49,5 @@ ys = [r.get_y() for r in allr] + [r.get_y() + r.get_height() for r in allr]
 ax.set_xlim(min(xs), max(xs)); ax.set_ylim(min(ys), max(ys)); ax.set_aspect("equal")
 ax.tick_params(labelsize=12)
 ax.set_xlabel("µm"); ax.set_ylabel("µm")
-ax.legend(handles=[Patch(fc="#E09F3E", label='플립플롭·래치'), Patch(fc="#E0443A", label=f"클록 게이트 ICG ({len(groups['icg'])})"), Patch(fc="#7FA8B5", label='조합 논리·기타'), Patch(fc="#2A3A44", label="필러·탭")], loc="upper right", fontsize=13, facecolor="#FFFFFF")
+ax.legend(handles=[Patch(fc="#C7C7CC", label='플립플롭·래치'), Patch(fc="#2997FF", label=f"클록 게이트 ICG ({len(groups['icg'])})"), Patch(fc="#5A5A5E", label='조합 논리·기타'), Patch(fc="#2A2A2C", label="필러·탭")], loc="upper right", fontsize=13, facecolor="#FFFFFF")
 fig.tight_layout(); fig.savefig(sys.argv[2]); print("saved")

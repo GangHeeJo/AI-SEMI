@@ -9,7 +9,8 @@ const fs = require("fs");
 const fig = (f) => path.join(FIG, f);
 const hasFig = (f) => fs.existsSync(fig(f));
 
-const INK = "1B2630", TEAL = "0E7C7B", AMBER = "E09F3E", LIGHT = "F2F5F6", MID = "5B6B76", RED = "B5483C", GREEN = "2E7D4F", WHITE = "FFFFFF", PALE = "DCEBEA";
+const INK = "1D1D1F", TEAL = "0066CC", AMBER = "0066CC", LIGHT = "F5F5F7", MID = "7A7A7A", RED = "1D1D1F", GREEN = "0066CC", WHITE = "FFFFFF", PALE = "F5F5F7";
+const BLUE_D = "2997FF", DARK = "272729", HAIR = "E0E0E0", MUTED_D = "CCCCCC";
 const FONT = "Malgun Gothic";
 
 const pres = new pptxgen();
@@ -18,27 +19,27 @@ pres.title = "회전 이벤트 카메라용 월드 좌표 변환·월드 메모�
 pres.author = "REDRED";
 pres.theme = { headFontFace: FONT, bodyFontFace: FONT };
 
-pres.defineSlideMaster({
-  title: "CONTENT", background: { color: WHITE },
+["CONTENT", "PARCH"].forEach((nm) => pres.defineSlideMaster({
+  title: nm, background: { color: nm === "CONTENT" ? WHITE : LIGHT },
   objects: [
     { text: { text: "팀 REDRED · Digital 2차", options: { x: 0.6, y: 7.08, w: 5, h: 0.3, fontFace: FONT, fontSize: 10, color: MID, margin: 0 } } },
   ],
   slideNumber: { x: 12.2, y: 7.08, w: 0.6, h: 0.3, fontFace: FONT, fontSize: 10, color: MID, align: "right" },
   margin: [0.5, 0.6, 0.5, 0.6],
-});
-pres.defineSlideMaster({ title: "DARK", background: { color: INK } });
+}));
+pres.defineSlideMaster({ title: "DARK", background: { color: DARK } });
 
 let n = 0;
 function content(title, notes) {
-  const s = pres.addSlide({ masterName: "CONTENT" });
-  s.addText(title, { x: 0.6, y: 0.35, w: 12.1, h: 0.95, fontFace: FONT, fontSize: 26, bold: true, color: INK, valign: "middle", margin: 0, isTextBox: true, fit: "shrink" });
+  const s = pres.addSlide({ masterName: n % 2 ? "PARCH" : "CONTENT" });
+  s.addText(title, { x: 0.6, y: 0.35, w: 12.1, h: 0.95, fontFace: FONT, fontSize: 26, bold: true, charSpacing: -0.3, color: INK, valign: "middle", margin: 0, isTextBox: true, fit: "shrink" });
   if (notes) s.addNotes(notes);
   n++;
   return s;
 }
 const T = (s, text, o) => s.addText(text, Object.assign({ fontFace: FONT, color: INK, fontSize: 15, margin: 0, isTextBox: true, valign: "top" }, o));
 function card(s, x, y, w, h, head, body, o = {}) {
-  s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: o.fill || LIGHT }, line: { color: o.fill || LIGHT }, rectRadius: 0.08 });
+  s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: o.fill || WHITE }, line: { color: HAIR, width: 0.75 }, rectRadius: 0.12 });
   T(s, head, { x: x + 0.2, y: y + 0.15, w: w - 0.4, h: 0.4, fontSize: 16, bold: true, color: o.headColor || TEAL });
   T(s, body, { x: x + 0.2, y: y + 0.6, w: w - 0.4, h: h - 0.75, fontSize: o.size || 14, color: INK });
 }
@@ -49,7 +50,7 @@ function table(s, rows, x, y, w, colW, o = {}) {
   const body = rows.map((r, ri) => r.map((c) => {
     const isH = ri === 0;
     const cell = typeof c === "object" ? c : { text: String(c) };
-    return { text: cell.text, options: Object.assign({ fontFace: FONT, fontSize: o.size || 13, color: isH ? WHITE : INK, bold: isH || !!cell.bold, fill: { color: isH ? TEAL : (ri % 2 ? WHITE : LIGHT) }, valign: "middle", margin: [0.04, 0.08, 0.04, 0.08], border: { type: "solid", pt: 0.5, color: "D5DCDF" } }, cell.options || {}) };
+    return { text: cell.text, options: Object.assign({ fontFace: FONT, fontSize: o.size || 13, color: INK, bold: isH || !!cell.bold, fill: { color: isH ? LIGHT : WHITE }, valign: "middle", margin: [0.04, 0.08, 0.04, 0.08], border: { type: "solid", pt: 0.5, color: HAIR } }, cell.options || {}) };
   }));
   s.addTable(body, { x, y, w, colW, rowH: o.rowH || 0.42, autoPage: false });
 }
@@ -57,16 +58,16 @@ const chartBase = (title, colors) => ({
   showTitle: true, title, titleFontFace: FONT, titleFontSize: 14, titleColor: INK,
   chartColors: colors, showLegend: false, showValue: true, dataLabelPosition: "outEnd", dataLabelFontFace: FONT, dataLabelFontSize: 12, dataLabelColor: INK,
   catAxisLabelFontFace: FONT, catAxisLabelFontSize: 12, catAxisLabelColor: INK, valAxisLabelFontFace: FONT, valAxisLabelFontSize: 11, valAxisLabelColor: MID,
-  valGridLine: { color: "E3E8EA", size: 0.5 }, catGridLine: { style: "none" }, barGapWidthPct: 60,
+  valGridLine: { color: "E8E8ED", size: 0.5 }, catGridLine: { style: "none" }, barGapWidthPct: 60,
 });
 
 // ---------- 1. 표지
 {
   const s = pres.addSlide({ masterName: "DARK" });
-  T(s, "2026 전국 대학생 AI 반도체 회로 설계 경진대회 · Digital 트랙 2차 결과", { x: 0.8, y: 1.0, w: 11.7, h: 0.4, fontSize: 16, color: "9FB4BD" });
+  T(s, "2026 전국 대학생 AI 반도체 회로 설계 경진대회 · Digital 트랙 2차 결과", { x: 0.8, y: 1.0, w: 11.7, h: 0.4, fontSize: 16, color: MUTED_D });
   T(s, "회전하는 이벤트 카메라를\n하나의 월드 지도로 옮기는 저전력 회로", { x: 0.8, y: 1.9, w: 11.7, h: 2.2, fontSize: 40, bold: true, color: WHITE, valign: "top" });
-  T(s, "Event camera world-coordinate transform & world memory (RTL, P&R)", { x: 0.8, y: 4.3, w: 11.7, h: 0.5, fontSize: 18, color: AMBER });
-  T(s, "팀 REDRED", { x: 0.8, y: 6.3, w: 11.7, h: 0.4, fontSize: 16, color: "9FB4BD" });
+  T(s, "Event camera world-coordinate transform & world memory (RTL, P&R)", { x: 0.8, y: 4.3, w: 11.7, h: 0.5, fontSize: 18, color: BLUE_D });
+  T(s, "팀 REDRED", { x: 0.8, y: 6.3, w: 11.7, h: 0.4, fontSize: 16, color: MUTED_D });
   s.addNotes("안녕하세요, 팀 REDRED입니다. 이번 2차 과제에서 저희는 회전하는 이벤트 카메라가 내보내는 이벤트를 하나의 월드 메모리에 정확히, 그리고 가장 적은 전력으로 쌓는 회로를 설계했습니다. 10분 동안 문제 정의, 설계, 검증 결과, 그리고 한계까지 말씀드리겠습니다.");
   n++;
 }
@@ -80,8 +81,8 @@ const chartBase = (title, colors) => ({
   card(s, 8.84, 1.55, 3.9, 1.95, "출력", "월드 메모리\n칸마다 이벤트 유무 + 극성\n호스트용 읽기 포트", { size: 15 });
   s.addImage({ path: img("worldmap_uncorrected_vs_omega_only.png"), x: 0.6, y: 3.7, w: 3.2, h: 3.2 });
   T(s, "회전을 보정하지 않고 쌓으면(위) 소용돌이로 번지고, 회전각으로 좌표를 바꿔 쌓으면(아래) 방의 구조가 보인다. (실제 DELTA 센서 영상, 소프트웨어 모델)", { x: 4.05, y: 3.9, w: 3.7, h: 2.5, fontSize: 15, color: MID });
-  s.addShape(pres.ShapeType.roundRect, { x: 8.0, y: 3.7, w: 4.74, h: 3.2, fill: { color: INK }, line: { color: INK }, rectRadius: 0.08 });
-  T(s, "우리가 정한 평가 관점", { x: 8.25, y: 3.9, w: 4.3, h: 0.4, fontSize: 17, bold: true, color: AMBER });
+  s.addShape(pres.ShapeType.roundRect, { x: 8.0, y: 3.7, w: 4.74, h: 3.2, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
+  T(s, "우리가 정한 평가 관점", { x: 8.25, y: 3.9, w: 4.3, h: 0.4, fontSize: 17, bold: true, color: BLUE_D });
   T(s, bullets(["이벤트를 잃지 않고 정확한 칸에 쓰는가", "구현 가능한 면적·전력인가", "회로가 실제 데이터에서 안정적인가", "한계를 스스로 설명할 수 있는가"], { gap: 4 }), { x: 8.25, y: 4.5, w: 4.3, h: 2.2, fontSize: 16, color: WHITE });
 }
 
@@ -104,21 +105,21 @@ const chartBase = (title, colors) => ({
   const s = content("구조: 1차 송신부 위에 좌표 변환과 월드 메모리를 얹었다",
     "전체 구조입니다. 1차에서 만든 AER 송신부가 사이클당 최대 8개 이벤트를 병렬로 뽑아냅니다. 그 이벤트마다 레인별 좌표 변환 회로가 세타를 이용해 월드 좌표를 계산하고, 월드 메모리 쓰기 모듈이 8개 레인의 경합을 하나의 쓰기 포트로 직렬화합니다. 메모리는 행 단위로 클록을 끄는 구조이고, 입력이 오래 없으면 코어 전체의 클록을 끄는 blink 기능을 넣었습니다. 회전각은 외부에서 주어지거나 아래쪽의 추정기가 공급합니다.");
   const bx = (x, y, w, h, t, sub, fill, tc) => {
-    s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: fill }, line: { color: fill }, rectRadius: 0.08 });
+    s.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: fill }, line: { color: (fill === LIGHT || fill === WHITE || fill === PALE) ? HAIR : fill }, rectRadius: 0.12 });
     T(s, t, { x: x + 0.1, y: y + 0.12, w: w - 0.2, h: 0.5, fontSize: 15, bold: true, color: tc, align: "center", valign: "middle" });
     T(s, sub, { x: x + 0.1, y: y + 0.65, w: w - 0.2, h: h - 0.7, fontSize: 13, color: tc, align: "center" });
   };
   const y = 1.9, h = 1.9;
-  bx(0.5, y, 1.9, h, "DVS 센서", "주소 + 극성\n(x, y, pol)", LIGHT, INK);
-  bx(2.85, y, 2.3, h, "AER 송신부 (1차)", "행 비트맵 + 훔치기 버퍼\n사이클당 최대 8 이벤트\nUZH 실측 손실 0.47%", PALE, INK);
+  bx(0.5, y, 1.9, h, "DVS 센서", "주소 + 극성\n(x, y, pol)", WHITE, INK);
+  bx(2.85, y, 2.3, h, "AER 송신부 (1차)", "행 비트맵 + 훔치기 버퍼\n사이클당 최대 8 이벤트\nUZH 실측 손실 0.47%", WHITE, INK);
   bx(5.6, y, 2.3, h, "좌표 변환 ×8 레인", "RMCM: 4096가지\n표 하나로 대체\n곱셈기 없음", TEAL, WHITE);
-  bx(8.35, y, 2.2, h, "월드 메모리 쓰기", "레인별 FIFO + 중재\n단일 쓰기 포트", PALE, INK);
+  bx(8.35, y, 2.2, h, "월드 메모리 쓰기", "레인별 FIFO + 중재\n단일 쓰기 포트", WHITE, INK);
   bx(11.0, y, 1.85, h, "월드 메모리", "행 클록 게이팅\n읽기 포트", TEAL, WHITE);
   const arrow = (x1, x2) => s.addShape(pres.ShapeType.line, { x: x1, y: y + h / 2, w: x2 - x1, h: 0, line: { color: INK, width: 2, endArrowType: "triangle" } });
   arrow(2.4, 2.85); arrow(5.15, 5.6); arrow(7.9, 8.35); arrow(10.55, 11.0);
-  bx(5.6, 4.35, 2.3, 1.5, "회전각 θ", "외부 공급 또는\n추정기(Bayes/CMax)", AMBER, INK);
+  bx(5.6, 4.35, 2.3, 1.5, "회전각 θ", "외부 공급 또는\n추정기(Bayes/CMax)", DARK, WHITE);
   s.addShape(pres.ShapeType.line, { x: 6.75, y: 3.8, w: 0, h: 0.55, flipV: true, line: { color: INK, width: 2, endArrowType: "triangle" } });
-  s.addShape(pres.ShapeType.roundRect, { x: 8.35, y: 4.35, w: 4.5, h: 1.5, fill: { color: LIGHT }, line: { color: TEAL, width: 1.5, dashType: "dash" }, rectRadius: 0.08 });
+  s.addShape(pres.ShapeType.roundRect, { x: 8.35, y: 4.35, w: 4.5, h: 1.5, fill: { color: WHITE }, line: { color: TEAL, width: 1.5, dashType: "dash" }, rectRadius: 0.12 });
   T(s, "Blink: 입력이 없으면 코어 클록 차단", { x: 8.55, y: 4.5, w: 4.1, h: 0.4, fontSize: 15, bold: true, color: TEAL });
   T(s, "메모리는 자체 행 게이팅으로 항상 읽기 가능", { x: 8.55, y: 5.0, w: 4.1, h: 0.7, fontSize: 13, color: INK });
   T(s, "핵심 선택 3가지: ① 계산 대신 표 ② 쓰기 포트 하나로 직렬화 ③ 메모리를 지배적 비용으로 보고 클록을 끄는 구조", { x: 0.6, y: 6.15, w: 12.1, h: 0.7, fontSize: 15, bold: true, color: INK });
@@ -137,7 +138,7 @@ const chartBase = (title, colors) => ({
     [{ text: "RMCM", bold: true }, { text: "+2,187 ps", bold: true }],
   ], 8.95, 1.7, 3.75, [2.15, 1.6], { size: 13, rowH: 0.5 });
   T(s, "Genus 합성, 5 ns, GPDK045. 입력 4096가지(4×4 로컬 좌표 × 256각도) 기준. RMCM은 직접 행렬곱과 bit-exact로 같은 값을 냄(근사 오차 0).", { x: 8.95, y: 3.95, w: 3.75, h: 1.4, fontSize: 13, color: MID });
-  s.addShape(pres.ShapeType.roundRect, { x: 0.6, y: 5.65, w: 12.1, h: 1.15, fill: { color: INK }, line: { color: INK }, rectRadius: 0.08 });
+  s.addShape(pres.ShapeType.roundRect, { x: 0.6, y: 5.65, w: 12.1, h: 1.15, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, "곱셈기를 없애는 것이 항상 이득은 아니다. 입력 후보가 몇 가지로 좁을 때는 계산을 없애고 표로 대체하는 쪽이 이겼다. (이 결론은 입력 공간이 큰 경우엔 달라질 수 있다.)", { x: 0.85, y: 5.75, w: 11.6, h: 0.95, fontSize: 16, bold: true, color: WHITE, valign: "middle" });
 }
 
@@ -150,10 +151,11 @@ const chartBase = (title, colors) => ({
     ["좌표 변환 전수 검사 (RMCM RTL)", "16 로컬 좌표 × 1024각도 = 16,384가지", { text: "16,384/16,384 일치", bold: true, options: { color: GREEN } }],
     ["실제 이벤트 재생 (UZH, 통합 회로)", "8,503개 이벤트 + 실제 자세", { text: "불일치 0, 손실 0, 90칸 기록", bold: true, options: { color: GREEN } }],
     ["무작위 스트레스", "20,000 사이클, 20% 도착률, 매 사이클 θ 변경", { text: "불일치 0 (20,241건), 528칸 기록", bold: true, options: { color: GREEN } }],
-    ["θ 추정기 RTL vs 오라클", "UZH 8,503 이벤트의 매 추정값", { text: "불일치 0", bold: true, options: { color: GREEN } }],
+    ["θ 추정기 RTL vs 오라클", "UZH 이벤트 300개의 매 추정값 (1024각도, 외부 SRAM 포트 버전)", { text: "불일치 0", bold: true, options: { color: GREEN } }],
     ["blink vs 항상-켬 코어", "유휴 100~6000 사이클", { text: "overrun·메모리 이미지 불일치 0", bold: true, options: { color: GREEN } }],
-  ], 0.6, 1.55, 12.1, [3.4, 5.1, 3.6], { size: 14, rowH: 0.52 });
-  card(s, 0.6, 5.0, 12.1, 1.85, "검증이 잡아낸 실제 버그", "① 등록형(registered) 파이프라인에서 θ가 한 박자 늦게 잡히는 것을 몰라 기대값이 어긋남 (테스트벤치, 2회)\n② 추정기 RTL: 같은 사이클에 레지스터를 갱신하고 그 값으로 분기해 갱신 전 값을 읽는 버그 → 최종값을 조합논리로 먼저 계산하도록 수정", { size: 15, headColor: AMBER });
+    ["게이트 시뮬레이션 (P&R 후 netlist + signoff SDF)", "무작위 6,000사이클 + 메모리 4,096칸 읽기", { text: "RTL과 출력 10,097줄 일치", bold: true, options: { color: GREEN } }],
+  ], 0.6, 1.5, 12.1, [4.3, 4.9, 2.9], { size: 13, rowH: 0.46 });
+  card(s, 0.6, 5.35, 12.1, 1.55, "검증이 잡아낸 실제 버그", "① 등록형(registered) 파이프라인에서 θ가 한 박자 늦게 잡히는 것을 몰라 기대값이 어긋남 (테스트벤치, 2회)\n② 추정기 RTL: 같은 사이클에 레지스터를 갱신하고 그 값으로 분기해 갱신 전 값을 읽는 버그 → 최종값을 조합논리로 먼저 계산하도록 수정", { size: 13, headColor: AMBER });
 }
 
 
@@ -180,14 +182,14 @@ if (hasFig("worldmem_rtl.png")) {
 {
   const s = content("면적의 70%는 월드 메모리, 그래서 메모리를 먼저 다뤘다",
     "처음에는 월드 메모리를 레지스터 배열로 합성했는데, 쓰기 모듈 하나가 전체 면적의 98퍼센트를 차지했습니다. 저장소를 SRAM 인터페이스 바깥으로 빼서 면적을 6배 줄였지만, 이건 저장소를 따로 계산한다는 뜻이지 공짜가 아닙니다. 메모리를 포함한 배치배선 결과로 보면 메모리가 면적의 70퍼센트 이상이고, 비트당 약 12제곱마이크로미터입니다. 교수님이 SRAM도 평가에 포함된다고 하셨고 교육용 PDK에는 SRAM 매크로가 없으므로, 메모리 면적과 전력은 별도 추정 모델로 다뤄야 합니다. 그래서 이후 최적화는 전부 메모리 쪽에 집중했습니다.");
-  s.addChart(pres.charts.BAR, [{ name: "면적", labels: ["메모리 제외", "메모리 포함 (FF 4096칸)"], values: [40259, 161599] }], Object.assign({ x: 0.6, y: 1.5, w: 5.4, h: 4.2, barDir: "col" }, chartBase("P&R 셀 면적 (µm²)", [TEAL, AMBER]), { valAxisHidden: true, dataLabelFormatCode: "#,##0" }));
+  s.addChart(pres.charts.BAR, [{ name: "면적", labels: ["메모리 제외", "메모리 포함 (FF 4096칸)"], values: [40259, 161599] }], Object.assign({ x: 0.6, y: 1.5, w: 5.4, h: 4.2, barDir: "col" }, chartBase("P&R 셀 면적 (µm²)", [MID, TEAL]), { valAxisHidden: true, dataLabelFormatCode: "#,##0" }));
   T(s, bullets([
     "쓰기 모듈 + 레지스터 배열 합성: 211,856 µm², 전체의 98%가 저장소",
     "저장소를 SRAM 인터페이스 밖으로 분리: 35,111 µm² (6.0배 감소). 단, 저장소는 별도 계산 대상",
     "메모리 포함 P&R: 메모리가 면적의 70% 이상, 약 12 µm²/비트",
     "교육용 PDK에는 SRAM 매크로가 없다 → 메모리는 별도 추정 모델이 필요",
   ], { gap: 10 }), { x: 6.3, y: 1.6, w: 6.4, h: 3.3, fontSize: 15 });
-  s.addShape(pres.ShapeType.roundRect, { x: 6.3, y: 5.0, w: 6.4, h: 1.75, fill: { color: INK }, line: { color: INK }, rectRadius: 0.08 });
+  s.addShape(pres.ShapeType.roundRect, { x: 6.3, y: 5.0, w: 6.4, h: 1.75, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, ["→ 이후 최적화의 초점은", "코어 로직이 아니라", "메모리의 클록 동작에 맞췄다."].join("\n"), { x: 6.55, y: 5.1, w: 5.9, h: 1.55, fontSize: 16, bold: true, color: WHITE, valign: "middle" });
 }
 
@@ -270,7 +272,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
   ], 0.6, 1.5, 12.1, [5.6, 2.5, 4.0], { size: 14, rowH: 0.46 });
   s.addImage({ path: img("gt_orientation_vs_ours.png"), x: 0.6, y: 4.0, w: 6.7, h: 2.52 });
   T(s, "실제 DELTA 영상: 장면 속 직선 방향으로 만든 회전각 정답(파랑) vs 우리 추정(주황), 오른쪽은 오차(°)", { x: 0.6, y: 6.55, w: 6.7, h: 0.4, fontSize: 11, color: MID });
-  card(s, 7.55, 4.0, 5.15, 1.45, "추정기 RTL (Bayes filter)", "이산 베이즈 필터를 고정소수점으로 구현. 오라클과 비트 단위 일치 검증(UZH 이벤트 재생).", { size: 13 });
+  card(s, 7.55, 4.0, 5.15, 1.45, "추정기 RTL (Bayes filter)", "이산 베이즈 필터를 고정소수점으로 구현. UZH 이벤트 300개 재생에서 오라클과 비트 단위로 일치(1024각도 버전).", { size: 13 });
   card(s, 7.55, 5.55, 5.15, 1.4, "정직한 한계", "정확도는 장면에 크게 의존한다. 로봇팔 실측(RobotEvt)에서는 UZH용 파라미터 그대로 평균 35.2° / 최악 91.8°.", { size: 13, headColor: RED });
 }
 
@@ -322,8 +324,9 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
     ["이득 조절(과부하 솎아내기)", { text: "기각·정정", options: { color: RED, bold: true } }, "합성 장면에서만 이득, 실제 DELTA 프레임에서 이득 없음"],
     ["추정기 입력 줄이기(ON만/중심 가중/불응기)", { text: "기각", options: { color: RED, bold: true } }, "정확도 1.5배 이상 악화"],
     ["미세 안구운동(지터)", { text: "기각", options: { color: RED, bold: true } }, "부화소 복원 효과 없음"],
-    ["최근 쓰기 캐시 (감각 기억)", { text: "보류", options: { color: AMBER, bold: true } }, "64항목만 전력 −16%/면적 +5.5%, 필수 아님"],
-  ], 0.6, 1.55, 12.1, [4.6, 1.5, 6.0], { size: 13, rowH: 0.56 });
+    ["원심성 복사(VOR): 회전 지령을 θ 사전분포로", { text: "기각", options: { color: INK, bold: true } }, "UZH 평균 23.4°→8.5°이나 RobotEvt 36.1°→34.9°(기준 25.3° 미달), 사전 등록 기준 미통과"],
+    ["최근 쓰기 캐시 (감각 기억)", { text: "보류", options: { color: MID, bold: true } }, "64항목만 전력 −16%/면적 +5.5%, 필수 아님"],
+  ], 0.6, 1.5, 12.1, [4.4, 1.3, 6.4], { size: 13, rowH: 0.54 });
 }
 
 // ---------- 15. 장단점·고려
@@ -339,15 +342,15 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
 {
   const s = pres.addSlide({ masterName: "DARK" });
   n++;
-  T(s, "요약과 앞으로", { x: 0.8, y: 0.6, w: 11.7, h: 0.8, fontSize: 34, bold: true, color: WHITE });
+  T(s, "요약과 앞으로", { x: 0.8, y: 0.6, w: 11.7, h: 0.8, fontSize: 34, bold: true, charSpacing: -0.3, color: WHITE });
   const col = (x, head, body, c) => {
-    T(s, head, { x, y: 1.8, w: 3.7, h: 0.5, fontSize: 18, bold: true, color: c });
+    T(s, head, { x, y: 1.8, w: 3.7, h: 0.5, fontSize: 18, bold: true, color: BLUE_D });
     T(s, body, { x, y: 2.4, w: 3.7, h: 3.6, fontSize: 17, color: WHITE });
   };
   col(0.8, "한 일", bullets(["회전각으로 이벤트를 월드 좌표로 옮기는 회로를 RTL로 구현", "표 기반 좌표 변환 (면적 2.5배↓, 전력 4.8배↓)", "단일 쓰기 포트, 행 클록 게이팅, blink"], { gap: 8 }), AMBER);
   col(4.9, "확인한 것", bullets(["소프트웨어 모델과 비트 단위 일치", "메모리 전력 −65.5%", "P&R: DRC·antenna 0건, 클록 게이팅 hold는 ICG로 해결"], { gap: 8 }), AMBER);
   col(9.0, "남은 것", bullets(["1024×1024로의 확장과 SRAM 모델링", "시차 보정의 RTL 반영", "실제 영상에서 θ 정확도 개선"], { gap: 8 }), AMBER);
-  T(s, "주소 자체가 이벤트다 — 필요한 것만 옮기고, 쉬는 동안은 끈다.", { x: 0.8, y: 6.2, w: 11.7, h: 0.6, fontSize: 18, bold: true, color: "9FB4BD" });
+  T(s, "주소 자체가 이벤트다 — 필요한 것만 옮기고, 쉬는 동안은 끈다.", { x: 0.8, y: 6.2, w: 11.7, h: 0.6, fontSize: 18, bold: true, color: MUTED_D });
   s.addNotes("정리하겠습니다. 저희는 회전각으로 이벤트를 월드 좌표로 옮기는 회로를 RTL로 만들고, 표 기반 좌표 변환과 메모리 행 게이팅, blink로 면적과 전력을 줄였습니다. 소프트웨어 모델과 비트 단위로 일치함을 확인했고, 배치배선에서도 DRC와 antenna 위반이 없습니다. 남은 과제는 목표 크기로의 확장과 SRAM 모델링, 시차 보정의 RTL 반영, 실제 영상에서의 각도 추정 정확도입니다. 들어주셔서 감사합니다.");
 }
 

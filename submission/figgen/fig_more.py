@@ -5,7 +5,7 @@ import numpy as np
 from wavelib import *
 
 rg_vcd, bl_vcd, mem_txt, out = sys.argv[1:5]
-INK, TEAL, AMBER, MID, RED = "#1B2630", "#0E7C7B", "#E09F3E", "#5B6B76", "#B5483C"
+INK, TEAL, AMBER, MID, RED = "#1D1D1F", "#0066CC", "#2997FF", "#7A7A7A", "#1D1D1F"
 
 
 def steps(ch, t0, t1):
@@ -48,7 +48,7 @@ ev = [(t0, value_at(ad, t0))] + [(t, v) for t, v in ad[1] if t0 < t <= t1]
 for i, (t, v) in enumerate(ev):
     te = ev[i + 1][0] if i + 1 < len(ev) else t1; iv = to_int(v)
     if iv is None: continue
-    ax.add_patch(plt.Rectangle((cyc(t), 0.1), (te - t) / 5000.0, 0.8, fc="#DCEBEA", ec=MID, lw=0.8))
+    ax.add_patch(plt.Rectangle((cyc(t), 0.1), (te - t) / 5000.0, 0.8, fc="#E5F0FA", ec=MID, lw=0.8))
     if (te - t) / 5000.0 > 0.8: ax.text(cyc(t) + (te - t) / 10000.0, 0.5, str(iv >> 6), ha="center", va="center", fontsize=11)
 for s in ("top", "right"): ax.spines[s].set_visible(False)
 for k, r in enumerate(show):
@@ -88,13 +88,13 @@ for line in open(mem_txt):
 img = np.zeros((64, 64, 3)) + 0.93
 for i in range(4096):
     if w[i]:
-        img[i // 64, i % 64] = (0.055, 0.486, 0.482) if p[i] else (0.878, 0.624, 0.243)
+        img[i // 64, i % 64] = (0.0, 0.4, 0.8) if p[i] else (0.525, 0.525, 0.545)
 print("filled", int(w.sum()))
 fig, ax = plt.subplots(1, 1, figsize=(5.2, 5.2), dpi=140)
 ax.imshow(img, interpolation="nearest"); ax.set_xticks([0, 16, 32, 48, 63]); ax.set_yticks([0, 16, 32, 48, 63]); ax.tick_params(labelsize=12)
 ax.set_xlabel("X", fontsize=13); ax.set_ylabel("Y", fontsize=13)
 ax.set_title(f"RTL이 쓴 월드 메모리 (64×64, 채워진 칸 {int(w.sum())}/4096)", fontsize=13)
 from matplotlib.patches import Patch
-ax.legend(handles=[Patch(fc=(0.055, 0.486, 0.482), label="극성 1"), Patch(fc=(0.878, 0.624, 0.243), label="극성 0"), Patch(fc=(0.93, 0.93, 0.93), label="비어 있음")], loc="lower left", fontsize=11)
+ax.legend(handles=[Patch(fc=(0.0, 0.4, 0.8), label="극성 1"), Patch(fc=(0.525, 0.525, 0.545), label="극성 0"), Patch(fc=(0.93, 0.93, 0.93), label="비어 있음")], loc="lower left", fontsize=11)
 fig.tight_layout(); fig.savefig(out + "/worldmem_rtl.png"); plt.close(fig)
 print("done")

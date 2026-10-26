@@ -1,0 +1,56 @@
+  uzh(112, 87) n=8503 base:22.2/57.7  s2:6.1/37.6  s5:9.4/40.4  s10:7.9/46.4  s5b5:6.2/36.2  wrong:23.3/57.7
+patch: x=[111,114] y=[86,89] (n=4)
+events=8595 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpl1v6ghaa\fx_113_88.tsv
+augmented 8595 events -> C:\Users\ggang\AppData\Local\Temp\tmpl1v6ghaa\fx_113_88_theta.tsv
+  uzh(113, 88) n=8595 base:21.6/57.3  s2:7.1/41.5  s5:8.7/42.9  s10:7.8/49.2  s5b5:6.5/39.4  wrong:22.5/57.3
+patch: x=[109,112] y=[84,87] (n=4)
+events=8419 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpgn3fhyqa\fx_111_86.tsv
+augmented 8419 events -> C:\Users\ggang\AppData\Local\Temp\tmpgn3fhyqa\fx_111_86_theta.tsv
+  uzh(111, 86) n=8419 base:26.0/59.1  s2:6.2/39.7  s5:7.4/46.1  s10:8.9/49.9  s5b5:5.9/45.0  wrong:22.5/57.7
+patch: x=[112,115] y=[87,90] (n=4)
+events=8511 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmp1ig3mka6\fx_114_89.tsv
+augmented 8511 events -> C:\Users\ggang\AppData\Local\Temp\tmp1ig3mka6\fx_114_89_theta.tsv
+  uzh(114, 89) n=8511 base:24.7/58.4  s2:6.8/40.4  s5:8.6/44.6  s10:7.5/39.7  s5b5:6.8/37.6  wrong:21.9/55.2
+patch: x=[105,108] y=[79,82] (n=4)
+events=8661 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpz31f9777\fx_107_81.tsv
+augmented 8661 events -> C:\Users\ggang\AppData\Local\Temp\tmpz31f9777\fx_107_81_theta.tsv
+  uzh(107, 81) n=8661 base:23.2/62.2  s2:7.9/57.3  s5:7.7/57.3  s10:6.7/59.8  s5b5:6.8/54.8  wrong:23.2/62.2
+patch: x=[119,122] y=[94,97] (n=4)
+events=8385 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpya91dgod\fx_121_96.tsv
+augmented 8385 events -> C:\Users\ggang\AppData\Local\Temp\tmpya91dgod\fx_121_96_theta.tsv
+  uzh(121, 96) n=8385 base:18.9/64.3  s2:6.6/47.5  s5:7.0/47.8  s10:13.0/60.5  s5b5:6.6/40.8  wrong:18.9/64.3
+patch: x=[99,102] y=[69,72] (n=4)
+events=7254 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpqqahzaqn\fx_101_71.tsv
+augmented 7254 events -> C:\Users\ggang\AppData\Local\Temp\tmpqqahzaqn\fx_101_71_theta.tsv
+  uzh(101, 71) n=7254 base:26.9/68.9  s2:8.1/48.2  s5:10.8/51.0  s10:11.6/50.6  s5b5:8.2/45.7  wrong:31.7/72.1
+patch: x=[129,132] y=[99,102] (n=4)
+events=7665 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpclqyc76r\fx_131_101.tsv
+augmented 7665 events -> C:\Users\ggang\AppData\Local\Temp\tmpclqyc76r\fx_131_101_theta.tsv
+  uzh(131, 101) n=7665 base:24.1/67.1  s2:8.0/55.2  s5:8.2/56.6  s10:10.5/59.8  s5b5:8.6/57.3  wrong:26.7/66.8
+patch: x=[144,147] y=[82,85] (n=4)
+events=5089 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmp89v696gq\fx_146_84.tsv
+augmented 5089 events -> C:\Users\ggang\AppData\Local\Temp\tmp89v696gq\fx_146_84_theta.tsv
+  robot(146, 84) n=5089 base:30.9/91.8  s2:29.9/92.5  s5:29.1/90.7  s10:29.2/90.0  s5b5:26.9/90.7  wrong:30.2/91.8
+patch: x=[156,159] y=[129,132] (n=4)
+events=3686 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmppsbl9zcb\fx_158_131.tsv
+augmented 3686 events -> C:\Users\ggang\AppData\Local\Temp\tmppsbl9zcb\fx_158_131_theta.tsv
+  robot(158, 131) n=3686 base:35.0/91.4  s2:22.8/90.0  s5:32.7/90.0  s10:34.0/90.0  s5b5:21.6/87.9  wrong:35.0/91.4
+patch: x=[162,165] y=[124,127] (n=4)
+events=3095 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmp7h0p9rje\fx_164_126.tsv
+augmented 3095 events -> C:\Users\ggang\AppData\Local\Temp\tmp7h0p9rje\fx_164_126_theta.tsv
+  robot(164, 126) n=3095 base:33.9/91.8  s2:26.2/88.9  s5:33.4/91.1  s10:33.9/92.1  s5b5:33.9/92.1  wrong:33.9/92.1
+patch: x=[118,121] y=[88,91] (n=4)
+events=2131 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmp9q__0u72\fx_120_90.tsv
+augmented 2131 events -> C:\Users\ggang\AppData\Local\Temp\tmp9q__0u72\fx_120_90_theta.tsv
+  robot(120, 90) n=2131 base:30.4/86.5  s2:26.4/80.9  s5:29.3/86.1  s10:31.7/87.5  s5b5:27.7/81.6  wrong:30.7/86.5
+patch: x=[178,181] y=[98,101] (n=4)
+events=1787 collisions=0 (0.00%) -> C:\Users\ggang\AppData\Local\Temp\tmpx25o_w82\fx_180_100.tsv
+augmented 1787 events -> C:\Users\ggang\AppData\Local\Temp\tmpx25o_w82\fx_180_100_theta.tsv
+  robot(180, 100) n=1787 base:50.1/90.7  s2:50.1/91.1  s5:50.1/91.1  s10:50.0/91.4  s5b5:50.0/90.7  wrong:50.1/91.1
+
+(시간 239s)  평균(꼬리10%)° / 최악°
+UZH base: 23.4/68.9  s2: 7.1/57.3  s5: 8.5/57.3  s10: 9.2/60.5  s5b5: 7.0/57.3  wrong: 23.8/72.1
+RobotEvt base: 36.1/91.8  s2: 31.1/92.5  s5: 34.9/91.1  s10: 35.7/92.1  s5b5: 32.0/92.1  wrong: 36.0/92.1
+UZH: A1 평균 8.5 <= 0.7*23.4 -> True | A2 최악 57.3 <= 68.9 -> True | A3 틀린 지령 23.8 <= 1.3*23.4 -> True
+RobotEvt: A1 평균 34.9 <= 0.7*36.1 -> False | A2 최악 91.1 <= 91.8 -> True | A3 틀린 지령 36.0 <= 1.3*36.1 -> True
+결과: 기각

@@ -81,6 +81,6 @@ def draw_bus(ax, ch, t0, t1, y0, h, color, tscale, fmt, min_label_w, zero_dim=Tr
         x, w = t / tscale, (te - t) / tscale
         iv = to_int(v)
         dim = zero_dim and iv == 0
-        ax.add_patch(plt.Rectangle((x, y0), w, h, fc="#EEF1F2" if dim else color, ec="#5B6B76", lw=0.8, alpha=1.0))
+        ax.add_patch(plt.Rectangle((x, y0), w, h, fc="#EEF1F2" if dim else color, ec="#7A7A7A", lw=0.8, alpha=1.0))
         if iv is not None and not dim and w >= min_label_w:
-            ax.text(x + w / 2, y0 + h / 2, fmt(iv), ha="center", va="center", fontsize=13, color="#1B2630")
+            ax.text(x + w / 2, y0 + h / 2, fmt(iv), ha="center", va="center", fontsize=13, color="#1D1D1F")
