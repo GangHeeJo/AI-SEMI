@@ -13,14 +13,20 @@ sec.left_margin = sec.right_margin = Cm(1.8)
 sec.top_margin = sec.bottom_margin = Cm(1.5)
 
 st = d.styles["Normal"]
-st.font.name = "NanumSquare Neo"; st.font.size = Pt(10)
-st.element.rPr.rFonts.set(qn("w:eastAsia"), "NanumSquare Neo")
+st.font.name = "나눔스퀘어 네오 Regular"; st.font.size = Pt(10)
+st.element.rPr.rFonts.set(qn("w:eastAsia"), "나눔스퀘어 네오 Regular")
 st.paragraph_format.space_after = Pt(3)
+
+
+def setf(r, bold):
+    nm = "나눔스퀘어 네오 Bold" if bold else "나눔스퀘어 네오 Regular"
+    r.font.name = nm; r.bold = False
+    r._r.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), nm)
 
 
 def para(text, size=10, bold=False, color=None, after=3):
     p = d.add_paragraph()
-    r = p.add_run(text); r.bold = bold; r.font.size = Pt(size)
+    r = p.add_run(text); setf(r, bold); r.font.size = Pt(size)
     if color: r.font.color.rgb = RGBColor.from_string(color)
     p.paragraph_format.space_after = Pt(after)
     return p
@@ -33,8 +39,7 @@ def table(rows, widths, header=True, size=9):
             c = t.cell(i, j); c.width = Cm(widths[j]); c.text = ""
             r = c.paragraphs[0].add_run(txt); r.font.size = Pt(size)
             c.paragraphs[0].paragraph_format.space_after = Pt(0)
-            if header and i == 0:
-                r.bold = True
+            setf(r, bool(header and i == 0))
     return t
 
 
@@ -72,7 +77,7 @@ para("참고", 11.5, True, "1B2630", 3)
 for t in ["대용량 원본 데이터(UZH shapes_rotation 약 500 MB, 센서 .dvs/.h5)와 대회 Q&A 자료는 제출 폴더에서 제외했습니다.",
           "프로젝트 전체 이력은 https://github.com/GangHeeJo/AI-SEMI (main)에서 확인할 수 있습니다.",
           "설계 조건: GPDK045 교육용 PDK, 클록 5 ns, 입출력 지연 0.25 ns, uncertainty 0.10 ns (팀 공통 SDC)."]:
-    p = d.add_paragraph(style="List Bullet"); r = p.add_run(t); r.font.size = Pt(9)
+    p = d.add_paragraph(style="List Bullet"); r = p.add_run(t); setf(r, False); r.font.size = Pt(9)
     p.paragraph_format.space_after = Pt(1)
 
 d.save(out)

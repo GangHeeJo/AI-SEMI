@@ -4019,3 +4019,8 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 
 ## 220. 발표자료 글꼴을 NanumSquare Neo로 교체 (2026-10-26)
 `C:\Users\ggang\Downloads\nanum-all_new.zip`에서 TTF 48개(NanumSquare Neo 5종 포함)를 사용자 글꼴로 설치(`%LOCALAPPDATA%\Microsoft\Windows\Fonts` + HKCU 등록, 관리자 권한 불필요). 덱·제출 설명서·그림(matplotlib)의 글꼴을 NanumSquare Neo로 교체. pptxgenjs는 한글(a:ea)을 라틴과 같은 글꼴로 안 채워 기본 맑은 고딕으로 빠지므로 `submission/figgen/post.py`가 모든 run/차트/마스터/테마의 `a:ea`를 지정. 알려진 점: NanumSquare Neo의 라틴/숫자는 자간이 불규칙(대문자 넓고 소문자 좁음)하게 보임. 라틴만 다른 글꼴로 바꾸려면 `LATIN_FONT="Segoe UI" python post.py in.pptx out.pptx`. 글꼴 포함(embed)은 PowerPoint COM으로 설정 불가였음 -> 다른 PC에서는 글꼴 설치 또는 PowerPoint UI(파일>옵션>저장>파일의 글꼴 포함) 필요, 안전판으로 `REDRED_2차_발표자료.pdf` 함께 생성.
+
+## 221. 글꼴 재적용(정정) + 5.2 ns P&R + 1024각도 RMCM 합성 (2026-10-26)
+**글꼴 정정(§220 수정).** §220에서 `NanumSquare Neo`/`나눔스퀘어 네오`(굵기 없는 가족명)로 지정했으나 PowerPoint가 이를 인식 못 하고 맑은 고딕/Calibri로 대체했음(8개 이름을 한 슬라이드에 넣고 직접 렌더링해 확인: 굵기가 붙은 이름만 인식됨). 이 PC의 GDI 가족명은 굵기별로 분리돼 있음(`나눔스퀘어 네오 Regular`/`Bold`/`ExtraBold`/`Heavy`/`Light`). `submission/figgen/post.py`가 일반 글자는 `나눔스퀘어 네오 Regular`, 굵은 글자(b="1")는 `나눔스퀘어 네오 Bold`로 바꾸고 b를 뺌(이중 굵기 방지), 한글(ea)/cs/테마(Hang 스크립트 포함)도 같은 글꼴. 제출 설명서(docx)와 그림(matplotlib)도 같은 가족명. 렌더링으로 확인.
+**5.2 ns P&R**(`syn/reports/icg_5p2ns/`, 서버 `~/ganghee_icg52`, 같은 ICG 설계·util 0.6): DRC 0, antenna 0, **setup +0.077 ns(위반 0)**, clock-gating hold +0.080 ns(0경로), **reg2reg hold -0.007 ns(61경로) 잔여**, 전력 5.72 mW(vectorless), 표준셀 면적 160,213 um2. 클록을 늦춰 setup은 닫혔으나 hold -7 ps는 여전히 남음(hold는 클록 주기와 무관).
+**1024각도 RMCM Genus**(`syn/reports/rmcm1024/`, 5 ns): 13,100셀, 면적 19,070.6 um2, 전력 0.2967 mW, 슬랙 +1,178 ps. 256각도(4096가지) 1,199 um2/0.0414 mW/+2,187 ps 대비 항목 16배, 면적 15.9배. 이 크기에서 직접 행렬곱 재합성은 안 해서 RMCM 우위가 1024각도에서도 유지되는지는 미확인(슬라이드 5·18에 명시).

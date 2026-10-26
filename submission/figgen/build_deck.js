@@ -11,7 +11,7 @@ const hasFig = (f) => fs.existsSync(fig(f));
 
 const INK = "1D1D1F", TEAL = "0066CC", AMBER = "0066CC", LIGHT = "F5F5F7", MID = "7A7A7A", RED = "1D1D1F", GREEN = "0066CC", WHITE = "FFFFFF", PALE = "F5F5F7";
 const BLUE_D = "2997FF", DARK = "272729", HAIR = "E0E0E0", MUTED_D = "CCCCCC";
-const FONT = "NanumSquare Neo";
+const FONT = "나눔스퀘어 네오 Regular";
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE"; // 13.33 x 7.5
@@ -137,7 +137,7 @@ const chartBase = (title, colors) => ({
     ["CORDIC", "−252 ps (위반)"],
     [{ text: "RMCM", bold: true }, { text: "+2,187 ps", bold: true }],
   ], 8.95, 1.7, 3.75, [2.15, 1.6], { size: 13, rowH: 0.5 });
-  T(s, "Genus 합성, 5 ns, GPDK045. 입력 4096가지(4×4 로컬 좌표 × 256각도) 기준. RMCM은 직접 행렬곱과 bit-exact로 같은 값을 냄(근사 오차 0).", { x: 8.95, y: 3.95, w: 3.75, h: 1.4, fontSize: 13, color: MID });
+  T(s, "Genus 합성, 5 ns, GPDK045. 입력 4096가지(256각도) 기준, RMCM은 직접 행렬곱과 bit-exact. 1024각도 RMCM(16,384가지)은 면적 19,071 µm², 0.297 mW, 슬랙 +1,178 ps(256각도의 15.9배 면적).", { x: 8.95, y: 3.95, w: 3.75, h: 1.4, fontSize: 13, color: MID });
   s.addShape(pres.ShapeType.roundRect, { x: 0.6, y: 5.65, w: 12.1, h: 1.15, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, "곱셈기를 없애는 것이 항상 이득은 아니다. 입력 후보가 몇 가지로 좁을 때는 계산을 없애고 표로 대체하는 쪽이 이겼다. (이 결론은 입력 공간이 큰 경우엔 달라질 수 있다.)", { x: 0.85, y: 5.75, w: 11.6, h: 0.95, fontSize: 16, bold: true, color: WHITE, valign: "middle" });
 }
@@ -335,7 +335,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
     "장점은 좌표 변환이 곱셈기 없이 표 하나로 끝나고 bit-exact로 검증됐다는 것, 메모리와 유휴 전력을 구조적으로 줄였다는 것, 실제 데이터로 검증하고 기각한 것까지 정리했다는 것입니다. 단점과 고려 사항도 분명합니다. RTL은 4 곱하기 4 패치와 64 곱하기 64 월드에서 검증했고, 1024 곱하기 1024로 확장하면 메모리가 지배적이 됩니다. 이 크기를 지금의 FF로 만들면 대략 25제곱밀리미터라서 반드시 SRAM 매크로가 필요하고, 교육용 PDK에는 없으므로 별도 모델이 필요합니다. 회전각 추정은 장면에 따라 편차가 크고, 시차 보정은 아직 RTL에 반영하지 못했습니다.");
   card(s, 0.6, 1.55, 5.9, 2.65, "장점", "• 곱셈기 없는 표 기반 좌표 변환, bit-exact 검증\n• 메모리 클록 게이팅(−65.5%)과 blink로 구조적 전력 절감\n• 실제 센서·로봇팔 데이터로 검증, 안 되는 것은 기각\n• 3차 Q&A로 확인된 물리 셋업(봉-피벗)과 모델이 일치", { size: 15, headColor: GREEN });
   card(s, 6.8, 1.55, 5.9, 2.65, "단점·한계", "• 통합 회로의 합성·P&R은 4×4 패치, 64×64 월드, 256각도 (좌표 변환·추정기만 1024×1024로 검증)\n• 회전각 추정 정확도가 장면에 크게 의존\n• 시차(깊이) 보정은 소프트웨어만, RTL 미반영\n• 정답 없는 실제 영상은 간접 지표로만 평가", { size: 14, headColor: RED });
-  card(s, 0.6, 4.4, 12.1, 2.45, "고려 사항: 목표 크기(1024×1024)로 확장할 때", "• 1024×1024 × 2비트 = 약 2.1 Mbit. 지금의 FF 메모리 비용(약 12 µm²/비트)로는 약 25 mm² → SRAM 매크로가 필수 (제안 크기 기준 단순 계산, 합성 결과 아님)\n• 교육용 PDK(GPDK045)에는 SRAM 컴파일러가 없어, 메모리 면적·전력은 별도 모델로 추정해야 함\n• 쓰기 경로(FIFO·중재·좌표 변환)는 레인 수에 비례해 늘어나지만 메모리에 비하면 작다", { size: 14, headColor: AMBER });
+  card(s, 0.6, 4.4, 12.1, 2.45, "고려 사항: 목표 크기(1024×1024)로 확장할 때", "• 1024×1024 × 2비트 = 약 2.1 Mbit. 지금의 FF 메모리 비용(약 12 µm²/비트)로는 약 25 mm² → SRAM 매크로가 필수 (제안 크기 기준 단순 계산, 합성 결과 아님)\n• 교육용 PDK(GPDK045)에는 SRAM 컴파일러가 없어, 메모리 면적·전력은 별도 모델로 추정해야 함\n• 좌표 변환 표(RMCM)는 1024각도로 늘리면 항목이 16배(16,384가지)가 되어 면적이 15.9배(1,199→19,071 µm²). 이 크기에서 직접 행렬곱과의 비교는 아직 안 함" + String.fromCharCode(10) + "• 쓰기 경로(FIFO·중재·좌표 변환)는 레인 수에 비례해 늘어나지만 메모리에 비하면 작다", { size: 14, headColor: AMBER });
 }
 
 // ---------- 16. 요약

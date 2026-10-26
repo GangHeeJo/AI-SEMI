@@ -8,7 +8,7 @@ from matplotlib import font_manager
 import glob, os
 for _p in glob.glob(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Windows", "Fonts", "NanumSquareNeo-*.ttf")):
     font_manager.fontManager.addfont(_p)
-for f in ("NanumSquare Neo", "Malgun Gothic", "NanumGothic", "AppleGothic"):
+for f in ("NanumSquare Neo Regular", "Malgun Gothic", "NanumGothic", "AppleGothic"):
     if any(f == x.name for x in font_manager.fontManager.ttflist):
         plt.rcParams["font.family"] = f
         break
