@@ -4041,4 +4041,4 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 - **hold 강화 변형(hold 목표 0.15 ns, setup 목표 0.05, postRoute hold 최적화 3회) -- 실패**: 5.2 ns에서 setup WNS **-1.165 ns(62경로)**, hold -0.007 ns(59경로); 5.0 ns에서 setup -0.143 ns(22경로), hold -0.008 ns(37경로). hold는 안 고쳐지고 setup만 깨짐 -> 미채택. (게이트 시뮬은 둘 다 SIM_MATCH, 타이밍 경고 287/186건.)
 - **5.2 ns 기존 ICG 설계 게이트 시뮬**: SIM_MATCH lines=10097, 타이밍 경고 17건.
 - **1024각도 직접 행렬곱 Genus(5 ns)**: 2,812셀, **면적 5,208.7 um2, 전력 0.2789 mW, 슬랙 0 ps(여유 없음)**. 같은 크기 RMCM(19,070.6 um2, 0.2967 mW, +1,178 ps)보다 **면적 3.7배 작음 -> 256각도에서의 RMCM 우위(1,199 vs 3,011 um2)가 1024각도에서 뒤집힘.** 목표 크기(1024각도)에서는 좌표 변환은 직접 행렬곱이 맞아 보임(통합 v1은 256각도 RMCM 사용 중이라 그대로). 덱 5·18·19쪽 문구를 이에 맞춰 정정.
-- **추정기(bayes_filter) Genus**: 3시간 48분째 진행 중(아직 미완료).
+- **추정기(bayes_filter) Genus 완료(5 ns, 서버 ~/ganghee_final/syn_run, 약 7시간)**: 셀 205,498개, **면적 584,630.8 um2**, 전력 14.47 mW(vectorless: 레지스터 68%, 로직 20%, 클록 11%), setup 슬랙 0 ps(MET). 면적 대부분이 belief 메모리 플립플롭(DFFQXL 64,533개 = 353,125 um2, 로직 포함 전체의 60%). 즉 추정기도 월드 메모리와 같이 **저장소가 면적을 지배**함. 리포트: syn/reports/bayes_filter_5ns/. 한계: 이 합성은 belief 메모리 전체를 FF로 푼 최악 경우이며 SRAM 매크로 없는 교육용 PDK의 상한 수치임.
