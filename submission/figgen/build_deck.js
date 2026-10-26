@@ -202,12 +202,12 @@ if (hasFig("worldmem_rtl.png")) {
   if (hasW) {
     s.addImage({ path: fig("wave_row_gating.png"), x: 7.2, y: 1.45, w: 5.5, h: 2.82 });
     T(s, "RTL 시뮬레이션 파형: 쓰는 행의 게이트 클록만 토글", { x: 7.2, y: 4.3, w: 5.5, h: 0.4, fontSize: 13, color: MID });
-    card(s, 7.2, 4.8, 5.5, 1.1, "결과", "전력 2.522 → 0.870 mW (−65.5%)\n면적 90,105 → 85,617 µm² (−5.0%)", { size: 15, headColor: GREEN });
+    card(s, 7.2, 4.8, 5.5, 1.3, "결과", "전력 2.522 → 0.870 mW (−65.5%)\n면적 90,105 → 85,617 µm² (−5.0%)", { size: 15, headColor: GREEN });
   } else {
     card(s, 8.5, 1.55, 4.2, 2.15, "원리", "행(y)마다 래치+AND 클록 게이트. 쓰는 행의 128개 FF만 클록을 받는다.", { size: 14 });
     card(s, 8.5, 3.9, 4.2, 1.9, "결과", "전력 2.522 → 0.870 mW (−65.5%)\n면적 90,105 → 85,617 µm² (−5.0%)", { size: 14, headColor: GREEN });
   }
-  T(s, "C64·C256 = 쓰기 캐시 64·256항목. 원리: 행(y)마다 클록 게이트를 두어 쓰는 행의 128개 FF만 클록을 받는다(리셋 때만 전 행). 쓰기 캐시(64항목)는 전력 −16%, 면적 +5.5%로 이득이 작아 필수로 두지 않았다. 256항목은 오히려 전력이 늘었다.", { x: 0.6, y: 6.0, w: 12.1, h: 0.9, fontSize: 14, color: MID });
+  T(s, "C64·C256 = 쓰기 캐시 64·256항목. 원리: 행(y)마다 클록 게이트를 두어 쓰는 행의 128개 FF만 클록을 받는다(리셋 때만 전 행). 쓰기 캐시(64항목)는 전력 −16%, 면적 +5.5%로 이득이 작아 필수로 두지 않았다. 256항목은 오히려 전력이 늘었다.", { x: 0.6, y: 6.25, w: 12.1, h: 0.7, fontSize: 13, color: MID });
 }
 
 // ---------- 9. blink
@@ -252,7 +252,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
   T(s, "괄호 안은 위반 경로 수. 5 ns, util 0.6, GPDK045, Quantus 추출.", { x: 0.6, y: 5.05, w: 8.0, h: 0.3, fontSize: 11, color: MID });
   if (hasFig("pnr_layout.png")) {
     s.addImage({ path: fig("pnr_layout.png"), x: 8.85, y: 1.45, w: 3.9, h: 3.51 });
-    T(s, "P&R 셀 배치도 (메모리 FF = 주황, 클록 게이트 = 빨강)", { x: 8.85, y: 5.0, w: 3.9, h: 0.5, fontSize: 11, color: MID });
+    T(s, "P&R 셀 배치도 (플립플롭 = 연회색, 클록 게이트 = 파랑)", { x: 8.85, y: 5.0, w: 3.9, h: 0.5, fontSize: 11, color: MID });
   }
   card(s, 0.6, 5.45, 3.9, 1.5, "원인", "CTS가 래치를 말단 싱크로 균형 맞춰 AND 게이트보다 약 0.2 ns 일찍 열림", { size: 13, headColor: RED });
   card(s, 4.65, 5.45, 3.95, 1.5, "수정과 시도", "래치+AND → 통합 클록게이트 셀로 hold 해결. signoff ECO는 setup −0.040 ns로 악화되어 미채택", { size: 13, headColor: GREEN });
@@ -283,7 +283,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
   s.addImage({ path: img("FINAL_comparison.png"), x: 0.6, y: 1.45, w: 9.6, h: 2.4 });
   T(s, "실제 DELTA 영상(960×720) 월드 지도: 첫 결과 · 최종(균형형) · 최종(정제형) · 같은 시점의 실제 프레임(각도 보정 후)", { x: 0.6, y: 3.9, w: 9.6, h: 0.5, fontSize: 12, color: MID });
   card(s, 10.4, 1.45, 2.3, 2.95, "정직한 평가", "정답이 없는 실제 영상은 육안과 간접 지표로만 평가", { size: 13, headColor: RED });
-  s.addImage({ path: img("UZH_worldmap.png"), x: 0.6, y: 4.5, w: 6.4, h: 2.62 });
+  s.addImage({ path: img("UZH_worldmap.png"), x: 0.6, y: 4.5, w: 6.0, h: 2.45 });
   T(s, bullets([
     "UZH(모션캡처 정답): 좌 = 정답 자세 맵(시간 어긋남 보정 전이라 번짐), 우 = 우리 ECC 추정 맵",
     "소프트웨어(ECC) 추정기: 광축 1초 구간 θ 오차 2.4~3.2° (정답 시간 보정 후)",

@@ -38,7 +38,7 @@ def table(rows, widths, header=True, size=9):
     return t
 
 
-para("2026 전국 대학생 AI 반도체 회로 설계 경진대회 · Digital 트랙 2차", 15, True, "0E7C7B", 1)
+para("2026 전국 대학생 AI 반도체 회로 설계 경진대회 · Digital 트랙 2차", 15, True, "0066CC", 1)
 para("결과물 제출 안내 (1쪽): ID, 팀명, 결과물 폴더 구성", 11, False, "5B6B76", 6)
 
 table([
