@@ -13,8 +13,8 @@ sec.left_margin = sec.right_margin = Cm(1.8)
 sec.top_margin = sec.bottom_margin = Cm(1.5)
 
 st = d.styles["Normal"]
-st.font.name = "Malgun Gothic"; st.font.size = Pt(10)
-st.element.rPr.rFonts.set(qn("w:eastAsia"), "Malgun Gothic")
+st.font.name = "NanumSquare Neo"; st.font.size = Pt(10)
+st.element.rPr.rFonts.set(qn("w:eastAsia"), "NanumSquare Neo")
 st.paragraph_format.space_after = Pt(3)
 
 

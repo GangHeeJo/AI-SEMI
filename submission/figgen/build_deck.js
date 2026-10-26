@@ -11,7 +11,7 @@ const hasFig = (f) => fs.existsSync(fig(f));
 
 const INK = "1D1D1F", TEAL = "0066CC", AMBER = "0066CC", LIGHT = "F5F5F7", MID = "7A7A7A", RED = "1D1D1F", GREEN = "0066CC", WHITE = "FFFFFF", PALE = "F5F5F7";
 const BLUE_D = "2997FF", DARK = "272729", HAIR = "E0E0E0", MUTED_D = "CCCCCC";
-const FONT = "Malgun Gothic";
+const FONT = "NanumSquare Neo";
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE"; // 13.33 x 7.5
@@ -32,7 +32,7 @@ pres.defineSlideMaster({ title: "DARK", background: { color: DARK } });
 let n = 0;
 function content(title, notes) {
   const s = pres.addSlide({ masterName: n % 2 ? "PARCH" : "CONTENT" });
-  s.addText(title, { x: 0.6, y: 0.35, w: 12.1, h: 0.95, fontFace: FONT, fontSize: 26, bold: true, charSpacing: -0.3, color: INK, valign: "middle", margin: 0, isTextBox: true, fit: "shrink" });
+  s.addText(title, { x: 0.6, y: 0.35, w: 12.1, h: 0.95, fontFace: FONT, fontSize: 26, bold: true, color: INK, valign: "middle", margin: 0, isTextBox: true, fit: "shrink" });
   if (notes) s.addNotes(notes);
   n++;
   return s;
@@ -342,7 +342,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
 {
   const s = pres.addSlide({ masterName: "DARK" });
   n++;
-  T(s, "요약과 앞으로", { x: 0.8, y: 0.6, w: 11.7, h: 0.8, fontSize: 34, bold: true, charSpacing: -0.3, color: WHITE });
+  T(s, "요약과 앞으로", { x: 0.8, y: 0.6, w: 11.7, h: 0.8, fontSize: 34, bold: true, color: WHITE });
   const col = (x, head, body, c) => {
     T(s, head, { x, y: 1.8, w: 3.7, h: 0.5, fontSize: 18, bold: true, color: BLUE_D });
     T(s, body, { x, y: 2.4, w: 3.7, h: 3.6, fontSize: 17, color: WHITE });
