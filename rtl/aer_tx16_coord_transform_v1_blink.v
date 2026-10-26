@@ -23,10 +23,18 @@ module aer_tx16_coord_transform_v1_blink #(parameter integer TIMEOUT = 511) (
     else if (hold != 0) hold <= hold - 1'b1;
   end
   wire enable = rst | any_arr | (hold != 0);
+`ifdef ICG_LIB
+  // 라이브러리 통합 클록게이트(래치+AND 한 셀): 분리형은 CTS가 래치를 AND보다 일찍 열어 게이팅 hold 위반이 났음(§218)
+  wire gclk;
+  TLATNCAX4 u_cg (.E(enable), .CK(clk), .ECK(gclk));
+  reg en_q; always @(posedge clk) en_q <= enable;       // 관측용(전력 통계/테스트): 래치 출력이 아니라 enable의 1사이클 지연
+  assign core_clk_on = en_q;
+`else
   reg en_l;
   always @(clk or enable) if (!clk) en_l <= enable;
   wire gclk = clk & en_l;
   assign core_clk_on = en_l;
+`endif
 
   wire        world_we, world_pol;
   wire [11:0] world_addr;
