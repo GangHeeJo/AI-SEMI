@@ -325,8 +325,10 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
     ["추정기 입력 줄이기(ON만/중심 가중/불응기)", { text: "기각", options: { color: RED, bold: true } }, "정확도 1.5배 이상 악화"],
     ["미세 안구운동(지터)", { text: "기각", options: { color: RED, bold: true } }, "부화소 복원 효과 없음"],
     ["원심성 복사(VOR): 회전 지령을 θ 사전분포로", { text: "기각", options: { color: INK, bold: true } }, "UZH 평균 23.4°→8.5°이나 RobotEvt 36.1°→34.9°(기준 25.3° 미달), 사전 등록 기준 미통과"],
+    ["희소 행 할당(해마식 지연 할당)", { text: "기각", options: { color: INK, bold: true } }, "건드려진 행 UZH 52.9%·RobotEvt 55.5%(기준 50% 이하 미달), 칸은 13~17%"],
+    ["기억 소멸(forgetting)", { text: "기각", options: { color: INK, bold: true } }, "카운터 감쇠(K=4096): UZH 23.4°→23.8°, RobotEvt 36.1°→36.0°(0.8배 기준 미달)"],
     ["최근 쓰기 캐시 (감각 기억)", { text: "보류", options: { color: MID, bold: true } }, "64항목만 전력 −16%/면적 +5.5%, 필수 아님"],
-  ], 0.6, 1.5, 12.1, [4.4, 1.3, 6.4], { size: 13, rowH: 0.54 });
+  ], 0.6, 1.5, 12.1, [4.4, 1.3, 6.4], { size: 12, rowH: 0.46 });
 }
 
 // ---------- 15. 장단점·고려
