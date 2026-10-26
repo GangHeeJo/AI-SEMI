@@ -21,9 +21,15 @@ module world_mem_ff_rg #(parameter integer ADDR_BITS = 12) (
   generate
     for (r = 0; r < ROWS; r = r + 1) begin : ROW
       wire row_en = rst | (we & (wy == r));
+`ifdef ICG_LIB
+      // 라이브러리 통합 클록게이트(래치+AND가 한 셀): 별도 래치+AND는 CTS가 래치를 말단 싱크로 균형 맞춰 AND보다 0.2 ns 일찍 열려 게이팅 hold 위반(-0.030 ns)이 났음
+      wire gclk;
+      TLATNCAX4 u_icg (.E(row_en), .CK(clk), .ECK(gclk));
+`else
       reg  en_l;
       always @(clk or row_en) if (!clk) en_l <= row_en;      // 낮은 구간에서 래치(글리치 없는 게이팅)
       wire gclk = clk & en_l;
+`endif
       for (c = 0; c < COLS; c = c + 1) begin : COL
         always @(posedge gclk) begin
           if (rst) valid_r[r*COLS + c] <= 1'b0;

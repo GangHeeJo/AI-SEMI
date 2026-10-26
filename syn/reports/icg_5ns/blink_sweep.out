@@ -1,0 +1,4 @@
+IDLE=100  core clock on 100.0% of cycles | overrun mismatches 0 | memory mismatches 0 (written cells 136)
+IDLE=300  core clock on 100.0% of cycles | overrun mismatches 0 | memory mismatches 0 (written cells 120)
+IDLE=1200  core clock on 54.0% of cycles | overrun mismatches 0 | memory mismatches 0 (written cells 140)
+IDLE=6000  core clock on 12.9% of cycles | overrun mismatches 0 | memory mismatches 0 (written cells 146)

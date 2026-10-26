@@ -1,0 +1,97 @@
+*----------------------------------------------------------------------------------------
+*	Innovus 23.14-s088_1 (64bit) 02/28/2025 12:25 (Linux 3.10.0-693.el7.x86_64)
+*	
+*
+* 	Date & Time:	2026-Oct-26 13:57:01 (2026-Oct-26 04:57:01 GMT)
+*
+*----------------------------------------------------------------------------------------
+*
+*	Design: aer_tx16_coord_transform_v1_rg
+*
+*	Liberty Libraries used: 
+*	        view_setup: /home/aiasic26911/ganghee_icg/w/pnr/final.enc.dat/libs/mmmc/slow_vdd1v0_basicCells.lib
+*
+*	Power Domain used: 
+*              Rail:        VDD      Voltage:        0.9 
+*
+*       Power View : view_setup
+*
+*       User-Defined Activity : N.A.
+*
+*       Activity File: N.A.
+*
+*       Hierarchical Global Activity: N.A.
+*
+*       Global Activity: N.A.
+*
+*       Sequential Element Activity: 0.100000
+*
+*       Primary Input Activity: 0.200000
+*
+*       Default icg ratio: N.A.
+*
+*       Global Comb ClockGate Ratio: N.A.
+*
+*	Power Units = 1mW
+*
+*	Time Units = 1e-09 secs 
+*
+*       report_power -outfile pnr/eco_power.rpt -view view_setup
+*
+-----------------------------------------------------------------------------------------
+
+
+Total Power 
+-----------------------------------------------------------------------------------------
+Total Internal Power:        3.62379010 	   59.2951%
+Total Switching Power:       2.48415091 	   40.6475%
+Total Leakage Power:         0.00351127 	    0.0575%
+Total Power:                 6.11145229 
+-----------------------------------------------------------------------------------------
+
+
+Group                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+Sequential                         2.174      0.2515    0.001182       2.427       39.71 
+Macro                                  0           0           0           0           0 
+IO                                     0           0           0           0           0 
+Combinational                     0.8394       1.468    0.002187        2.31       37.79 
+Clock (Combinational)             0.2453      0.5455   6.057e-05      0.7909       12.94 
+Clock (Sequential)                0.3649      0.2192   8.151e-05      0.5842       9.559 
+-----------------------------------------------------------------------------------------
+Total                              3.624       2.484    0.003511       6.111         100 
+-----------------------------------------------------------------------------------------
+
+
+Rail                  Voltage   Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+VDD                       0.9      3.624       2.484    0.003511       6.111         100 
+
+
+Clock                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+clk                               0.6103      0.7646   0.0001421       1.375        22.5 
+-----------------------------------------------------------------------------------------
+Total (excluding duplicates)      0.6103      0.7646   0.0001421       1.375        22.5 
+-----------------------------------------------------------------------------------------
+Clock: clk
+Clock Period: 0.005000 usec 
+Clock Toggle Rate:   400.0000 Mhz 
+Clock Static Probability:  0.5000
+
+
+
+-----------------------------------------------------------------------------------------
+*	Power Distribution Summary: 
+*                Highest Average Power:       u_mem_ROW[23].u_icg (TLATNCAX20):         0.008111 
+*                Highest Leakage Power:        u_mem_ROW[6].u_icg (TLATNCAX20):        7.323e-07 
+*          Total Cap:      2.2589e-10 F
+*          Total instances in design: 57291
+*          Total instances in design with no power:     0
+*          Total instances in design with no activity:     0
+*          Total Fillers and Decap:     0
+-----------------------------------------------------------------------------------------
+

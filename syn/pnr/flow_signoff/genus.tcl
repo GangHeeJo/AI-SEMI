@@ -13,7 +13,7 @@ foreach p $DBL { foreach c [get_db lib_cells */$p] { set_db $c .dont_use true } 
 set_db lp_insert_clock_gating [expr {[info exists ::env(CG)] && $::env(CG) eq "1"}]
 set_db use_scan_seqs_for_non_dft false
 set_db init_hdl_search_path /home/aiasic26911/redred-faer
-read_hdl -sv $::env(RTL)
+if {[info exists ::env(DEFS)] && $::env(DEFS) ne ""} { read_hdl -sv -define $::env(DEFS) $::env(RTL) } else { read_hdl -sv $::env(RTL) }
 elaborate $TOP
 check_design -unresolved
 create_clock -name clk -period $PER [get_ports clk]
