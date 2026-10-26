@@ -1,0 +1,747 @@
+
+Cadence Innovus(TM) Implementation System.
+Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+
+Version:	v23.14-s088_1, built Fri Feb 28 12:25:44 PST 2025
+Options:	-no_gui -files /home/aiasic26911/gf_hold52/flow/signoff_sta.tcl -log signoff 
+Date:		Mon Oct 26 16:13:38 2026
+Host:		snu.polaris.09 (x86_64 w/Linux 3.10.0-1160.el7.x86_64) (16cores*64cpus*Intel(R) Xeon(R) Gold 6246R CPU @ 3.40GHz 36608KB)
+OS:		CentOS Linux 7 (Core)
+
+License:
+		[16:13:38.406962] Configured Lic search path (23.02-s006): 5280@210.126.11.80:5280@210.126.11.71
+
+		invs	Innovus Implementation System	23.1	checkout succeeded
+		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+Create and set the environment variable TMPDIR to /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz.
+
+Change the soft stacksize limit to 0.2%RAM (1288 mbytes). Set global soft_stack_size_limit to change the value.
+Info: Process UID = 175681 / 1e5d4615-e9ad-43fa-87de-15f58e8310c4 / AbEMRgbcpI
+source /tools/cadence/DDI231/INNOVUS231/tools.lnx86/../etc/synth/attr_def/plus_attr_defs.tcl
+Loading attribute definitions from mini dummy db...
+Info: Defined 24215 Synthesis attributes
+Info: Skipped defining 360 Synthesis attributes already defined in Innovus
+source /tools/cadence/DDI231/INNOVUS231/tools.lnx86/../etc/synth/attr_def/plus_msg_defs.tcl
+
+**INFO:  MMMC transition support version v31-84 
+
+Sourcing file "/home/aiasic26911/gf_hold52/flow/signoff_sta.tcl" ...
+innovus 1> source /home/aiasic26911/gf_hold52/flow/signoff_sta.tcl
+#% Begin load design ... (date=10/26 16:14:01, mem=1635.5M)
+Loading design 'aer_tx16_coord_transform_v1_rg' saved by 'Innovus' '23.14-s088_1' on 'Mon Oct 26 16:12:33 2026'.
+% Begin Load MMMC data ... (date=10/26 16:14:02, mem=1638.8M)
+% End Load MMMC data ... (date=10/26 16:14:02, total cpu=0:00:00.0, real=0:00:00.0, peak res=1639.9M, current mem=1639.9M)
+
+Loading LEF file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/libs/lef/gsclib045_tech.lef ...
+Set DBUPerIGU to M2 pitch 400.
+
+Loading LEF file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/libs/lef/gsclib045_macro.lef ...
+**WARN: (IMPLF-200):	Pin 'A' in macro 'ANTENNA' has no ANTENNAGATEAREA value defined. The library data is incomplete and some process antenna rules will not be checked correctly.
+Type 'man IMPLF-200' for more detail.
+
+##  Check design process and node:  
+##  Both design process and tech node are not set.
+
+Loading view definition file from /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/viewDefinition.tcl
+Reading lib_slow timing library '/home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib' ...
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP9'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP8'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP7'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP6'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP5'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP4'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP3'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP2'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP10'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'ANTENNA'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/slow_vdd1v0_basicCells.lib)
+Read 489 cells in library 'slow_vdd1v0' 
+Reading lib_fast timing library '/home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib' ...
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP9'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP8'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP7'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP6'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP5'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP4'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP3'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP2'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'DECAP10'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+**WARN: (TECHLIB-302):	No function defined for cell 'ANTENNA'. The cell will only be used for analysis. (File /home/aiasic26911/gsclib045_all_v4.7/gsclib045/timing/fast_vdd1v0_basicCells.lib)
+Read 489 cells in library 'fast_vdd1v0' 
+*** End library_loading (cpu=0.03min, real=0.03min, mem=55.5M, fe_cpu=0.44min, fe_real=0.43min, fe_mem=1799.8M) ***
+% Begin Load netlist data ... (date=10/26 16:14:04, mem=1659.1M)
+*** Begin netlist parsing (mem=1799.8M) ***
+Created 489 new cells from 2 timing libraries.
+Reading netlist ...
+Backslashed names will retain backslash and a trailing blank character.
+Reading verilogBinary netlist '/home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/vbin/aer_tx16_coord_transform_v1_rg.v.bin'
+
+*** Memory Usage v#2 (Current mem = 1799.754M, initial mem = 831.461M) ***
+*** End netlist parsing (cpu=0:00:00.1, real=0:00:00.0, mem=1799.8M) ***
+% End Load netlist data ... (date=10/26 16:14:04, total cpu=0:00:00.1, real=0:00:00.0, peak res=1685.3M, current mem=1685.3M)
+Set top cell to aer_tx16_coord_transform_v1_rg.
+Hooked 978 DB cells to tlib cells.
+Starting recursive module instantiation check.
+No recursion found.
+Building hierarchical netlist for Cell aer_tx16_coord_transform_v1_rg ...
+***** UseNewTieNetMode *****.
+*** Netlist is unique.
+** info: there are 1388 modules.
+** info: there are 58681 stdCell insts.
+** info: there are 58681 stdCell insts with at least one signal pin.
+
+*** Memory Usage v#2 (Current mem = 1861.766M, initial mem = 831.461M) ***
+*info: set bottom ioPad orient R0
+**WARN: (IMPFP-3961):	The techSite 'CornerSite' has no related standard cells in the LEF/OA library. The calculations for this site type cannot be made unless standard cell models of this type exist in the LEF/OA library. Ignore this warning if the SITE is not used by the library. Alternatively, remove the SITE definition for the LEF/OA library to avoid this message.
+Type 'man IMPFP-3961' for more detail.
+**WARN: (IMPFP-3961):	The techSite 'IOSite' has no related standard cells in the LEF/OA library. The calculations for this site type cannot be made unless standard cell models of this type exist in the LEF/OA library. Ignore this warning if the SITE is not used by the library. Alternatively, remove the SITE definition for the LEF/OA library to avoid this message.
+Type 'man IMPFP-3961' for more detail.
+Start create_tracks
+##  Process: 45            (User Set)               
+##     Node: (not set)                           
+
+##  Check design process and node:  
+##  Design tech node is not set.
+
+Applying the recommended capacitance filtering threshold values for 45nm process node: total_c_th=0, relative_c_th=1 and coupling_c_th=0.1.
+	These values will be used by all post-route extraction engines, including TQuantus, IQuantus and Quantus QRC extraction.
+	Capacitance filtering mode(-capFilterMode option of the setExtractRCMode) is 'relAndCoup' for all engines.
+	The accuracy mode for postRoute effortLevel low extraction will be set to 'high'.
+	Default value for EffortLevel(-effortLevel option of the setExtractRCMode) in postRoute extraction mode will be 'medium' if Quantus QRC technology file is specified else 'low'.
+**WARN: (IMPOPT-3602):	The specified path group name tdgp_reg2reg_default is not defined.
+Type 'man IMPOPT-3602' for more detail.
+Effort level <high> specified for tdgp_reg2reg_default path_group
+Slack adjustment of -0 applied on tdgp_reg2reg_default path_group
+**WARN: (IMPTCM-77):	Option "-drouteStartIteration" for command setNanoRouteMode is obsolete and will be removed in a future release. The obsolete option still works in this release but to avoid this warning and to ensure compatibility with future releases, remove the obsolete option from your script.
+AAE_INFO: switching setDelayCal -siAware from false to true ...
+AAE_INFO: The setting is changed from false to true in setDelayCalMode -SIAware
+*Info: initialize multi-corner CTS.
+Total number of combinational cells: 318
+Total number of sequential cells: 152
+Total number of tristate cells: 10
+Total number of level shifter cells: 0
+Total number of power gating cells: 0
+Total number of isolation cells: 0
+Total number of power switch cells: 0
+Total number of pulse generator cells: 0
+Total number of always on buffers: 0
+Total number of retention cells: 0
+Total number of physical cells: 9
+List of usable buffers: BUFX2 BUFX12 BUFX16 BUFX20 CLKBUFX2 BUFX3 BUFX4 BUFX6 BUFX8 CLKBUFX12 CLKBUFX16 CLKBUFX20 CLKBUFX3 CLKBUFX4 CLKBUFX6 CLKBUFX8
+Total number of usable buffers: 16
+List of unusable buffers:
+Total number of unusable buffers: 0
+List of usable inverters: CLKINVX1 CLKINVX2 CLKINVX12 CLKINVX16 CLKINVX20 CLKINVX4 CLKINVX3 CLKINVX6 CLKINVX8 INVX1 INVX2 INVX12 INVX16 INVX20 INVXL INVX3 INVX4 INVX6 INVX8
+Total number of usable inverters: 19
+List of unusable inverters:
+Total number of unusable inverters: 0
+List of identified usable delay cells: DLY1X1 DLY1X4 DLY2X1 DLY2X4 DLY3X1 DLY3X4 DLY4X1 DLY4X4
+Total number of identified usable delay cells: 8
+List of identified unusable delay cells:
+Total number of identified unusable delay cells: 0
+Reading floorplan file - /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.fp.gz (mem = 2136.0M).
+% Begin Load floorplan data ... (date=10/26 16:14:05, mem=2028.0M)
+*info: reset 59068 existing net BottomPreferredLayer and AvoidDetour
+Deleting old partition specification.
+Set FPlanBox to (0 0 930400 924160)
+**WARN: (IMPFP-3961):	The techSite 'CornerSite' has no related standard cells in the LEF/OA library. The calculations for this site type cannot be made unless standard cell models of this type exist in the LEF/OA library. Ignore this warning if the SITE is not used by the library. Alternatively, remove the SITE definition for the LEF/OA library to avoid this message.
+Type 'man IMPFP-3961' for more detail.
+**WARN: (IMPFP-3961):	The techSite 'IOSite' has no related standard cells in the LEF/OA library. The calculations for this site type cannot be made unless standard cell models of this type exist in the LEF/OA library. Ignore this warning if the SITE is not used by the library. Alternatively, remove the SITE definition for the LEF/OA library to avoid this message.
+Type 'man IMPFP-3961' for more detail.
+ ... processed partition successfully.
+Reading binary special route file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.fp.spr.gz (Created by Innovus v23.14-s088_1 on Mon Oct 26 16:12:31 2026, version: 1)
+Convert 0 swires and 0 svias from compressed groups
+34 swires and 80 svias were compressed
+34 swires and 80 svias were decompressed from small or sparse groups
+Ending "Read special route file" (total cpu=0:00:00.0, real=0:00:01.0, peak res=2029.1M, current mem=2029.1M)
+There are 969 nets with weight being set
+There are 969 nets with bottomPreferredRoutingLayer being set
+There are 969 nets with avoidDetour being set
+Extracting standard cell pins and blockage ...... 
+Pin and blockage extraction finished
+Delete all existing relative floorplan constraints.
+% End Load floorplan data ... (date=10/26 16:14:06, total cpu=0:00:00.2, real=0:00:01.0, peak res=2029.8M, current mem=2029.7M)
+Reading congestion map file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.route.congmap.gz ...
+% Begin Load SymbolTable ... (date=10/26 16:14:06, mem=2029.8M)
+Suppress "**WARN ..." messages.
+Un-suppress "**WARN ..." messages.
+% End Load SymbolTable ... (date=10/26 16:14:06, total cpu=0:00:00.2, real=0:00:00.0, peak res=2036.9M, current mem=2036.8M)
+Loading place ...
+% Begin Load placement data ... (date=10/26 16:14:06, mem=2036.8M)
+Reading placement file - /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.place.gz.
+** Reading stdCellPlacement_binary (Created by Innovus v23.14-s088_1 on Mon Oct 26 16:12:31 2026, version# 2) ...
+Read Views for adaptive view pruning ...
+Read 0 views from Binary DB for adaptive view pruning
+*** applyConnectGlobalNets disabled.
+*** Completed restorePlace (cpu=0:00:00.1 real=0:00:00.0 mem=2147.0M) ***
+Total net length = 1.435e+06 (7.827e+05 6.520e+05) (ext = 4.839e+03)
+% End Load placement data ... (date=10/26 16:14:06, total cpu=0:00:00.2, real=0:00:00.0, peak res=2051.2M, current mem=2048.7M)
+Reading PG file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.pg.gz, version#2, (Created by Innovus v23.14-s088_1 on       Mon Oct 26 16:12:31 2026)
+*** Completed restorePGFile (cpu=0:00:00.1 real=0:00:00.0 mem=2147.0M) ***
+% Begin Load routing data ... (date=10/26 16:14:06, mem=2050.0M)
+Reading routing file - /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.route.gz.
+Reading Innovus routing data (Created by Innovus v23.14-s088_1 on Mon Oct 26 16:12:30 2026 Format: 23.1) ...
+*** Total 58746 nets are successfully restored.
+*** Completed restoreRoute (cpu=0:00:00.7 real=0:00:01.0 mem=2225.0M) ***
+% End Load routing data ... (date=10/26 16:14:07, total cpu=0:00:00.8, real=0:00:01.0, peak res=2132.3M, current mem=2131.8M)
+TAT_INFO: ::restoreCongMap REAL = 0 : CPU = 0 : MEM = 0.
+Reading property file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.prop
+*** Completed restoreProperty (cpu=0:00:00.1 real=0:00:00.0 mem=2231.0M) ***
+Reading dirtyarea snapshot file /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.db.da.gz (Create by Innovus v23.14-s088_1 on Mon Oct 26 16:12:31 2026, version: 7).
+Loading preRoute extraction data from directory '/home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/extraction/' ...
+Extraction setup Started for TopCell aer_tx16_coord_transform_v1_rg 
+Initializing multi-corner RC extraction with 1 active RC Corners ...
+Captable file(s) not specified in multi-corner setup. PreRoute extraction will use technology file. For postRoute extraction, default value for effort level would be 'medium' and effort level 'low' would not be allowed.
+Generating auto layer map file.
+Loading preRoute extracted patterns from file '/home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg.techData.gz' ...
+Completed (cpu: 0:00:00.7 real: 0:00:01.0)
+Set Shrink Factor to 1.00000
+Summary of Active RC-Corners : 
+ 
+ Analysis View: view_setup
+    RC-Corner Name        : rc_typ
+    RC-Corner Index       : 0
+    RC-Corner Temperature : 25 Celsius
+    RC-Corner Cap Table   : ''
+    RC-Corner PreRoute Res Factor         : 1
+    RC-Corner PreRoute Cap Factor         : 1
+    RC-Corner PostRoute Res Factor        : 1 {1 1 1}
+    RC-Corner PostRoute Cap Factor        : 1 {1 1 1}
+    RC-Corner PostRoute XCap Factor       : 1 {1 1 1}
+    RC-Corner PreRoute Clock Res Factor   : 1	[Derived from postRoute_res (effortLevel low)]
+    RC-Corner PreRoute Clock Cap Factor   : 1	[Derived from postRoute_cap (effortLevel low)]
+    RC-Corner PostRoute Clock Cap Factor  : 1 {1 1 1} 	[Derived from postRoute_cap (effortLevel high)]
+    RC-Corner PostRoute Clock Res Factor  : 1 {1 1 1} 	[Derived from postRoute_res (effortLevel high)]
+    RC-Corner PostRoute Clock coupling capacitance Factor : 1 {1 1 1} 	[Derived from postRoute_xcap (effortLevel high)]
+    RC-Corner Technology file: '/home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/libs/mmmc/rc_typ/qrcTechFile'
+ 
+ Analysis View: view_hold
+    RC-Corner Name        : rc_typ
+    RC-Corner Index       : 0
+    RC-Corner Temperature : 25 Celsius
+    RC-Corner Cap Table   : ''
+    RC-Corner PreRoute Res Factor         : 1
+    RC-Corner PreRoute Cap Factor         : 1
+    RC-Corner PostRoute Res Factor        : 1 {1 1 1}
+    RC-Corner PostRoute Cap Factor        : 1 {1 1 1}
+    RC-Corner PostRoute XCap Factor       : 1 {1 1 1}
+    RC-Corner PreRoute Clock Res Factor   : 1	[Derived from postRoute_res (effortLevel low)]
+    RC-Corner PreRoute Clock Cap Factor   : 1	[Derived from postRoute_cap (effortLevel low)]
+    RC-Corner PostRoute Clock Cap Factor  : 1 {1 1 1} 	[Derived from postRoute_cap (effortLevel high)]
+    RC-Corner PostRoute Clock Res Factor  : 1 {1 1 1} 	[Derived from postRoute_res (effortLevel high)]
+    RC-Corner PostRoute Clock coupling capacitance Factor : 1 {1 1 1} 	[Derived from postRoute_xcap (effortLevel high)]
+    RC-Corner Technology file: '/home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/libs/mmmc/rc_typ/qrcTechFile'
+Initializing multi-corner resistance tables ...
+Default value for postRoute extraction mode's effortLevel (-effortLevel option of setExtractRCMode) changed to 'medium'.
+Start generating vias ..
+#Skip building auto via since it is not turned on.
+Extracting standard cell pins and blockage ...... 
+Pin and blockage extraction finished
+Via generation completed.
+% Begin Load power constraints ... (date=10/26 16:14:11, mem=2194.5M)
+source /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/aer_tx16_coord_transform_v1_rg_power_constraints.tcl
+'set_default_switching_activity' finished successfully.
+** WARN:  (VOLTUS_POWR-3212): The 'set_power_analysis_mode -leakage_power_view |-dynamic_power_view|-analysis_view' will be obsolete in 18.20 release. Use 'set_analysis_view -leakage <> | -dynamic <>' to set leakage and dynamic power views.
+
+% End Load power constraints ... (date=10/26 16:14:11, total cpu=0:00:00.0, real=0:00:00.0, peak res=2200.3M, current mem=2200.3M)
+% Begin load AAE data ... (date=10/26 16:14:11, mem=2230.2M)
+**WARN: (IMPESI-3505):	setDelayCalMode -eng_enablePrePlacedFlow false (default=false) will be obsoleted along with its sgs2set equivalent.  This parameter will continue to be supported in the current release, but will be removed in the next major release of the software.
+AAE DB initialization (MEM=2250.105469 CPU=0:00:00.0 REAL=0:00:00.0) 
+% End load AAE data ... (date=10/26 16:14:12, total cpu=0:00:00.5, real=0:00:01.0, peak res=2250.4M, current mem=2250.4M)
+Restoring CCOpt config...
+  Extracting original clock gating for clk...
+    clock_tree clk contains 12171 sinks and 377 clock gates.
+  Extracting original clock gating for clk done.
+  The skew group clk/cm was created. It contains 12171 sinks and 1 sources.
+  The skew group clk/cm was created. It contains 12171 sinks and 1 sources.
+Restoring CCOpt config done.
+Total number of combinational cells: 318
+Total number of sequential cells: 152
+Total number of tristate cells: 10
+Total number of level shifter cells: 0
+Total number of power gating cells: 0
+Total number of isolation cells: 0
+Total number of power switch cells: 0
+Total number of pulse generator cells: 0
+Total number of always on buffers: 0
+Total number of retention cells: 0
+Total number of physical cells: 9
+List of usable buffers: BUFX12 BUFX16 BUFX20 CLKBUFX2 BUFX3 BUFX4 BUFX6 BUFX8 CLKBUFX12 CLKBUFX16 CLKBUFX20 CLKBUFX3 CLKBUFX4 CLKBUFX6 CLKBUFX8
+Total number of usable buffers: 15
+List of unusable buffers: BUFX2
+Total number of unusable buffers: 1
+List of usable inverters: CLKINVX1 CLKINVX2 CLKINVX12 CLKINVX16 CLKINVX20 CLKINVX4 CLKINVX3 CLKINVX6 CLKINVX8 INVX1 INVX2 INVX12 INVX16 INVX20 INVXL INVX3 INVX4 INVX6 INVX8
+Total number of usable inverters: 19
+List of unusable inverters:
+Total number of unusable inverters: 0
+List of identified usable delay cells: DLY1X1 DLY1X4 DLY2X1 DLY2X4 DLY3X1 DLY3X4 DLY4X1 DLY4X4
+Total number of identified usable delay cells: 8
+List of identified unusable delay cells:
+Total number of identified unusable delay cells: 0
+#% End load design ... (date=10/26 16:14:12, total cpu=0:00:09.9, real=0:00:11.0, peak res=2264.2M, current mem=2256.4M)
+
+*** Summary of all messages that are not suppressed in this session:
+Severity  ID               Count  Summary                                  
+WARNING   IMPLF-200            1  Pin '%s' in macro '%s' has no ANTENNAGAT...
+WARNING   IMPFP-3961           4  The techSite '%s' has no related standar...
+WARNING   IMPESI-3505          1  setDelayCalMode -eng_%s (default=%s) wil...
+WARNING   IMPOPT-3602          1  The specified path group name %s is not ...
+WARNING   IMPTCM-77            1  Option "%s" for command %s is obsolete a...
+WARNING   TECHLIB-302         20  No function defined for cell '%s'. The c...
+*** Message Summary: 28 warning(s), 0 error(s)
+
+
+SPEF files for RC Corner rc_typ:
+Start spef parsing (MEM=2399.61).
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 10 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 20 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 30 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 40 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 50 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 60 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 70 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 80 %
+Spef file 'pnr/aer_tx16_coord_transform_v1_rg_quantus.spef' reading completed:: 90 %
+SPEF file pnr/aer_tx16_coord_transform_v1_rg_quantus.spef.
+Number of Resistors     : 410840
+Number of Ground Caps   : 369513
+Number of Coupling Caps : 2576608
+
+End spef parsing (MEM=2479.61 CPU=0:00:08.2 REAL=0:00:03.0).
+**WARN: (IMPOPT-7250):	Option -signOff for command timeDesign is obsolete and has been replaced by signoffTimeDesign.
+The obsolete option still works in this release but to avoid this warning and to ensure compatibility with future releases, update your script to use signoffTimeDesign.
+The setDelayCalMode -SIAware true is set. Running Signoff AAE-SI Analysis.
+*** timeDesign #1 [begin] () : totSession cpu/real = 0:00:42.0/0:00:36.8 (1.1), mem = 2479.6M
+**INFO: SpefIn flow is detected ...
+ Reset EOS DB
+Ignoring AAE DB Resetting ...
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+Deleting AAE DB and timing data for delay calculations...
+AAE DB initialization (MEM=2317.558594 CPU=0:00:00.0 REAL=0:00:00.0) 
+[16:14:16.154339] Periodic Lic check successful
+[16:14:16.154361] Feature usage summary:
+[16:14:16.154361] Innovus_Impl_System
+[16:14:16.154368] Tempus_Timing_Signoff_XL
+
+(#118) This command "timeDesign -signoff -outDir pnr/signoff_setup" required an extra checkout of license tpsxl.
+Additional license(s) checked out: 1 'tpsxl' (Tempus_Timing_Signoff_XL; TPS200; 23.1) license(s)
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+Starting delay calculation for Setup views
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 0 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2395.48)
+ Report initialization with DMWrite ... (0, Worst)
+Total number of fetched objects 59121
+AAE_INFO: Total number of nets for which stage creation was skipped for all views 0
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2583.44 CPU=0:00:24.1 REAL=0:00:25.0)
+End delay calculation (fullDC). (MEM=2568.17 CPU=0:00:25.3 REAL=0:00:25.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2590.5M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.3, REAL = 0:00:00.0, MEM = 2592.7M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2583.85)
+ Report initialization with DMUpdate ... (1, Worst)
+**WARN: (IMPESI-3140):	Bumpy transitions may exist in the design which may lead to inaccurate delay computation. To report/analyze the nets having bumpy transition, please enable delay report and use command 'report_noise -bumpy_waveform -threshold 0' after timing analysis. Delay report is enabled by setting 'set_si_mode -enable_delay_report true' before timing analysis.
+Type 'man IMPESI-3140' for more detail.
+Glitch Analysis: View view_setup -- Total Number of Nets Skipped = 544. 
+Glitch Analysis: View view_setup -- Total Number of Nets Analyzed = 59121. 
+Total number of fetched objects 59121
+AAE_INFO: Total number of nets for which stage creation was skipped for all views 0
+AAE_INFO-618: Total number of nets in the design is 59068,  10.8 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2608.46 CPU=0:00:04.5 REAL=0:00:04.0)
+End delay calculation (fullDC). (MEM=2608.46 CPU=0:00:04.5 REAL=0:00:04.0)
+Swap out waveforms (MEM=2585.77 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+*** Done Building Timing Graph (cpu=0:00:35.6 real=0:00:35.0 totSessionCpu=0:01:18 mem=2843.5M)
+** INFO: Initializing Glitch Interface
+** INFO: Initializing Glitch Interface
+
+OptSummary:
+
+------------------------------------------------------------------
+          timeDesign Summary
+------------------------------------------------------------------
+
+Setup views included:
+ view_setup 
+
++--------------------+---------+---------+---------+---------+
+|     Setup mode     |   all   | reg2reg |reg2cgate| default |
++--------------------+---------+---------+---------+---------+
+|           WNS (ns):| -1.165  | -1.165  |  0.193  |  0.337  |
+|           TNS (ns):| -4.473  | -4.473  |  0.000  |  0.000  |
+|    Violating Paths:|   62    |   62    |    0    |    0    |
+|          All Paths:|  12576  |  12028  |   377   |  9247   |
++--------------------+---------+---------+---------+---------+
+
++----------------+-------------------------------+------------------+
+|                |              Real             |       Total      |
+|    DRVs        +------------------+------------+------------------|
+|                |  Nr nets(terms)  | Worst Vio  |  Nr nets(terms)  |
++----------------+------------------+------------+------------------+
+|   max_cap      |      0 (0)       |   0.000    |      0 (0)       |
+|   max_tran     |    611 (1753)    |   -0.750   |    611 (1753)    |
+|   max_fanout   |      0 (0)       |     0      |      0 (0)       |
+|   max_length   |      0 (0)       |     0      |      0 (0)       |
++----------------+------------------+------------+------------------+
+
+Density: 88.370%
+       (100.000% with Fillers)
+Total number of glitch violations: 1
+------------------------------------------------------------------
+Reported timing to dir pnr/signoff_setup
+Total CPU time: 41.68 sec
+Total Real time: 43.0 sec
+Total Memory Usage: 3078.542969 Mbytes
+Reset AAE Options
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+*** timeDesign #1 [finish] () : cpu/real = 0:00:41.8/0:00:42.8 (1.0), totSession cpu/real = 0:01:23.9/0:01:19.6 (1.1), mem = 3060.8M
+**WARN: (IMPOPT-7250):	Option -signOff for command timeDesign is obsolete and has been replaced by signoffTimeDesign.
+The obsolete option still works in this release but to avoid this warning and to ensure compatibility with future releases, update your script to use signoffTimeDesign.
+The setDelayCalMode -SIAware true is set. Running Signoff AAE-SI Analysis.
+*** timeDesign #2 [begin] () : totSession cpu/real = 0:01:23.9/0:01:19.7 (1.1), mem = 3060.8M
+**INFO: SpefIn flow is detected ...
+ Reset EOS DB
+Ignoring AAE DB Resetting ...
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+Starting delay calculation for Hold views
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 1 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2610.51)
+*** Calculating scaling factor for lib_fast libraries using the default operating condition of each library.
+ Report initialization with DMWrite ... (0, Best)
+Total number of fetched objects 59121
+AAE_INFO: Total number of nets for which stage creation was skipped for all views 0
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2643.62 CPU=0:00:21.0 REAL=0:00:21.0)
+End delay calculation (fullDC). (MEM=2643.62 CPU=0:00:21.9 REAL=0:00:22.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2650.8M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.3, REAL = 0:00:00.0, MEM = 2651.0M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2636.75)
+ Report initialization with DMUpdate ... (1, Worst)
+Glitch Analysis: View view_hold -- Total Number of Nets Skipped = 1110. 
+Glitch Analysis: View view_hold -- Total Number of Nets Analyzed = 59121. 
+Total number of fetched objects 59121
+AAE_INFO: Total number of nets for which stage creation was skipped for all views 0
+AAE_INFO-618: Total number of nets in the design is 59068,  4.2 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2647.2 CPU=0:00:01.9 REAL=0:00:02.0)
+End delay calculation (fullDC). (MEM=2647.2 CPU=0:00:02.0 REAL=0:00:02.0)
+Swap out waveforms (MEM=2628.59 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+*** Done Building Timing Graph (cpu=0:00:29.3 real=0:00:29.0 totSessionCpu=0:01:54 mem=3030.5M)
+
+OptSummary:
+
+------------------------------------------------------------------
+          timeDesign Summary
+------------------------------------------------------------------
+
+Hold views included:
+ view_hold 
+
++--------------------+---------+---------+---------+---------+
+|     Hold mode      |   all   | reg2reg |reg2cgate| default |
++--------------------+---------+---------+---------+---------+
+|           WNS (ns):| -0.007  | -0.007  |  0.081  |  0.108  |
+|           TNS (ns):| -0.142  | -0.142  |  0.000  |  0.000  |
+|    Violating Paths:|   59    |   59    |    0    |    0    |
+|          All Paths:|  12576  |  12028  |   377   |  9247   |
++--------------------+---------+---------+---------+---------+
+
+Density: 88.370%
+       (100.000% with Fillers)
+------------------------------------------------------------------
+Reported timing to dir pnr/signoff_hold
+Total CPU time: 31.57 sec
+Total Real time: 32.0 sec
+Total Memory Usage: 3004.816406 Mbytes
+Reset AAE Options
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+**WARN: (GLOBAL-100):	Global 'timing_enable_backward_compatible_default_input_delay_mode' has become obsolete. It will be removed in the next release.
+*** timeDesign #2 [finish] () : cpu/real = 0:00:31.6/0:00:31.7 (1.0), totSession cpu/real = 0:01:55.5/0:01:51.4 (1.0), mem = 3004.8M
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 0 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2610.32)
+*** Calculating scaling factor for lib_slow libraries using the default operating condition of each library.
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2636.4 CPU=0:00:21.6 REAL=0:00:21.0)
+End delay calculation (fullDC). (MEM=2636.4 CPU=0:00:22.5 REAL=0:00:22.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2643.2M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.3, REAL = 0:00:01.0, MEM = 2643.5M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2636.58)
+AAE_INFO-618: Total number of nets in the design is 59068,  6.8 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2651.51 CPU=0:00:03.1 REAL=0:00:03.0)
+End delay calculation (fullDC). (MEM=2651.51 CPU=0:00:03.2 REAL=0:00:03.0)
+Swap out waveforms (MEM=2632.46 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 1 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2627.24)
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2650.49 CPU=0:00:18.9 REAL=0:00:19.0)
+End delay calculation (fullDC). (MEM=2650.49 CPU=0:00:19.9 REAL=0:00:20.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2653.5M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.3, REAL = 0:00:01.0, MEM = 2653.7M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2634.21)
+AAE_INFO-618: Total number of nets in the design is 59068,  0.7 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2648.23 CPU=0:00:00.7 REAL=0:00:01.0)
+End delay calculation (fullDC). (MEM=2648.23 CPU=0:00:00.8 REAL=0:00:01.0)
+Swap out waveforms (MEM=2632.98 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+'set_default_switching_activity' finished successfully.
+
+Power Net Detected:
+        Voltage	    Name
+             0V	    VSS
+           0.9V	    VDD
+Using Power View: view_setup.
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 0 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2628.16)
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2655.37 CPU=0:00:20.8 REAL=0:00:21.0)
+End delay calculation (fullDC). (MEM=2655.37 CPU=0:00:21.7 REAL=0:00:22.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2657.4M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.3, REAL = 0:00:00.0, MEM = 2657.7M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2641.34)
+AAE_INFO-618: Total number of nets in the design is 59068,  6.8 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2657 CPU=0:00:03.2 REAL=0:00:03.0)
+End delay calculation (fullDC). (MEM=2657 CPU=0:00:03.2 REAL=0:00:03.0)
+Swap out waveforms (MEM=2636.95 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+Load RC corner of view view_setup
+
+Begin Power Analysis
+
+             0V	    VSS
+           0.9V	    VDD
+
+Begin Processing Timing Library for Power Calculation
+
+Ended Processing Timing Library for Power Calculation: (cpu=0:00:00, real=0:00:00, mem(process/total/peak)=2643.98MB/5155.37MB/2657.40MB)
+
+
+
+Begin Processing Power Net/Grid for Power Calculation
+
+Ended Processing Power Net/Grid for Power Calculation: (cpu=0:00:00, real=0:00:00, mem(process/total/peak)=2644.05MB/5155.37MB/2657.40MB)
+
+Begin Processing Timing Window Data for Power Calculation
+
+clk(192.308MHz) CK: assigning clock clk to net clk
+Ended Processing Timing Window Data for Power Calculation: (cpu=0:00:01, real=0:00:00, mem(process/total/peak)=2653.93MB/5155.37MB/2657.40MB)
+
+Begin Processing User Attributes
+
+Ended Processing User Attributes: (cpu=0:00:00, real=0:00:00, mem(process/total/peak)=2656.91MB/5155.37MB/2657.40MB)
+
+Begin Processing Signal Activity
+
+
+Starting Levelizing
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT)
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 10%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 20%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 30%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 40%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 50%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 60%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 70%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 80%
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 90%
+
+Finished Levelizing
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT)
+
+Starting Activity Propagation
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT)
+2026-Oct-26 16:17:01 (2026-Oct-26 07:17:01 GMT): 10%
+2026-Oct-26 16:17:02 (2026-Oct-26 07:17:02 GMT): 20%
+
+Finished Activity Propagation
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT)
+Ended Processing Signal Activity: (cpu=0:00:02, real=0:00:02, mem(process/total/peak)=2664.57MB/5155.37MB/2664.57MB)
+
+Begin Power Computation
+
+      ----------------------------------------------------------
+      # of cell(s) missing both power/leakage table: 0
+      # of cell(s) missing power table: 0
+      # of cell(s) missing leakage table: 0
+      ----------------------------------------------------------
+
+
+
+Starting Calculating power
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT)
+ ... Calculating switching power
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT): 10%
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT): 20%
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT): 30%
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT): 40%
+2026-Oct-26 16:17:03 (2026-Oct-26 07:17:03 GMT): 50%
+ ... Calculating internal and leakage power
+2026-Oct-26 16:17:04 (2026-Oct-26 07:17:04 GMT): 60%
+2026-Oct-26 16:17:04 (2026-Oct-26 07:17:04 GMT): 70%
+2026-Oct-26 16:17:05 (2026-Oct-26 07:17:05 GMT): 80%
+2026-Oct-26 16:17:06 (2026-Oct-26 07:17:06 GMT): 90%
+
+Finished Calculating power
+2026-Oct-26 16:17:07 (2026-Oct-26 07:17:07 GMT)
+      # of MSMV cell(s) missing power_level: 0
+Ended Power Computation: (cpu=0:00:04, real=0:00:04, mem(process/total/peak)=2668.41MB/5155.37MB/2668.41MB)
+
+Begin Processing User Attributes
+
+Begin Processing set_power
+Ended Processing set_power: (cpu=0:00:00, real=0:00:00,
+mem(process/total/peak)=2668.46MB/5155.37MB/2668.47MB)
+Ended Processing User Attributes: (cpu=0:00:00, real=0:00:00, mem(process/total/peak)=2668.47MB/5155.37MB/2668.48MB)
+
+Ended Power Analysis: (cpu=0:00:07, real=0:00:08, mem(process/total/peak)=2668.48MB/5155.37MB/2668.48MB)
+
+Begin Boundary Leakage Calculation
+Ended Boundary Leakage Calculation: (cpu=0:00:00, real=0:00:00,
+mem(process/total/peak)=2668.55MB/5155.37MB/2668.55MB)
+Begin Static Power Report Generation
+*
+
+
+
+Total Power
+-----------------------------------------------------------------------------------------
+Total Internal Power:        3.54686520 	   56.6325%
+Total Switching Power:       2.71234655 	   43.3078%
+Total Leakage Power:         0.00374184 	    0.0597%
+Total Power:                 6.26295359
+-----------------------------------------------------------------------------------------
+** INFO:  (VOLTUS_POWR-3465): There are 0 decaps and 0 fillers in the design
+
+Ended Static Power Report Generation: (cpu=0:00:00, real=0:00:00,
+mem(process/total/peak)=2686.18MB/5155.37MB/2686.19MB)
+
+
+Output file is pnr/signoff_power.rpt
+**WARN: (SDF-808):	The software is currently operating in a high performance mode which optimizes the handling of multiple timing arcs between input and output pin pairs. With the current settings, the SDF file generated will contain the same delay information for all of these arcs. To have the SDF recalculated with explicit pin pair data, you should use the option '-recompute_delay_calc'. This setting is recommended for generating SDF for functional  simulation applications.
+AAE_INFO: opIsDesignInPostRouteState() is 1
+AAE_INFO: resetNetProps viewIdx 0 
+AAE_INFO: resetNetProps viewIdx 1 
+Starting SI iteration 1 using Infinite Timing Windows
+#################################################################################
+# Design Stage: PostRoute
+# Design Name: aer_tx16_coord_transform_v1_rg
+# Design Mode: 45nm
+# Analysis Mode: MMMC OCV 
+# Parasitics Mode: SPEF/RCDB 
+# Signoff Settings: SI On 
+#################################################################################
+AAE_INFO: 1 threads acquired from CTE.
+Start delay calculation (fullDC) (1 T). (MEM=2673.8)
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+AAE_INFO-618: Total number of nets in the design is 59068,  100.0 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2706.32 CPU=0:00:40.0 REAL=0:00:40.0)
+End delay calculation (fullDC). (MEM=2706.32 CPU=0:00:41.4 REAL=0:00:42.0)
+esiiDumpWaveformsThread is successfull 1 
+Save waveform /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data in separate thread...
+Finish pthread dumping compressed waveforms.
+Loading CTE timing window with TwFlowType 0...(CPU = 0:00:00.0, REAL = 0:00:00.0, MEM = 2710.1M)
+Add other clocks and setupCteToAAEClockMapping during iter 1
+Loading CTE timing window is completed (CPU = 0:00:00.5, REAL = 0:00:00.0, MEM = 2710.4M)
+Starting SI iteration 2
+Start delay calculation (fullDC) (1 T). (MEM=2693.51)
+AAE_INFO-618: Total number of nets in the design is 59068,  6.8 percent of the nets selected for SI analysis
+AAE_INFO-618: Total number of nets in the design is 59068,  1.8 percent of the nets selected for SI analysis
+End delay calculation. (MEM=2714.98 CPU=0:00:04.0 REAL=0:00:04.0)
+End delay calculation (fullDC). (MEM=2714.98 CPU=0:00:04.1 REAL=0:00:04.0)
+Swap out waveforms (MEM=2689.9 CPU=0:00:00.0 REAL=0:00:00.0) 
+Save and delete waveform data /home/aiasic26911/gf_hold52/w/innovus_temp_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4_snu.polaris.09_aiasic26911_oJIXXz/.AAE_P10r92/.AAE_175681_1e5d4615-e9ad-43fa-87de-15f58e8310c4/waveform.data ...
+Finish pthread dumping timing data and compressed waveforms.
+SIGNOFF_STA_DONE
+
+*** Memory Usage v#2 (Current mem = 3111.527M, initial mem = 831.461M) ***
+*** Message Summary: 42 warning(s), 0 error(s)
+
+--- Ending "Innovus" (totcpu=0:04:27, real=0:04:24, mem=3111.5M) ---
+

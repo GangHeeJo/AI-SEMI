@@ -1,0 +1,9 @@
+rtl:  TB_DONE valid_cells=413
+gate: TB_DONE valid_cells=413
+timing violations: 287
+	Annotating SDF timing data:
+		Backannotation scope:  tb.dut
+	Annotation completed successfully...
+		 No. of Pathdelays = 120197  	 No. of Disabled Pathdelays = 0        Annotated = 99.01% (119003/120197) 
+		 No. of Tchecks    = 52022   	 No. of Disabled Tchecks    = 0        Annotated = 97.69% (50822/52022) 
+SIM_MATCH lines=10097

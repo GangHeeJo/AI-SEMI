@@ -1,0 +1,100 @@
+*----------------------------------------------------------------------------------------
+*	Innovus 23.14-s088_1 (64bit) 02/28/2025 12:25 (Linux 3.10.0-693.el7.x86_64)
+*	
+*
+* 	Date & Time:	2026-Oct-26 16:17:07 (2026-Oct-26 07:17:07 GMT)
+*
+*----------------------------------------------------------------------------------------
+*
+*	Design: aer_tx16_coord_transform_v1_rg
+*
+*	Liberty Libraries used: 
+*	        view_setup: /home/aiasic26911/gf_hold52/w/pnr/final.enc.dat/libs/mmmc/slow_vdd1v0_basicCells.lib
+*
+*	Power Domain used: 
+*              Rail:        VDD      Voltage:        0.9 
+*
+*	Parasitic Files used: 
+*	        pnr/aer_tx16_coord_transform_v1_rg_quantus.spef
+*
+*       Power View : view_setup
+*
+*       User-Defined Activity : N.A.
+*
+*       Activity File: N.A.
+*
+*       Hierarchical Global Activity: N.A.
+*
+*       Global Activity: N.A.
+*
+*       Sequential Element Activity: 0.100000
+*
+*       Primary Input Activity: 0.200000
+*
+*       Default icg ratio: N.A.
+*
+*       Global Comb ClockGate Ratio: N.A.
+*
+*	Power Units = 1mW
+*
+*	Time Units = 1e-09 secs 
+*
+*       report_power -outfile pnr/signoff_power.rpt -view view_setup
+*
+-----------------------------------------------------------------------------------------
+
+
+Total Power 
+-----------------------------------------------------------------------------------------
+Total Internal Power:        3.54686520 	   56.6325%
+Total Switching Power:       2.71234655 	   43.3078%
+Total Leakage Power:         0.00374184 	    0.0597%
+Total Power:                 6.26295359 
+-----------------------------------------------------------------------------------------
+
+
+Group                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+Sequential                         2.022      0.2307    0.001128       2.254       35.99 
+Macro                                  0           0           0           0           0 
+IO                                     0           0           0           0           0 
+Combinational                     0.9591       1.768    0.002476        2.73       43.59 
+Clock (Combinational)             0.2294      0.5234   5.966e-05      0.7529       12.02 
+Clock (Sequential)                0.3364      0.1899   7.857e-05      0.5263       8.404 
+-----------------------------------------------------------------------------------------
+Total                              3.547       2.712    0.003742       6.263         100 
+-----------------------------------------------------------------------------------------
+
+
+Rail                  Voltage   Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+VDD                       0.9      3.547       2.712    0.003742       6.263         100 
+
+
+Clock                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+clk                               0.5658      0.7133   0.0001382       1.279       20.43 
+-----------------------------------------------------------------------------------------
+Total (excluding duplicates)      0.5658      0.7133   0.0001382       1.279       20.43 
+-----------------------------------------------------------------------------------------
+Clock: clk
+Clock Period: 0.005200 usec 
+Clock Toggle Rate:   384.6154 Mhz 
+Clock Static Probability:  0.5000
+
+
+
+-----------------------------------------------------------------------------------------
+*	Power Distribution Summary: 
+*                Highest Average Power:       u_mem_ROW[11].u_icg (TLATNCAX20):         0.007288 
+*                Highest Leakage Power:       u_mem_ROW[24].u_icg (TLATNCAX20):        7.323e-07 
+*          Total Cap:      2.61579e-10 F
+*          Total instances in design: 58681
+*          Total instances in design with no power:     0
+*          Total instances in design with no activity:     0
+*          Total Fillers and Decap:     0
+-----------------------------------------------------------------------------------------
+

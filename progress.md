@@ -4034,3 +4034,11 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 - `rtl/aer_tx16_coord_transform_v1_blink.v`: 코어 클록 게이트도 `ifdef ICG_LIB`로 라이브러리 통합 클록게이트(TLATNCAX4) 사용(기본값은 기존 래치+AND, tb_blink IDLE=1200 결과 54.0%·불일치 0 그대로 확인). 관측용 core_clk_on은 ICG 변형에서 enable의 1사이클 지연.
 - 1024각도 직접 행렬곱 `rtl/coord_transform_rotate2d_1024.v`(+cos/sin 1024항목 LUT, 폭 28비트)를 새로 만들어 RMCM(1024각도)과 전수 비교(`tb/tb_coord_transform_rotate2d_1024_vs_rmcm.v`): 16384 비교, 불일치 0. Genus 스크립트 `syn/run_genus_coord_transform_rotate2d_1024.tcl` -- RMCM(19,071 um2)과 같은 크기에서의 면적/전력 비교용(슬라이드 5·18의 미확인 항목).
 - 서버에서 병렬 실행 시작: `~/gf_blink52`(blink 풀 플로우 5.2 ns+게이트 시뮬), `~/gf_hold52`/`~/gf_hold50`(rg ICG 설계, hold 목표 0.15·setup 0.05 + postRoute hold 최적화 3회, 5.2/5.0 ns), `~/gf_rot1024`(직접 행렬곱 1024각도 Genus), `~/ganghee_final`(5.2 ns 게이트 시뮬, bayes_filter Genus 진행 중).
+
+## 224. 서버 일괄 실행 결과(§223): blink P&R, hold 강화 변형(실패), 1024각도 직접 행렬곱, 5.2 ns 게이트 시뮬 (2026-10-26)
+리포트: `syn/reports/blink_5p2ns/`, `hold_variant_5p2ns/`, `hold_variant_5p0ns/`, `rot1024/`, `icg_5p2ns/gatesim.log`. (중복 실행됐던 작업은 나중에 시작한 쪽 11개 프로세스를 종료하고 먼저 시작한 쪽만 남김 -- 작업 폴더에 잠깐 겹쳐 쓰였을 가능성은 있음.)
+- **blink top P&R(5.2 ns, ICG, util 0.6)**: DRC 0, antenna 0, setup WNS +0.022 ns(위반 0), clock-gating hold +0.081 ns(0경로), **reg2reg hold -0.010 ns(181경로)**, 전력 5.94 mW(vectorless), 표준셀 면적 162,719 um2. 게이트 시뮬(RTL vs SDF): 출력 10,097줄 중 2줄 차이(`m128`, `m256`의 rd_valid가 RTL 0, 게이트 x), valid_cells 413 동일, 타이밍 경고 10건. 원인 = `u_mem_valid_r_reg[128]` setup 위반(게이트 모델이 x를 냄, D가 CK 98 ps 전에 도착하는데 요구 106 ps) -- 논리 오류가 아니라 타이밍 여유 부족. 5.0 ns rg 설계에서는 불일치 없었음.
+- **hold 강화 변형(hold 목표 0.15 ns, setup 목표 0.05, postRoute hold 최적화 3회) -- 실패**: 5.2 ns에서 setup WNS **-1.165 ns(62경로)**, hold -0.007 ns(59경로); 5.0 ns에서 setup -0.143 ns(22경로), hold -0.008 ns(37경로). hold는 안 고쳐지고 setup만 깨짐 -> 미채택. (게이트 시뮬은 둘 다 SIM_MATCH, 타이밍 경고 287/186건.)
+- **5.2 ns 기존 ICG 설계 게이트 시뮬**: SIM_MATCH lines=10097, 타이밍 경고 17건.
+- **1024각도 직접 행렬곱 Genus(5 ns)**: 2,812셀, **면적 5,208.7 um2, 전력 0.2789 mW, 슬랙 0 ps(여유 없음)**. 같은 크기 RMCM(19,070.6 um2, 0.2967 mW, +1,178 ps)보다 **면적 3.7배 작음 -> 256각도에서의 RMCM 우위(1,199 vs 3,011 um2)가 1024각도에서 뒤집힘.** 목표 크기(1024각도)에서는 좌표 변환은 직접 행렬곱이 맞아 보임(통합 v1은 256각도 RMCM 사용 중이라 그대로). 덱 5·18·19쪽 문구를 이에 맞춰 정정.
+- **추정기(bayes_filter) Genus**: 3시간 48분째 진행 중(아직 미완료).
