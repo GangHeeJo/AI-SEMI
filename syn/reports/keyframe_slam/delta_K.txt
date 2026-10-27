@@ -1,0 +1,9 @@
+B1 track 45s, final theta 324.3 deg
+B1 halves: best rotation +0.0 deg, ncc max 0.241, ncc@0 0.241
+K run 68s, KFs 89, accepted loops 0
+K halves (keyframe maps): best rotation +0.0 deg, ncc max 0.196, ncc@0 0.196
+K halves (event maps, corrected theta, diagnostic): best rotation +0.0 deg, ncc max 0.198, ncc@0 0.198
+D2 max |theta_K,corr - theta_B1| = 1.75 deg (mean 0.52); online-vs-B1 max 1.75
+D3 loops accepted 0, residual RMS nan deg
+diag: candidates 0, passed ratio test 0, NCC of those: none
+== D0 PASS | D1 WORSE (ncc@0 ratio 0.81) | D2 PASS | D3 FAIL
