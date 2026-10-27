@@ -1,0 +1,9 @@
+P1s0  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.6  참 각도   1.5
+P1s1  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.6  참 각도   1.5
+P1s2  ghost% 미포화: B1   1.6  K-coarse(보정각)   1.7  참 각도   1.6
+P2s0  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.5  참 각도   1.5
+P2s1  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.5  참 각도   1.5
+P2s2  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.5  참 각도   1.5
+P3s0  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.6  참 각도   1.5
+P3s1  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.5  참 각도   1.5
+P3s2  ghost% 미포화: B1   1.5  K-coarse(보정각)   1.7  참 각도   1.5
