@@ -4118,3 +4118,8 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 | 표준셀 면적 | 160,213 um2 | 160,681.5 um2 (+468, +0.29%) |
 | 전력(vectorless) | 5.72 mW | 5.75 mW |
 - 한계: hold 여유 +3 ps는 팀 공통 조건(uncertainty 0.1 ns) 기준에서 양수가 된 것으로 얇다. 이 수정은 P&R 후 ECO 단계라 RTL은 그대로이며, 5.0 ns 설계와 blink top에는 아직 적용하지 않음. 사용률 0.5로 전체 흐름을 다시 돌리는 비교 실행(`~/gf_util50`)은 진행 중.
+
+
+## 229. 발표자료 갱신 (hold 수정 반영)
+
+`submission/figgen/build_deck.js` 수정 후 재빌드(pptx 직접 편집 아님): 12쪽(물리 검증) 제목·대본·표(5.2 ns 열을 hold ECO 결과로: hold +0.003 ns (0), setup +0.028 ns (0), 160,682 um2, 5.75 mW)·카드·각주(앞 두 열 5.0 ns, 오른쪽 열 5.2 ns), 19쪽 정리 문구(행 게이팅 통합 설계 5.2 ns에서 위반 0건, blink 포함 top은 hold -10 ps 잔여). validate 통과, PowerPoint 렌더로 12·19쪽 확인, PDF 재생성(19쪽).

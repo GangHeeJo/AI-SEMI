@@ -238,8 +238,8 @@ if (hasFig("worldmem_rtl.png")) {
 // ---------- 10. 물리 검증
 const PNR = JSON.parse(process.env.PNR_JSON || "{}");
 {
-  const s = content("물리 검증: 클록 게이팅 hold는 구조로 해결, 일반 경로에 ps 단위 잔여",
-    "배치배선까지 완주해 Quantus 추출 기반 signoff 수준으로 재타이밍했습니다. 래치와 AND 게이트를 따로 둔 행 게이팅 설계는 DRC와 antenna는 0건이었지만 클록 게이팅 hold가 최악 마이너스 30피코초였습니다. 원인은 클록 트리 합성이 래치를 말단 싱크로 보고 균형을 맞추면서 래치가 AND 게이트보다 0.2나노초 일찍 열린 것이었습니다. 라이브러리의 통합 클록 게이트 셀로 바꾸자 클록 게이팅 hold 위반은 0건이 됐습니다. 다만 5나노초에서 일반 레지스터 경로에 hold 마이너스 7피코초, setup 마이너스 19피코초 위반이 남았고, signoff 단계 ECO로는 setup이 오히려 나빠져 채택하지 않았습니다. 클록을 5.2나노초로 늦춘 결과는 오른쪽 열에 적었습니다.");
+  const s = content("물리 검증: hold는 구조 수정과 ECO로 해결, 5.2 ns에서 위반 0건",
+    "배치배선까지 완주해 Quantus 추출 기반 signoff 수준으로 재타이밍했습니다. 래치와 AND 게이트를 따로 둔 행 게이팅 설계는 DRC와 antenna는 0건이었지만 클록 게이팅 hold가 최악 마이너스 30피코초였습니다. 원인은 클록 트리 합성이 래치를 말단 싱크로 보고 균형을 맞추면서 래치가 AND 게이트보다 0.2나노초 일찍 열린 것이었습니다. 라이브러리의 통합 클록 게이트 셀로 바꾸자 클록 게이팅 hold 위반은 0건이 됐습니다. 다만 일반 레지스터 경로에는 hold 마이너스 7피코초가 남았습니다. 이 경로는 월드 메모리 플립플롭이 자기 자신으로 돌아오는 짧은 경로입니다. 지연 버퍼를 새로 넣는 방법은 메모리 배열에 빈자리가 없어 버퍼가 멀리 밀려나면서 setup이 깨졌습니다. 그래서 해당 경로의 선택 회로 292개를 한 단계 느린 셀로 교체하고 남은 setup 위반 한 경로를 후처리로 고쳤습니다. 5.2나노초에서 hold와 setup 위반이 모두 0건이 됐고, RTL과 배치배선 넷리스트의 게이트 시뮬레이션도 일치합니다. 오른쪽 열이 그 결과입니다. hold 여유는 3피코초로 얇습니다.");
   table(s, [
     ["항목 (signoff)", "래치+AND 분리", "통합 ICG", PNR.col52Head || "통합 ICG @5.2 ns"],
     ["DRC / antenna", "0 / 0", "0 / 0", PNR.drc52 || "(진행 중)"],
@@ -249,14 +249,14 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
     ["전력 (vectorless)", "5.89 mW", "6.11 mW", PNR.power52 || "(진행 중)"],
     ["표준셀 면적", "159,459 µm²", "162,312 µm²", PNR.area52 || "(진행 중)"],
   ], 0.6, 1.5, 8.0, [2.2, 1.8, 1.9, 2.1], { size: 12, rowH: 0.5 });
-  T(s, "괄호 안은 위반 경로 수. 5 ns, util 0.6, GPDK045, Quantus 추출.", { x: 0.6, y: 5.05, w: 8.0, h: 0.3, fontSize: 11, color: MID });
+  T(s, "괄호 안은 위반 경로 수. 앞 두 열 5.0 ns, 오른쪽 열 5.2 ns, util 0.6, GPDK045, Quantus 추출.", { x: 0.6, y: 5.05, w: 8.0, h: 0.3, fontSize: 11, color: MID });
   if (hasFig("pnr_layout.png")) {
     s.addImage({ path: fig("pnr_layout.png"), x: 8.85, y: 1.45, w: 3.9, h: 3.51 });
     T(s, "P&R 셀 배치도 (플립플롭 = 연회색, 클록 게이트 = 파랑)", { x: 8.85, y: 5.0, w: 3.9, h: 0.5, fontSize: 11, color: MID });
   }
   card(s, 0.6, 5.45, 3.9, 1.5, "원인", "CTS가 래치를 말단 싱크로 균형 맞춰 AND 게이트보다 약 0.2 ns 일찍 열림", { size: 13, headColor: RED });
-  card(s, 4.65, 5.45, 3.95, 1.5, "수정과 시도", "래치+AND → 통합 클록게이트 셀로 hold 해결. ECO·hold 목표 강화는 setup이 깨져(−0.04~−1.17 ns) 미채택", { size: 13, headColor: GREEN });
-  card(s, 8.85, 5.55, 3.85, 1.4, "남은 것", "일반 경로 ps 단위 잔여 위반. 클록 여유로 흡수하는 것이 현재 해법", { size: 13, headColor: AMBER });
+  card(s, 4.65, 5.45, 3.95, 1.5, "수정과 시도", "래치+AND → 통합 클록게이트 셀. reg2reg hold는 hold mux 292개를 느린 셀로 교체하는 ECO로 해결(5.2 ns)", { size: 13, headColor: GREEN });
+  card(s, 8.85, 5.55, 3.85, 1.4, "남은 것", "hold 여유 +3 ps로 얇음(팀 공통 uncertainty 0.1 ns 기준). 5.0 ns 설계와 blink top에는 미적용", { size: 13, headColor: AMBER });
 }
 
 // ---------- 11. θ 추정
@@ -350,7 +350,7 @@ const PNR = JSON.parse(process.env.PNR_JSON || "{}");
     T(s, body, { x, y: 2.4, w: 3.7, h: 3.6, fontSize: 17, color: WHITE });
   };
   col(0.8, "한 일", bullets(["회전각으로 이벤트를 월드 좌표로 옮기는 회로를 RTL로 구현", "표 기반 좌표 변환 (256각도에서 면적 2.5배↓, 전력 4.8배↓)", "단일 쓰기 포트, 행 클록 게이팅, blink"], { gap: 8 }), AMBER);
-  col(4.9, "확인한 것", bullets(["소프트웨어 모델과 비트 단위 일치", "메모리 전력 −65.5%", "P&R: DRC·antenna 0건, 클록 게이팅 hold는 ICG로 해결"], { gap: 8 }), AMBER);
+  col(4.9, "확인한 것", bullets(["소프트웨어 모델과 비트 단위 일치", "메모리 전력 −65.5%", "P&R(5.2 ns, 행 게이팅 통합 설계): DRC·antenna·hold·setup 위반 0건 (blink 포함 top은 hold −10 ps 잔여)"], { gap: 8 }), AMBER);
   col(9.0, "남은 것", bullets(["1024×1024로의 확장과 SRAM 모델링", "시차 보정의 RTL 반영", "실제 영상에서 θ 정확도 개선"], { gap: 8 }), AMBER);
   T(s, "주소 자체가 이벤트다 — 필요한 것만 옮기고, 쉬는 동안은 끈다.", { x: 0.8, y: 6.2, w: 11.7, h: 0.6, fontSize: 18, bold: true, color: MUTED_D });
   s.addNotes("정리하겠습니다. 저희는 회전각으로 이벤트를 월드 좌표로 옮기는 회로를 RTL로 만들고, 표 기반 좌표 변환과 메모리 행 게이팅, blink로 면적과 전력을 줄였습니다. 소프트웨어 모델과 비트 단위로 일치함을 확인했고, 배치배선에서도 DRC와 antenna 위반이 없습니다. 남은 과제는 목표 크기로의 확장과 SRAM 모델링, 시차 보정의 RTL 반영, 실제 영상에서의 각도 추정 정확도입니다. 들어주셔서 감사합니다.");
