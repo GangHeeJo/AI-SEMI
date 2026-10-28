@@ -4096,3 +4096,25 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 - 전력(vectorless, 활동도 0.1) 0.679 mW(내부 49.8%, 스위칭 50.2%, 누설 0.03%). Genus 0.279 mW와 조건이 달라 직접 비교 불가.
 - 해석: 256각도 RMCM 통합 설계(§221~224)와 같은 5.0 ns 조건에서 이 직접 행렬곱은 타이밍을 못 맞춤. 1024각도 RMCM의 P&R은 아직 안 했으므로 둘의 P&R 비교는 미완 -- 설계 교체 판단 근거로 쓰기에는 이르다.
 - 추정기(bayes_filter) P&R은 서버에서 Genus 단계 진행 중(3시간 20분째, 이전 단독 합성 약 7시간).
+
+
+## 228. reg2reg hold -7 ps 해결 (5.2 ns, 같은 ICG 설계) -- 위반 끝점 hold mux 교체 + setup 후처리
+
+원인(§224 이후 재확인): 남은 위반(`syn/reports/icg_5p2ns/signoff_hold.rpt`)은 월드 메모리 `u_mem_valid_r_reg`/`u_mem_pol_r_reg` 플립플롭이 자기 자신으로 돌아오는 경로(Q -> hold mux -> D, 지연 약 94 ps)다. 팀 공통 SDC의 clock uncertainty 0.1 ns가 hold 요구에도 들어가 있어 슬랙 -7 ps(uncertainty를 빼면 약 +92 ps)였고, 같은 기준에서 Innovus의 `optDesign -hold`는 버퍼를 1,300여 개 넣고도 이 경로를 못 고쳤다.
+
+**실패한 시도(원인 포함)**:
+1. 위반 끝점 D 핀에 지연 버퍼(`hold_eco.tcl`): 같은 D로 들어오는 쓰기 enable 경로(setup 여유 0.08 ns)가 느려져 setup WNS -0.830 ns, 게이트 시뮬 불일치.
+2. 버퍼를 feedback 입력에 삽입: 위치 미지정이면 die 가장자리로, 싱크 옆으로 지정해도 합법화가 메모리 배열(밀도 83%)에서 빈자리를 못 찾아 100~180 um 밖으로 밀어냄 -> Q 선 용량 0.001 -> 0.031 pF, clk->Q 0.25 -> 2.1 ns -> setup -0.18~-0.27 ns. (3~5차)
+3. hold mux를 `MX2XL`(면적 2.394 < CLKMX2X2 3.078)로 교체: setup은 +0.078 ns 유지되나 `MX2XL`이 오히려 12 ps 빨라 hold -0.019 ns(293경로)로 악화(6차).
+4. 후보 셀 비교(내부 측정, 292개 교체): CLKMX2X2 hold -2/setup +22 ps, CLKMX2X3 -3/+13, **CLKMX2X4 +4/+16**, CLKMX2X6 +4/+16, MX2X2 -2/+22, MX2X4 +4/+16. 면적 CLKMX2X4 4.104 < CLKMX2X6 4.446 -> CLKMX2X4 선택.
+
+**채택(7~8차)**: `syn/pnr/flow_signoff/hold_eco_swap.tcl`(위반 경로의 첫 게이트가 CLKMX2X2/MX2X1이면 CLKMX2X4로 교체, 295개) -> 남은 setup 위반 1경로(-5 ps, 입력 `rd_addr[7]` -> `rd_pol`)를 `setup_fix.tcl`(setup 전용 `optDesign -postRoute -setup`)로 해결. 서버 `~/gf_holdeco7`(교체), `~/gf_holdeco8`(후처리), 입력은 `~/ganghee_icg52`의 5.2 ns ICG P&R 결과(원본은 건드리지 않음). 리포트 `syn/reports/hold_fix_5p2ns/`.
+| 항목 | 이전(§221) | 수정 후 |
+|---|---|---|
+| hold (signoff) | -0.007 ns, 61경로 | **+0.003 ns, 위반 0** (reg2cgate +0.080 유지) |
+| setup reg2reg / 입출력 | +0.077 / +0.386 ns | +0.028 / +0.348 ns, 위반 0 |
+| DRC / 연결 / antenna | 0 | 0 / 이상 없음 / 위반 없음 |
+| 게이트 시뮬(RTL vs signoff SDF) | SIM_MATCH 10,097줄 | **SIM_MATCH 10,097줄**(타이밍 경고 별도) |
+| 표준셀 면적 | 160,213 um2 | 160,681.5 um2 (+468, +0.29%) |
+| 전력(vectorless) | 5.72 mW | 5.75 mW |
+- 한계: hold 여유 +3 ps는 팀 공통 조건(uncertainty 0.1 ns) 기준에서 양수가 된 것으로 얇다. 이 수정은 P&R 후 ECO 단계라 RTL은 그대로이며, 5.0 ns 설계와 blink top에는 아직 적용하지 않음. 사용률 0.5로 전체 흐름을 다시 돌리는 비교 실행(`~/gf_util50`)은 진행 중.

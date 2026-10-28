@@ -1,0 +1,7 @@
+/home/aiasic26911/gf_holdeco7/w/eco.out:ECO_SKIP FE_PHC9236_u_mem_valid_r_2185 CLKBUFX2
+/home/aiasic26911/gf_holdeco7/w/eco.out:ECO_SKIP FE_PHC10284_u_mem_pol_r_454 CLKBUFX2
+/home/aiasic26911/gf_holdeco7/w/eco.out:ECO_ITER 0 muxes_to_swap 292
+/home/aiasic26911/gf_holdeco7/w/eco.out:ECO_ITER 1 muxes_to_swap 3
+/home/aiasic26911/gf_holdeco7/w/eco.out:ECO_DONE_SWAPS 295
+/home/aiasic26911/gf_holdeco7/w/eco.out:HOLD_ECO_DONE aer_tx16_coord_transform_v1_rg
+/home/aiasic26911/gf_holdeco8/w/eco.out:SETUP_FIX_DONE aer_tx16_coord_transform_v1_rg
