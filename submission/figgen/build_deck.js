@@ -128,7 +128,7 @@ const chartBase = (title, colors) => ({
 // ---------- 5. 좌표 변환 3종 비교
 {
   const s = content("좌표 변환: 256각도에서는 계산 대신 표가 이겼다",
-    "좌표 변환을 세 가지로 구현해 같은 조건에서 합성했습니다. 직접 행렬 곱, CORDIC, 그리고 RMCM입니다. CORDIC은 곱셈기를 없애니 더 작을 것이라 예상했지만 오히려 면적이 네 배 이상 커졌습니다. 우리 문제는 로컬 좌표가 4가지, 각도 후보가 256가지뿐이라 입력 공간 전체가 4096가지입니다. 그래서 전체를 표 하나로 만든 RMCM이 면적 2.5분의 1, 전력 4.8분의 1로 압승했고 근사 오차도 없습니다. 이 결론은 입력 공간이 좁을 때에 한정됩니다. 각도를 1024단계로 늘려 다시 합성했더니 표가 19071제곱마이크로미터, 직접 행렬곱이 5209제곱마이크로미터로 결과가 뒤집혔습니다.");
+    "좌표 변환을 세 가지로 구현해 같은 조건에서 합성했습니다. 직접 행렬 곱, CORDIC, 그리고 RMCM입니다. CORDIC은 곱셈기를 없애니 더 작을 것이라 예상했지만 오히려 면적이 네 배 이상 커졌습니다. 우리 문제는 로컬 좌표가 4가지, 각도 후보가 256가지뿐이라 입력 공간 전체가 4096가지입니다. 그래서 전체를 표 하나로 만든 RMCM이 면적 2.5분의 1, 전력 4.8분의 1로 압승했고 근사 오차도 없습니다. 이 결론은 입력 공간이 좁을 때에 한정됩니다. 각도를 1024단계로 늘려 다시 합성했더니 표가 19071제곱마이크로미터, 직접 행렬곱이 5209제곱마이크로미터로 결과가 뒤집혔습니다. 배치배선까지 해 보니 차이가 더 커졌습니다. 직접 행렬곱은 면적 7354제곱마이크로미터에 DRC 위반이 없고 setup이 0.1나노초 모자란 수준이지만, 표는 면적 33935제곱마이크로미터에 배선이 풀리지 않아 DRC 위반이 1만 건 이상이고 타이밍도 크게 어긋났습니다. 그래서 목표 크기인 1024각도에서는 직접 행렬곱이 맞다고 판단합니다.");
   s.addChart(pres.charts.BAR, [{ name: "면적", labels: ["직접 행렬곱", "CORDIC", "RMCM"], values: [3011, 12858, 1199] }], Object.assign({ x: 0.6, y: 1.5, w: 4.0, h: 3.9, barDir: "col" }, chartBase("면적 (µm²)", [MID, RED, TEAL]), { invertedColors: [MID], valAxisHidden: true }));
   s.addChart(pres.charts.BAR, [{ name: "전력", labels: ["직접 행렬곱", "CORDIC", "RMCM"], values: [0.200, 1.278, 0.041] }], Object.assign({ x: 4.7, y: 1.5, w: 4.0, h: 3.9, barDir: "col" }, chartBase("전력 (mW)", [MID, RED, TEAL]), { dataLabelFormatCode: "0.000", valAxisHidden: true }));
   table(s, [
@@ -137,9 +137,9 @@ const chartBase = (title, colors) => ({
     ["CORDIC", "−252 ps (위반)"],
     [{ text: "RMCM", bold: true }, { text: "+2,187 ps", bold: true }],
   ], 8.95, 1.7, 3.75, [2.15, 1.6], { size: 13, rowH: 0.5 });
-  T(s, "Genus 합성, 5 ns, GPDK045. 입력 4096가지(256각도) 기준, RMCM은 직접 행렬곱과 bit-exact. 1024각도에서는 RMCM 19,071 µm²·0.297 mW·+1,178 ps, 직접 행렬곱 5,209 µm²·0.279 mW·0 ps.", { x: 8.95, y: 3.95, w: 3.75, h: 1.4, fontSize: 13, color: MID });
+  T(s, "Genus 합성, 5 ns, GPDK045. 입력 4096가지(256각도) 기준, RMCM은 직접 행렬곱과 bit-exact. 1024각도: 합성 RMCM 19,071 vs 직접 5,209 µm². P&R(5 ns) RMCM 33,935 µm²·DRC 1만+·setup −20.9 ns, 직접 7,354 µm²·DRC 0·setup −0.099 ns.", { x: 8.95, y: 3.95, w: 3.75, h: 1.4, fontSize: 12, color: MID });
   s.addShape(pres.ShapeType.roundRect, { x: 0.6, y: 5.65, w: 12.1, h: 1.15, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
-  T(s, "곱셈기를 없애는 것이 항상 이득은 아니다. 256각도(입력 4,096가지)에서는 표가 이겼지만, 1024각도(16,384가지)에서는 표가 직접 행렬곱보다 3.7배 커서 결과가 뒤집혔다.", { x: 0.85, y: 5.75, w: 11.6, h: 0.95, fontSize: 16, bold: true, color: WHITE, valign: "middle" });
+  T(s, "곱셈기를 없애는 것이 항상 이득은 아니다. 256각도(입력 4,096가지)에서는 표가 이겼지만, 1024각도(16,384가지)에서는 표가 직접 행렬곱보다 합성 3.7배, 배치배선 후 4.6배 크고 배선도 안 풀려 결과가 뒤집혔다.", { x: 0.85, y: 5.75, w: 11.6, h: 0.95, fontSize: 16, bold: true, color: WHITE, valign: "middle" });
 }
 
 // ---------- 6. 검증

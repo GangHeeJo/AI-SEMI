@@ -4136,3 +4136,20 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 - blink top 5.2 ns(~/gf_fixblink -> gf_fixblink2, `syn/reports/hold_fix_blink_5p2ns/`): ECO 후 hold +0.001 ns, setup -0.029 ns(1경로) -> 목표 여유 60 ps로 setup 후처리 재실행(SETUP_TARGET 환경변수) -> **setup +0.069 ns, hold 0.000 ns(위반 0, 여유 0)**, DRC/연결/antenna 깨끗, 전력 5.97 mW. 게이트 시뮬은 ECO 전과 같은 2줄(`m128` x) 불일치 -- 이 x는 ECO 이전(§224 blink 5.2 ns)에도 있던 것(SDF 시뮬이 CPPR 없이 setup 검사를 해서 나온 것으로 추정, 논리 오류 아님).
 
 **로컬 정리**: `tb_coord_transform_rmcm_uzh_trace.v`를 256각도 모듈 `coord_transform_rmcm_v1`로 연결을 바꿔 8503/8503 PASS(world_cells_filled 89/4096) -- 이전 FAIL(8502건)은 1024각도 모듈에 옛 TB를 붙인 것이 원인. 이전 세션에서 쌓인 미커밋 수정(reference_papers.md, coord_transform_model.py, rotation_estimate_model.py, arbiter_reorder_accuracy.py, batch_ba_rotation.py, tb_arbiter_reorder_capture.v) 커밋. 서버 ~/redred-faer에 로컬 전용 데이터(Q&A, shapes_rotation, common_traces_robotevt, aer16.vcd) 업로드 완료(영상 파일 제외).
+
+
+## 231. 1024각도 RMCM P&R 결과 -- 직접 행렬곱이 합성·P&R 모두 우세, 덱 5쪽 반영
+
+서버 `~/gf_rmcmpnr`(Genus 344 s + Innovus 8,170 s, 5.0 ns, 사용률 0.6, 단독 모듈 `coord_transform_rmcm` 1024각도), 리포트 `syn/reports/rmcm1024_pnr/`. 같은 조건의 직접 행렬곱(§227, `syn/reports/rot1024_pnr/`)과 비교:
+| 항목 | 1024각도 RMCM(표) | 1024각도 직접 행렬곱 |
+|---|---|---|
+| 합성 면적 | 19,071 um2 (+1,178 ps) | 5,209 um2 (0 ps) |
+| P&R 표준셀 면적(물리 셀 제외) | 33,935 um2 | 7,354 um2 (RMCM의 약 1/4.6) |
+| DRC | **위반 10,000건 이상**(리포트 한도 도달, Metal Short 등: 배선이 안 풀림) | 0 |
+| antenna | 위반 없음 | 위반 없음 |
+| signoff setup WNS | **-20.886 ns**(17경로) | -0.099 ns(8경로) |
+| signoff hold WNS | +0.158 ns | +0.158 ns |
+| 전력(vectorless) | 2.418 mW | 0.679 mW |
+- 해석: 1024각도(입력 16,384가지)에서는 표 방식이 합성뿐 아니라 배치배선에서도 훨씬 불리(면적 4.6배, 배선 불가, 타이밍 대폭 미달). 직접 행렬곱은 5.0 ns에서 setup이 0.1 ns 모자란 것만 남았음 -> 클록을 조금 늦추거나(예: 5.2 ns) 최적화로 닫을 후보. **목표 크기 1024각도로 갈 때 좌표 변환은 직접 행렬곱이 맞아 보임**(통합 설계가 256각도 RMCM이라 교체는 사용자 결정 대기, 교체 시 통합 P&R·게이트 시뮬 재실행 필요).
+- 한계: 단독 모듈 P&R이며 통합 설계에서의 결과가 아님. RMCM의 DRC 한도(10,000)에 걸려 실제 위반 수는 더 많을 수 있음. 직접 행렬곱 5.2 ns 이상에서의 통과 여부는 이번에 재지 않음.
+- 덱: 5쪽 설명·표 각주·하단 문구를 P&R 결과로 갱신(합성 3.7배 -> 배치배선 후 4.6배, RMCM DRC 1만+/setup -20.9 ns, 직접 7,354 um2/DRC 0/setup -0.099 ns).
