@@ -1,9 +1,10 @@
 # hold ECO (셀 교체 방식): 버퍼를 새로 넣는 방식(hold_eco.tcl)은 메모리 배열 영역에 빈자리가 없어 합법화가 버퍼를 100~180 um 밖으로 밀어내
 # Q 선이 길어지고 clk->Q가 2 ns가 되어 setup이 -0.18 ns로 깨졌다(progress.md §228). 새 자리가 필요 없게, 자기 루프의 hold mux를
-# 같은 기능의 한 단계 느리고 더 작은 셀(MX2XL, 면적 2.394 < CLKMX2X2 3.078)로 바꾼다.
+# 같은 기능의 더 느린 셀로 바꾼다. 처음 시도한 MX2XL(면적 2.394)은 오히려 12 ps 빨라 hold가 -19 ps로 악화됐고,
+# 후보 비교(progress.md §228)로 CLKMX2X4(면적 4.104 vs CLKMX2X2 3.078, hold +4 ps)를 선택했다.
 # env: TOP, SWAP_CELL(기본 CLKMX2X4; MX2XL은 더 빨라 hold가 악화됨), HOLD_MARGIN(기본 0.005), ECO_ITER(기본 2)
 set TOP $::env(TOP)
-set NEWC [expr {[info exists ::env(SWAP_CELL)] ? $::env(SWAP_CELL) : "MX2XL"}]
+set NEWC [expr {[info exists ::env(SWAP_CELL)] ? $::env(SWAP_CELL) : "CLKMX2X4"}]
 set MARGIN [expr {[info exists ::env(HOLD_MARGIN)] ? $::env(HOLD_MARGIN) : 0.005}]
 set NIT [expr {[info exists ::env(ECO_ITER)] ? $::env(ECO_ITER) : 2}]
 restoreDesign pnr/final.enc.dat $TOP
