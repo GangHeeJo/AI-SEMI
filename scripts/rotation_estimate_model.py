@@ -13,6 +13,7 @@
 #
 # 이 스크립트는 RTL을 전혀 안 건드림 -- 정확도가 나쁘면 여기서 멈추고 방향을 다시 잡는다.
 
+import math
 import sys
 
 from coord_transform_model import N_THETA, transform
@@ -436,6 +437,65 @@ def run_contrast_max(events, table, window=16, search_radius=None):
                 best_theta = theta_idx
         prev_theta = best_theta
         errs.append(circular_diff(best_theta, gt_mid))
+    return errs
+
+
+def _cmax_track(chunks, table, radius):
+    """run_contrast_max()의 추적 루프를 이벤트 청크 시퀀스(순서 무관, 정방향/역방향 둘 다
+    그대로 씀)에 대해 독립적으로 돌리는 내부 헬퍼 -- run_contrast_max_fb_smooth()가
+    정방향/역방향 두 번 재사용."""
+    ests = []
+    prev_theta, first = 0, True
+    for chunk in chunks:
+        candidates = range(N_THETA) if first else [(prev_theta + d) % N_THETA for d in range(-radius, radius + 1)]
+        first = False
+        best_score, best_theta = -1, 0
+        for theta_idx in candidates:
+            hist = {}
+            for row, col, pol, _ in chunk:
+                key = (*table[(row, col, theta_idx)], pol)
+                hist[key] = hist.get(key, 0) + 1
+            score = sum(c * c for c in hist.values())
+            if score > best_score:
+                best_score, best_theta = score, theta_idx
+        prev_theta = best_theta
+        ests.append(best_theta)
+    return ests
+
+
+def _circular_mean(vals, n=N_THETA):
+    sx = sum(math.cos(2 * math.pi * v / n) for v in vals)
+    sy = sum(math.sin(2 * math.pi * v / n) for v in vals)
+    return round(math.atan2(sy, sx) % (2 * math.pi) / (2 * math.pi) * n) % n
+
+
+def run_contrast_max_fb_smooth(events, table, window=16, search_radius=30, smooth_k=9):
+    """2026-09-22 세션(progress.md §141): run_contrast_max()는 순수 causal(직전 추정만 참고)
+    이라 CMax-SLAM류의 backend bundle adjustment(전체 궤적을 한꺼번에 재조정)가 주는 이득을
+    전혀 못 받음 -- 그 이득의 값싼 근사로 "정방향 추적 + 역방향 추적(뒤에서부터 같은 방식으로
+    추적) -> 두 추정을 원순환 평균 -> 인접 윈도우 k개로 원순환 국소평활" 3단계를 적용한다.
+    진짜 비선형 번들조정(연속 궤적을 반복 최적화)은 아니지만, "미래 정보도 쓴다"는 핵심 효과를
+    공짜에 가까운 비용(추적을 한 번 더 돌리는 것뿐)으로 흉내낸다.
+
+    단일 패치(112,87) 실측: 순수 causal 평균11.4°/최악57.3° -> 이 함수(k=9) 평균9.8°/최악33.0°
+    (평균 -14%, 최악 -42%) -- 실질적이지만 "2도 밑"과는 거리가 먼 개선폭. k=9~21은 거의
+    평평(9.5~9.8°대에서 수렴, 그 이상 늘려도 추가 이득 미미)."""
+    n = len(events)
+    chunks = [events[s:s + window] for s in range(0, n - window + 1, window)]
+    if not chunks:
+        return []
+    gts = [c[window // 2][3] for c in chunks]
+
+    fwd = _cmax_track(chunks, table, search_radius)
+    bwd = list(reversed(_cmax_track(list(reversed(chunks)), table, search_radius)))
+    fb = [_circular_mean([f, b]) for f, b in zip(fwd, bwd)]
+
+    half = smooth_k // 2
+    errs = []
+    for i in range(len(fb)):
+        lo, hi = max(0, i - half), min(len(fb), i + half + 1)
+        sm = _circular_mean(fb[lo:hi])
+        errs.append(circular_diff(sm, gts[i]))
     return errs
 
 

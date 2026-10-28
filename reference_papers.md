@@ -363,6 +363,12 @@
 
 5-7. *(정식 논문 아님, 참고자료)* **Ryu, H. E. — "Industrial DVS Design: Key Features and Applications."** CVPR 2019 Workshop on Event-based Vision 발표자료 (rpg.ifi.uzh.ch 게시). 산업용 DVS 설계 원칙을 실전 관점에서 정리한 슬라이드 — 인용 시 정식 논문이 아님을 명시. **원문 전체 확보·정독 완료, 심층분석은 `paper_notes/P4_Ryu2019_TraditionalAER_ProblemTimeline.md` 참고** — Gen1~Gen3에 걸쳐 "전통적 AER의 문제"가 **throughput bottleneck → bandwidth-induced latency → unfair arbitration → timestamp/motion artifact → deterministic scan readout**으로 재정의되는 시간적 흐름을 원문 인용 기반으로 재구성함.
 
+5-8. **Won, J.-Y., Ryu, H., Delbruck, T., Lee, J. H., Hu, J. — "Proximity Sensing Based on a Dynamic Vision Sensor for Mobile Devices."** *IEEE Trans. Industrial Electronics*, 2014. Delbruck(DVS 원조 개발자, iniVation) 공저. 모바일 근접 센싱 응용 — 타임스탬프 설계와는 직접 관련 없음, 원문 미확보(초록 수준).
+
+5-9. **Cha, M., Lee, K., Chang, B., Ryu, H. — "A DVS-CIS Sensor Data Receiver on FPGA with a 10 Gbps MIPI Controller."** ISCAS 2025. 2026-09-22 신규 확인, **현재 본인 SNU 연구실 최신작(2025)**. 저비용 address decoder + inline transpose로 DVS 스트림을 DRAM에 저장, DVS 13,900fps 무손실 디코드를 CIS 60fps 동시 스트리밍과 병행(Xilinx Zynq+ ZCU106, 135 BRAM/38 DSP/69489 LUT/86626 FF, 6.977W). "DVS frames" 표현을 쓰는 것으로 보아 프레임(스캔) 단위 타임스탬프 철학(5-7/P4, P5와 동일 계보)을 유지하는 것으로 추정 — 우리 대회 DELTA 센서 실제 수신단 구조에 가장 가까운 최신 레퍼런스. IEEE Xplore 봇 차단으로 초록만 확보, 원문 미확보(SNU 계정 접근 가능하면 재확인 필요).
+
+5-10. **(같은 팀, ISCAS 2025)** "An Energy-Efficient Daily Surveillance System with DVS-CIS Sensor Fusion and Event-based NPU Triggering", "Live Demonstration: DVS-CIS Sensor Fusion System for Real-Time DNN-Based Object Detection." DVS를 트리거로 써서 NPU/CIS를 깨우는 에너지효율 응용 — 타임스탬프보다 센서 융합/트리거링 쪽, 초록 수준만 확인.
+
 ### 5-A. 류현석 교수의 AER 설계 발전 과정 — Throughput에서 Temporal Fidelity로
 
 류현석의 DVS/AER 연구는 단순히 AER 전송 속도를 높이는 방향으로만 발전한 것이 아니라, 실제 산업용 고해상도 DVS에서 발생하는 대역폭 병목, arbitration 지연, timestamp 오차, motion artifact를 순차적으로 해결하는 방향으로 변화했다. 특히 삼성전자 System LSI 재직 당시 발표한 5-7의 *Industrial DVS Design* 자료는 2014년 Gen1부터 2018년 Gen3, 2020년 Gen4까지의 설계 변화를 직접 설명하고 있어 그의 문제 인식을 추적하기에 가장 좋은 1차 자료다(원문 전체 확보·정독 완료 — 아래 인용은 전부 슬라이드 원문 그대로).

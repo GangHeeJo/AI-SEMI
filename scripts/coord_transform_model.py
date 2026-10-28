@@ -42,6 +42,25 @@ def local_xy_from_row_col(row, col):
     return xc2, yc2
 
 
+def local_rot_xy(xc2, yc2, theta_idx, sub_scale=8):
+    """§143 근본원인 대응(progress.md §144): transform()의 world 좌표는 R(궤도반경)이
+    지배해서 로컬 오프셋(xc2,yc2)이 겨우 4칸/1024칸 스프레드로 압축된다 -- 그런데 윈도우
+    안에서는 모든 이벤트가 같은 theta 가설로 채점되므로, world_center(θ)=WC+R·cosθ 항은
+    "그 윈도우의 모든 이벤트에 더해지는 상수"일 뿐 클러스터링 판별에는 전혀 기여 안 한다
+    (오히려 θ마다 반올림 경계가 달라져서 잡음만 주입함, §143 진단).
+    그래서 이 함수는 world_center/WC/HC를 아예 빼고 local_rot(θ)=Rot(θ)·(xc2,yc2)만,
+    world grid 1칸을 sub_scale개로 쪼갠 고정밀 로컬 좌표로 반환한다 -- contrast-max
+    채점 전용(월드메모리 실제 주소 계산에는 여전히 transform()을 씀)."""
+    theta_idx &= (N_THETA - 1)
+    c, s = COS_LUT[theta_idx], SIN_LUT[theta_idx]
+    local_rot_x_fx = xc2 * c - yc2 * s
+    local_rot_y_fx = xc2 * s + yc2 * c
+    denom = 2 * SCALE
+    lx = _round_div(local_rot_x_fx * sub_scale, denom)
+    ly = _round_div(local_rot_y_fx * sub_scale, denom)
+    return lx, ly
+
+
 def transform(xc2, yc2, theta_idx):
     """로컬(반정수 스케일 xc2,yc2) + theta_idx -> world 좌표(X,Y). RTL과 동일해야 하는 핵심 함수."""
     theta_idx &= (N_THETA - 1)
