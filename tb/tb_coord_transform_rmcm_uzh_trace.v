@@ -1,4 +1,4 @@
-// coord_transform_rmcm 실트래픽 검증 -- 실제 UZH shapes_rotation 4x4 patch 이벤트
+// coord_transform_rmcm_v1(256각도, 통합 설계가 쓰는 모듈) 실트래픽 검증 -- 실제 UZH shapes_rotation 4x4 patch 이벤트
 // 8,503개 + 실제 groundtruth pose에서 뽑은 theta_idx를 그대로 태워서, 소프트웨어 오라클이
 // 계산한 기대값(row col theta_idx X Y pol, scripts/coord_transform_model.py 기반)과
 // 한 건도 안 틀리는지 확인하고, RTL 시뮬레이션으로 직접 world memory를 채워 커버리지를 보고한다.
@@ -13,7 +13,7 @@ module tb_coord_transform_uzh_trace;
   wire valid_out;
   wire [5:0] x_out, y_out;
 
-  coord_transform_rmcm dut(
+  coord_transform_rmcm_v1 dut(
     .clk(clk), .rst(rst),
     .valid_in(valid_in), .xc2_in(xc2_in), .yc2_in(yc2_in), .theta_idx(theta_idx),
     .valid_out(valid_out), .x_out(x_out), .y_out(y_out)
