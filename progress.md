@@ -4123,3 +4123,16 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 ## 229. 발표자료 갱신 (hold 수정 반영)
 
 `submission/figgen/build_deck.js` 수정 후 재빌드(pptx 직접 편집 아님): 12쪽(물리 검증) 제목·대본·표(5.2 ns 열을 hold ECO 결과로: hold +0.003 ns (0), setup +0.028 ns (0), 160,682 um2, 5.75 mW)·카드·각주(앞 두 열 5.0 ns, 오른쪽 열 5.2 ns), 19쪽 정리 문구(행 게이팅 통합 설계 5.2 ns에서 위반 0건, blink 포함 top은 hold -10 ps 잔여). validate 통과, PowerPoint 렌더로 12·19쪽 확인, PDF 재생성(19쪽).
+
+
+## 230. 서버 추가 실행 결과 (추정기 P&R, 사용률 0.5, hold ECO 확대, 로컬 정리)
+
+**추정기(`bayes_filter`) 단독 P&R(5.0 ns, 사용률 0.6, 서버 `~/gf_bayespnr`, Genus 29,888 s + Innovus 42,504 s)** -- `syn/reports/bayes_pnr_5ns/`: **타이밍 크게 미달**. signoff setup WNS -17.698 ns(9,900/65,711경로), hold WNS -0.382 ns(50,165경로), DRC/antenna 위반 없음. 표준셀 면적 합성 584,631 -> P&R 후 1,162,829 um2(약 2배, 밀도 95.7%), 전력 81.6 mW(합성 14.47 mW). 해석: belief 메모리 전체를 플립플롭으로 푼 설계는 배선이 길어 5 ns를 못 맞춤 -> 추정기도 SRAM이 필요. 합성 수치(584,631 um2)만 인용하면 낙관적이므로 덱에 P&R 미달을 함께 표기.
+
+**사용률 0.5 전체 재실행(~/gf_util50, 5.2 ns)** -- `syn/reports/util50_5p2ns/`: setup +0.121 ns(위반 0), hold -0.007 ns(31경로, 사용률 0.6의 61경로에서 감소), 면적 163,678 um2, 전력 5.70 mW. 사용률을 낮추는 것만으로는 hold가 안 닫힘(ECO가 필요).
+
+**hold ECO(§228) 확대 적용** (`hold_eco_swap.tcl` + `setup_fix.tcl`):
+- 5.0 ns 통합 설계(~/gf_fix50, `syn/reports/hold_fix_5p0ns/`): hold +0.003 ns(위반 0)이나 setup -0.093 ns(10경로). ECO 직후 setup -0.017 ns(2경로)였고 setup 후처리가 오히려 악화. 원본 5.0 ns 설계도 setup -0.019 ns라 5.0 ns는 setup이 닫히지 않음(hold와 무관). 게이트 시뮬은 내 파일 목록 오류(없는 .v 포함)로 RTL 시뮬이 시작되지 못해 미실시.
+- blink top 5.2 ns(~/gf_fixblink -> gf_fixblink2, `syn/reports/hold_fix_blink_5p2ns/`): ECO 후 hold +0.001 ns, setup -0.029 ns(1경로) -> 목표 여유 60 ps로 setup 후처리 재실행(SETUP_TARGET 환경변수) -> **setup +0.069 ns, hold 0.000 ns(위반 0, 여유 0)**, DRC/연결/antenna 깨끗, 전력 5.97 mW. 게이트 시뮬은 ECO 전과 같은 2줄(`m128` x) 불일치 -- 이 x는 ECO 이전(§224 blink 5.2 ns)에도 있던 것(SDF 시뮬이 CPPR 없이 setup 검사를 해서 나온 것으로 추정, 논리 오류 아님).
+
+**로컬 정리**: `tb_coord_transform_rmcm_uzh_trace.v`를 256각도 모듈 `coord_transform_rmcm_v1`로 연결을 바꿔 8503/8503 PASS(world_cells_filled 89/4096) -- 이전 FAIL(8502건)은 1024각도 모듈에 옛 TB를 붙인 것이 원인. 이전 세션에서 쌓인 미커밋 수정(reference_papers.md, coord_transform_model.py, rotation_estimate_model.py, arbiter_reorder_accuracy.py, batch_ba_rotation.py, tb_arbiter_reorder_capture.v) 커밋. 서버 ~/redred-faer에 로컬 전용 데이터(Q&A, shapes_rotation, common_traces_robotevt, aer16.vcd) 업로드 완료(영상 파일 제외).

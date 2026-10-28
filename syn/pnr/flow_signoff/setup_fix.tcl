@@ -5,7 +5,7 @@ restoreDesign pnr/final.enc.dat $TOP
 setAnalysisMode -analysisType onChipVariation -cppr both
 spefIn -rc_corner rc_typ pnr/${TOP}_quantus.spef
 catch {deleteFiller -prefix FILLER}
-setOptMode -setupTargetSlack 0.020
+setOptMode -setupTargetSlack [expr {[info exists ::env(SETUP_TARGET)] ? $::env(SETUP_TARGET) : 0.020}]
 catch {optDesign -postRoute -setup}
 catch {ecoRoute}
 catch {setFillerMode -core {FILL64 FILL32 FILL16 FILL8 FILL4 FILL2 FILL1} -corePrefix FILLER}
