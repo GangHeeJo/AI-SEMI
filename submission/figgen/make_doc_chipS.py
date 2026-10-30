@@ -62,15 +62,15 @@ table([
     ["hyunsu_round2/code/tb/", "테스트벤치: tb_chip_full(종단), tb_chip_full_gate(게이트 시뮬), tb_est, tb_chip_s, tb_bank"],
     ["hyunsu_round2/code/results/, code/CANDIDATES.md", "설계·검증 기록 job*.md(job23 RTL, job24 추정기, job25 풀칩 P&R, job26 일반화), 후보 판정표 code/CANDIDATES.md, 정수 기준모델 job24_est.py·job23_golden.py"],
     ["hyunsu_round2/job25/", "풀칩 합성·P&R·signoff·LEC·게이트 시뮬 스크립트(flow/), 산출물 full_5.0/pnr/ (chip_s_full3.gds·.def·_pnr3.v·_quantus.spef·_signoff.sdf, signoff_power3_80.rpt)"],
-    ["redred-faer/submission/", "제출 파일: 발표자료 .pptx/.pdf, 본 설명서, 발표 영상, 그림·덱 생성 스크립트(figgen/)"],
+    ["redred-faer/submission/", "제출 파일: 칩 S 발표자료 REDRED_2차_발표자료_칩S(.pptx/.pdf), 본 설명서, 발표 대본, 그림·덱 생성 스크립트(figgen/). 발표 영상은 별도 파일로 제출. archive_parallel_design/ = 팀 내 병행 설계 라인의 이전 자료(참고용)"],
     ["redred-faer/scripts/, syn/reports/hyunsu_selfcal/", "자기보정(피벗 상수 알고리즘화)을 정답 있는 합성 장면에서 독립 검증한 스크립트·결과·사전 평가 기준"],
-    ["redred-faer/syn/reports/, progress.md", "병행 설계(행 클록 게이팅, blink, hold ECO 등)의 P&R 리포트와 시도·기각 전체 기록(§1~§235)"],
+    ["redred-faer/syn/reports/, progress.md", "병행 설계(행 클록 게이팅, blink, hold ECO 등)의 P&R 리포트와 시도·기각 전체 기록(§1~§236)"],
 ], [4.6, 12.8])
 
 para("", 4)
 para("재현 방법", 11.5, True, "1B2630", 3)
 para("① 게이트 시뮬(SDF): cd ~/hyunsu_round2/job25 && bash flow/gate_sim.sh roll_B MAXIMUM full_5.0/pnr/chip_s_full_pnr3.v full_5.0/pnr/chip_s_full3_signoff.sdf  (pan_B도 동일, 8 ns 주기)", 9, False, None, 2)
-para("② 정수 기준모델: cd ~/hyunsu_round2/code/results && python job24_check.py roll  → ECC 대비 0.467° (센서 원본 .dvs 필요)", 9, False, None, 2)
+para("② 정수 기준모델: cd ~/hyunsu_round2/code/results && python job24_check.py roll  → ECC 대비 0.467° (센서 원본 .dvs를 ~/hyunsu_round2/code/data/ 에 두어야 실행됨)", 9, False, None, 2)
 para("③ 합성·P&R·signoff: job25/flow/ 의 run_syn.sh, run_top.sh, run_signoff3_80.sh, lec_full.sh (절차와 결과는 results/job25_fullchip_pnr.md)", 9, False, None, 6)
 
 para("참고", 11.5, True, "1B2630", 3)
