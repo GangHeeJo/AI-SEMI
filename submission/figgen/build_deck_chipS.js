@@ -284,7 +284,8 @@ const chartBase = (title, colors) => ({
     ["병합 캐시", "프레임 단위로 비우는 완전연관 write-back 64칸 — 읽기 14,568회 = 프레임당 서로 다른 워드 수"],
     ["뱅크 게이팅", "시야 밑 뱅크만 클록 활성 (roll 약 71%, pan 약 41%)"],
   ], 0.6, 1.55, 7.6, [1.7, 5.9], { size: 13, rowH: 0.62 });
-  s.addChart(pres.charts.BAR, [{ name: "비트당 면적", labels: ["FF+클록게이팅", "FF(게이팅 없음)"], values: [11.8, 15.5] }], Object.assign({ x: 8.5, y: 1.5, w: 4.2, h: 3.0, barDir: "col" }, chartBase("메모리 비트당 면적 (µm²/bit)", [TEAL, "7A7A7A"]), { dataLabelFormatCode: "0.0" }));
+  s.addImage({ path: fig("wave_row_gating.png"), x: 8.45, y: 1.5, w: 4.25, h: 2.27 });
+  T(s, "행 단위 클록 게이팅 파형: 쓰는 행의 게이트 클록만 토글, 나머지 행은 꺼짐 (RTL 시뮬)", { x: 8.45, y: 3.8, w: 4.25, h: 0.7, fontSize: 11, color: MID });
   card(s, 8.5, 4.65, 4.2, 2.25, "선택 근거", "FF+클록게이팅은 Layout·PEX·게이트 시뮬이 전부 닫히는 유일한 구현. 게이팅이 없으면 면적 1.3배·전력 3.8배.", { size: 13 });
   card(s, 0.6, 5.55, 7.6, 1.35, "정직한 한계", "교육용 PDK에는 SRAM 매크로가 없어 FF 기반이다. 비트당 약 11.8 µm²라 큰 월드로 가려면 SRAM이 필요하다.", { size: 13, fill: LIGHT });
 }
@@ -391,9 +392,8 @@ const chartBase = (title, colors) => ({
   s.addShape(pres.ShapeType.roundRect, { x: 9.35, y: 1.5, w: 3.35, h: 1.6, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, "−65.5%", { x: 9.55, y: 1.6, w: 3.0, h: 0.8, fontSize: 36, bold: true, color: BLUE_D, valign: "middle" });
   T(s, "행 클록 게이팅 메모리 전력\n(실제 DELTA 활동도, 면적 −5%)", { x: 9.55, y: 2.4, w: 3.0, h: 0.65, fontSize: 12, color: WHITE });
-  s.addShape(pres.ShapeType.roundRect, { x: 9.35, y: 3.25, w: 3.35, h: 1.6, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
-  T(s, "−71%", { x: 9.55, y: 3.35, w: 3.0, h: 0.8, fontSize: 36, bold: true, color: BLUE_D, valign: "middle" });
-  T(s, "blink 유휴 전력\n(유휴 긴 시험 입력 한정)", { x: 9.55, y: 4.15, w: 3.0, h: 0.65, fontSize: 12, color: WHITE });
+  s.addImage({ path: fig("wave_blink.png"), x: 9.35, y: 3.25, w: 3.35, h: 1.2 });
+  T(s, "Blink 파형: 입력이 끊기면 코어 클록 차단, 새 입력에 다시 켬. 유휴 전력 −71% (유휴 긴 시험 입력 한정)", { x: 9.35, y: 4.47, w: 3.35, h: 0.5, fontSize: 9, color: MID });
   card(s, 9.35, 5.0, 3.35, 1.9, "칩 S와의 관계", "칩 S의 8 kbit 뱅크는 이미 클록 게이팅(FF+CG). 13 mW는 활동도 입력이 없는 값이라 절감은 이 실측으로 보강. 실제 DELTA 칩 가동 비율은 3~25%.", { size: 11, headColor: RED });
   T(s, "원칙: 합성 장면 이득은 실제 프레임과 사전 기준으로 다시 확인한 뒤에만 채택", { x: 0.6, y: 6.55, w: 8.5, h: 0.4, fontSize: 13, bold: true, color: TEAL });
 }
