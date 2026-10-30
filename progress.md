@@ -4182,3 +4182,10 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 **mul1024 코어 후처리(서버 `~/gf_mulfix52/56/60`)**: §232 결과(5.6 ns setup -0.010/hold -0.000, 6.0 ns setup -0.036/hold -0.006, 5.2 ns setup -0.088/hold -0.011)에 hold 셀 교체 ECO(CLKMX2X4) -> signoff -> setup 후처리(목표 여유 60 ps) -> signoff -> 게이트 시뮬(`tb/tb_mul1024_gate.sv`)을 건 상태. 6.0 ns의 hold 위반 1개는 `OAI211X1` 게이트라 기존 ECO 셀 목록에 없음. 결과 대기.
 
 **칩 S 자기보정 반영 착수**: 현수 코드 사본(스크래치 `chipS/code`), roll `.dvs` 해독(`events.npy` 75,340,608개, 프레임 2,062) 완료, 정답 궤적(`roll_ecc.npy`)은 현수 `register_roll.py`로 재생성 예정. est_core의 `cfg_px/py`(추정기 피벗), `cfg_wP*/wO*`(월드 프레임), `cfg_KA/KX/KY/BY16`(pan 연동)이 정적 입력이라, 부트스트랩 구간에 3-DOF로 돌려 (th, tx, ty)를 누적해 피벗을 구하는 블록을 앞에 두고 roll형 피벗을 cfg로 쓰는 방식을 설계 중. 풀칩 한 바퀴 시간(현수 기록): Genus 43분 + Innovus 41분(첫 실행), 이후 DRC 정리/signoff/게이트 시뮬에 6시간 이상.
+
+
+## 234. 발표자료(칩 S 중심) 생성 (2026-10-30)
+
+`submission/REDRED_2차_발표자료_칩S.pptx`(20쪽) + `.pdf`, 생성 스크립트 `submission/figgen/build_deck_chipS.js`(서식은 기존 덱과 동일: Apple 스타일 팔레트, 나눔스퀘어 네오 Regular/Bold는 post.py가 변환, 슬라이드 노트에 발표 대본). 기존 `REDRED_2차_발표자료.pptx`(행 게이팅 병행 설계 중심, 19쪽)는 그대로 둠.
+구성: 문제 정의 -> 교수 센서 데이터 해독 -> 전체 구조(디코더/변환 8레인/월드 메모리/추정기) -> 변환 후보 비교 -> 월드 메모리 -> 추정기 -> 정확도 -> 과적합(상수=피벗 하나) -> 자기보정 독립 검증(합성 정답: 주 시험 + 먼 피벗) -> 자기보정 칩 반영 현황(정수 기준모델까지, RTL 미완 명시) -> 검증 -> 풀칩 P&R(배치도는 DEF에서 그림) -> 시행착오 4쪽(클록 8 ns 후퇴, 후보 60개 탈락, 메모리·물리 설계 함정, 병행 설계에서 겪은 것) -> 병행 설계 전력 근거 -> 장단점·한계·고려사항 -> 요약.
+수치 출처: 현수 칩 S는 `~/hyunsu_round2` 문서(job21/23/24/25/26, CANDIDATES.md)에서 읽은 값이며 직접 재실행한 것이 아님. 자기보정 독립 검증과 피벗 민감도(정수 기준모델 roll 모드: float 피벗 0.405 deg, 칩 피벗 0.467 deg, 중심 0.529 deg, 정수 3-DOF 추정 피벗 1.1 deg, 100 px 어긋남 6.7 deg)는 우리가 측정. PowerPoint 열기 실패 원인: 높이가 0.75 in 미만인 카드에서 본문 상자 높이가 음수가 됨(카드 함수에 하한 추가).
