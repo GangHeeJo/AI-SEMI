@@ -223,17 +223,16 @@ const chartBase = (title, colors) => ({
 
 // ---------- 8c. 파노라마와 3D
 {
-  const s = content("같은 센서 데이터로 만든 월드 지도: 파노라마와 3D 시점 변환",
+  const s = content("월드 지도 모음: pan 파노라마, 3D 시점, 외부 UZH 데이터",
     "위쪽은 pan 녹화로 만든 월드 지도 파노라마이고, 방과 광학 테이블의 구조가 이어져 보입니다. 아래는 회전만으로 복원한 월드 지도를 회전 중심 기준 상대 3D 점구름으로 보고, 수직축으로 마이너스 35도와 플러스 35도 돌려 본 것입니다. 이 그림들은 우리 소프트웨어 모델로 만든 시각화이고 칩의 출력 형식과 같은 월드 좌표를 씁니다.");
   s.addImage({ path: fig("panorama_pan.png"), x: 0.6, y: 1.4, w: 6.0, h: 1.67 });
   T(s, "pan 녹화 월드 지도 파노라마 (소프트웨어 모델)", { x: 0.6, y: 3.1, w: 6.0, h: 0.3, fontSize: 11, color: MID });
-  s.addImage({ path: fig("worldmap_stages.png"), x: 0.6, y: 3.55, w: 6.0, h: 1.5 });
-  T(s, "roll 월드 지도의 개선 단계: 첫 결과 → 보정 → 정리 → 참조 프레임", { x: 0.6, y: 5.1, w: 6.0, h: 0.3, fontSize: 11, color: MID });
+  s.addImage({ path: fig("hs_B_shapes.png"), x: 0.6, y: 3.5, w: 6.0, h: 2.68 });
+  T(s, "외부 UZH shapes_rotation(59초) 칩 S 월드 맵: 복제 제거 전(왼쪽) 대 자기보정+키프레임 앵커(오른쪽), 응집도 3.18 → 10.03", { x: 0.6, y: 6.22, w: 6.0, h: 0.6, fontSize: 10, color: MID });
   s.addImage({ path: img("ROLL_3D_real_views.png"), x: 6.9, y: 1.4, w: 5.8, h: 2.32 });
   T(s, "roll 3D 월드 지도, 시점 −35° / +35°", { x: 6.9, y: 3.75, w: 5.8, h: 0.3, fontSize: 11, color: MID });
   s.addImage({ path: img("PAN_3D_real_views.png"), x: 6.9, y: 4.2, w: 5.8, h: 2.32 });
   T(s, "pan 3D 월드 지도, 시점 −35° / +35°", { x: 6.9, y: 6.55, w: 5.8, h: 0.3, fontSize: 11, color: MID });
-  T(s, "실제 DELTA 센서 영상 · 회전만 보정", { x: 0.6, y: 5.6, w: 6.0, h: 0.5, fontSize: 14, bold: true, color: TEAL });
 }
 
 // ---------- 9. 과적합: 원인, 해결, 독립 검증
