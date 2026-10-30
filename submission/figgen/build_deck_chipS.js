@@ -199,9 +199,10 @@ const chartBase = (title, colors) => ({
     ["pan (교수)", "ECC 대비 이동 오차", { text: "평균 14.0 px (오프셋 제거 11.8 px)", options: { bold: true } }, "pan은 회전+이동 연동 상수 사용"],
     ["UZH (3자유도)", "float 복제 모델", "5초 간격 중앙값 28 → 9 px (키프레임 8장), 모델 바닥 3.9 px", "float 결과"],
     ["UZH (3자유도)", "정수 기준모델", { text: "5초 91 px — 정확도 수치로 쓰지 않음", options: { color: RED, bold: true } }, "RTL=기준모델 일치 검증용"],
-  ], 0.6, 1.55, 12.1, [1.9, 3.3, 4.2, 2.7], { size: 13, rowH: 0.7 });
-  card(s, 0.6, 5.2, 5.9, 1.7, "읽는 법", "정답이 ECC 체인이라 그 자체의 오차가 섞여 있다. 교수 데이터와 UZH 정확도는 서로 직접 비교하면 안 된다.", { size: 14 });
-  card(s, 6.8, 5.2, 5.9, 1.7, "남은 문제", "빠른 3축 회전에서 추적을 잃으면 도형이 여러 벌로 복제된다. 키프레임·월드 앵커로 줄였지만 완전히 풀지는 못했다.", { size: 14, headColor: RED });
+  ], 0.6, 1.5, 12.1, [1.9, 3.3, 4.2, 2.7], { size: 12, rowH: 0.5 });
+  s.addChart(pres.charts.BAR, [{ name: "roll 각도 오차", labels: ["구한 피벗", "손으로 맞춘 피벗", "영상 중심", "100 px 어긋남"], values: [0.405, 0.467, 0.529, 6.7] }], Object.assign({ x: 0.6, y: 4.2, w: 6.4, h: 2.8, barDir: "col" }, chartBase("roll 각도 오차 (°): 피벗 위치에 따른 변화", [TEAL]), { dataLabelFormatCode: "0.000", valAxisMinVal: 0, valAxisMaxVal: 8 }));
+  card(s, 7.3, 4.3, 5.4, 1.2, "읽는 법", "정답이 ECC 체인이라 그 자체의 오차가 섞여 있다. 교수 데이터와 UZH 정확도는 서로 직접 비교하면 안 된다.", { size: 12 });
+  card(s, 7.3, 5.6, 5.4, 1.35, "남은 문제", "빠른 3축 회전에서 추적을 잃으면 도형이 여러 벌로 복제된다. 키프레임·월드 앵커로 줄였지만 완전히 풀지는 못했다.", { size: 12, headColor: RED });
 }
 
 // ---------- 8b. 칩이 만든 월드 지도 (roll)
@@ -240,14 +241,15 @@ const chartBase = (title, colors) => ({
     ["정수 기준모델: 구한 피벗 / 손으로 맞춘 피벗", "0.405° / 0.467°", "12.0 px"],
   ], 0.6, 1.5, 7.9, [4.3, 1.6, 2.0], { size: 12, rowH: 0.42 });
   card(s, 8.8, 1.5, 3.9, 2.3, "자기보정 방식", "처음 몇 창을 3자유도로 돌려 (θ, tx, ty)를 모으고 t = (R(θ)−I)·u 를 최소제곱으로 맞춰 피벗 u를 구함. 설명도 r² 0.9 이상이면 1자유도로 고정.", { size: 12 });
-  table(s, [
-    ["합성 정답 장면: 피벗 R", "회전각", "복원된 R (시드 3개)", "자기보정", "재맞춤", "프리즈"],
-    ["50~150 px (G1~G4)", "120°", "오차 0.7~6.9 px", "1.8~2.1°", "1.8~2.0°", "0.7~2.6°"],
-    ["1,552 px (V1)", "20°", "1,516 / 1,525 / 1,611", { text: "0.29°", options: { bold: true } }, "0.25°", { text: "8.3°", options: { color: RED, bold: true } }],
-    ["6,000 px (V2)", "8°", "5,689 / 6,078 / 7,710", { text: "0.22°", options: { bold: true } }, "0.10°", { text: "18.1°", options: { color: RED, bold: true } }],
-    ["20,025 px (V3, pan 크기)", "5°", "14,137 / 22,397 / 31,072", "1.68°", "0.06°", { text: "115.9°", options: { color: RED, bold: true } }],
-  ], 0.6, 4.05, 12.1, [2.9, 0.9, 3.0, 1.6, 1.5, 2.2], { size: 12, rowH: 0.42 });
-  T(s, "자기보정은 피벗을 데이터에서 복원해 붕괴(프리즈 8~116°)를 0.2~1.7°로 막고, 정수 모델에서는 손으로 맞춘 상수보다 오차가 작다(0.405° 대 0.467°). 합성은 단일 깊이·한 방향 회전이라 먼 피벗(pan 크기)의 R 정밀도는 제한적이다.", { x: 0.6, y: 6.3, w: 12.1, h: 0.65, fontSize: 13, color: MID });
+  s.addChart(pres.charts.BAR, [
+    { name: "자기보정", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [0.29, 0.22, 1.68] },
+    { name: "재맞춤", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [0.25, 0.10, 0.06] },
+    { name: "프리즈 (다른 녹화 상수)", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [8.3, 18.1, 115.9] },
+  ], Object.assign({ x: 0.6, y: 3.95, w: 8.0, h: 3.0, barDir: "col" }, chartBase("정답 있는 합성 장면: 각도 오차 (°)", [TEAL, "7A7A7A", "1D1D1F"]), { showLegend: true, legendPos: "b", legendFontFace: FONT, legendFontSize: 11, dataLabelFormatCode: "0.00", dataLabelFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: 130 }));
+  s.addShape(pres.ShapeType.roundRect, { x: 8.9, y: 3.95, w: 3.8, h: 1.45, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
+  T(s, "115.9° → 1.68°", { x: 9.1, y: 4.05, w: 3.4, h: 0.7, fontSize: 28, bold: true, color: BLUE_D, valign: "middle" });
+  T(s, "pan 크기 피벗(R 20,025 px): 프리즈 대비 자기보정", { x: 9.1, y: 4.8, w: 3.4, h: 0.55, fontSize: 12, color: WHITE });
+  card(s, 8.9, 5.5, 3.8, 1.45, "범위", "50~150 px 피벗(G1~G4, 회전 120°)에서는 세 방식 모두 0.7~2.6°. 합성은 단일 깊이·한 방향 회전.", { size: 11 });
 }
 
 // ---------- 5. 좌표 변환
@@ -262,9 +264,12 @@ const chartBase = (title, colors) => ({
     ["3단 전단(shear) 분해 회전", "탈락", "정수 픽셀 전단은 평균 0.44 px 오차, 정수 일치 70% — 비트 일치 아님"],
     ["행별 읽기 시각 보정", "탈락", "프레임당 최대 0.4°라 선명도 변화 +0.2~0.4%"],
     ["렌즈 왜곡 보정", "탈락", "직선성 잔차 0.987 → 0.987 px, 지도 선명도 −1.9% (손해)"],
-  ], 0.6, 1.55, 12.1, [3.4, 1.2, 7.5], { size: 13, rowH: 0.5 });
-  card(s, 0.6, 5.2, 5.9, 1.7, "채택안 사양", "고정소수점 F=10, cos/sin은 CORDIC 2개(추정기 F=12, 월드 F=10)로 계산 — 각도 단계 LUT가 아니라 연속 각도\n합성 변환 블록 13,866 µm²", { size: 13 });
-  card(s, 6.8, 5.2, 5.9, 1.7, "조건부 이득의 의미", "곱셈기를 없애는 것이 항상 이득은 아니다 — 입력 형식(8픽셀 그룹)과 맞물릴 때만 이긴다.", { size: 14, fill: LIGHT });
+  ], 0.6, 1.5, 12.1, [3.4, 1.2, 7.5], { size: 12, rowH: 0.42 });
+  s.addChart(pres.charts.BAR, [
+    { name: "직접 곱셈", labels: ["면적", "전력"], values: [1.0, 1.0] },
+    { name: "증분 변환 8레인 (채택)", labels: ["면적", "전력"], values: [0.44, 0.39] },
+  ], Object.assign({ x: 6.8, y: 4.45, w: 5.9, h: 2.55, barDir: "col" }, chartBase("직접 곱셈 대비 상대값 (작을수록 좋음)", ["7A7A7A", TEAL]), { showLegend: true, legendPos: "r", legendFontFace: FONT, legendFontSize: 11, dataLabelFormatCode: "0.00", valAxisMinVal: 0, valAxisMaxVal: 1.2 }));
+  card(s, 0.6, 4.7, 5.9, 2.2, "채택안 사양", "고정소수점 F=10, cos/sin은 CORDIC 2개(추정기 F=12, 월드 F=10)로 계산 — 각도 단계 LUT가 아니라 연속 각도\n합성 변환 블록 13,866 µm². 곱셈기를 없애는 것이 항상 이득은 아니고, 8픽셀 그룹 입력과 맞물릴 때만 이긴다.", { size: 12 });
 }
 
 // ---------- 6. 월드 메모리
@@ -331,7 +336,9 @@ const chartBase = (title, colors) => ({
     ["world 예측 부호화 (AER)", "보류", "−25%지만 센서 측 1.38 Mbit 버퍼 필요"],
     ["메모리 뱅크를 래치로", "탈락", "배치 후 시뮬레이션 24% 불일치"],
     ["α-β 추적기", "탈락", "UZH에서 오히려 악화 (38.7 vs 32.6 °/s), 교수 데이터 과적합"],
-  ], 0.6, 1.5, 12.1, [3.3, 1.0, 7.8], { size: 12, rowH: 0.5 });
+  ], 0.6, 1.5, 8.0, [2.4, 0.8, 4.8], { size: 11, rowH: 0.52 });
+  s.addChart(pres.charts.BAR, [{ name: "지도 상관", labels: ["8 px 격자 (채택)", "선형 극좌표", "로그 극좌표", "블록 부동소수점"], values: [0.92, 0.87, 0.71, 0.60] }], Object.assign({ x: 8.9, y: 1.5, w: 3.8, h: 4.2, barDir: "bar" }, chartBase("월드 표현별 지도 상관 (높을수록 좋음)", [TEAL, "7A7A7A", "7A7A7A", "7A7A7A"]), { dataLabelFormatCode: "0.00", valAxisMinVal: 0, valAxisMaxVal: 1 }));
+  T(s, "블록 부동소수점은 0.62/0.58의 평균", { x: 8.9, y: 5.75, w: 3.8, h: 0.4, fontSize: 11, color: MID });
 }
 
 // ---------- 16. 시행착오: 메모리와 물리 구현
