@@ -420,4 +420,13 @@ const chartBase = (title, colors) => ({
 }
 
 
+// 발표 대본(10분)으로 노트 교체: notes_chipS.js
+{
+  const NOTES = require(path.join(__dirname, "notes_chipS.js"));
+  pres._slides.forEach((sl, i) => {
+    sl._slideObjects = sl._slideObjects.filter((o) => o._type !== "notes");
+    if (NOTES[i]) sl.addNotes(NOTES[i]);
+  });
+}
+
 pres.writeFile({ fileName: OUT }).then(() => console.log("wrote", OUT, "slides", pres.slides ? pres.slides.length : n));
