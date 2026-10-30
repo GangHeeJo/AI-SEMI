@@ -110,8 +110,7 @@ const chartBase = (title, colors) => ({
   card(s, 0.6, 1.55, 3.9, 1.95, "입력", "센서 960×720\n이벤트 = 주소 + 극성\n프레임당 타임스탬프 1개", { size: 15 });
   card(s, 4.72, 1.55, 3.9, 1.95, "제약 (교수 Q&A 확정)", "회전 180° 이내\n평행 이동 없음\n표면만 보는 2차원 월드", { size: 15 });
   card(s, 8.84, 1.55, 3.9, 1.95, "칩이 하는 일", "① 회전각을 이벤트에서 추정\n② 이벤트마다 월드 좌표 계산\n③ 월드 메모리에 쓰기", { size: 15 });
-  s.addImage({ path: img("worldmap_uncorrected_vs_omega_only.png"), x: 0.6, y: 3.7, w: 3.2, h: 3.2 });
-  T(s, "회전을 보정하지 않고 쌓으면(위) 소용돌이로 번지고, 회전각으로 좌표를 바꿔 쌓으면(아래) 방의 구조가 보인다. (실제 DELTA 센서 영상, 소프트웨어 모델)", { x: 4.05, y: 3.75, w: 3.7, h: 1.6, fontSize: 13, color: MID });
+  s.addImage({ path: fig("hs_A1_roll.png"), x: 0.6, y: 3.6, w: 7.1, h: 3.48 });
   s.addShape(pres.ShapeType.roundRect, { x: 8.0, y: 3.7, w: 4.74, h: 3.2, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, "우리가 정한 평가 관점", { x: 8.25, y: 3.9, w: 4.3, h: 0.4, fontSize: 17, bold: true, color: BLUE_D });
   T(s, bullets(["실제 센서 데이터에서 동작하는가", "RTL이 기준모델과 비트 단위로 같은가", "배치배선까지 닫혔는가", "한계를 스스로 설명할 수 있는가"], { gap: 4 }), { x: 8.25, y: 4.4, w: 4.3, h: 2.3, fontSize: 15, color: WHITE });
@@ -201,19 +200,25 @@ const chartBase = (title, colors) => ({
     ["UZH (3자유도)", "float 복제 모델", "5초 간격 중앙값 28 → 9 px (키프레임 8장), 모델 바닥 3.9 px", "float 결과"],
     ["UZH (3자유도)", "정수 기준모델", { text: "5초 91 px — 정확도 수치로 쓰지 않음", options: { color: RED, bold: true } }, "RTL=기준모델 일치 검증용"],
   ], 0.6, 1.5, 12.1, [1.9, 3.3, 4.2, 2.7], { size: 12, rowH: 0.45 });
-  s.addImage({ path: fig("chip_theta_vs_ecc.png"), x: 0.6, y: 4.0, w: 8.5, h: 2.81 });
-  card(s, 9.3, 4.0, 3.4, 1.4, "읽는 법", "정답이 ECC 체인이라 그 자체의 오차가 섞여 있다. 교수 데이터와 UZH 정확도는 서로 직접 비교하면 안 된다.", { size: 11 });
-  card(s, 9.3, 5.5, 3.4, 1.4, "남은 문제", "빠른 3축 회전에서 추적을 잃으면 도형이 여러 벌로 복제된다. 키프레임·월드 앵커로 줄였지만 완전히 풀지는 못했다.", { size: 11, headColor: RED });
+  s.addImage({ path: fig("hs_C3_roll_ecc.png"), x: 0.6, y: 3.95, w: 4.6, h: 2.87 });
+  s.addImage({ path: fig("hs_C5b_err_hist.png"), x: 5.4, y: 3.95, w: 7.3, h: 2.59 });
+  T(s, "정답이 ECC 체인이라 그 자체의 오차가 섞여 있어 교수 데이터와 UZH 정확도는 직접 비교하지 않는다. 빠른 3축 회전에서는 추적을 잃으면 도형이 복제되는 한계가 남아 있다.", { x: 5.4, y: 6.58, w: 7.3, h: 0.5, fontSize: 11, color: MID });
 }
 
-// ---------- 8b. 칩이 만든 월드 지도 (roll)
+// ---------- 8b. 칩이 만든 월드 지도 (roll, pan)
 {
-  const s = content("칩이 쓴 월드 메모리: 보정 없이 쌓으면 번지고, 칩 출력에는 방이 보인다",
-    "왼쪽은 보정 없이 센서 좌표에 그대로 쌓은 결과이고, 가운데는 칩 RTL 시뮬레이션이 실제 roll 녹화 32프레임을 받아 월드 메모리에 쓴 결과입니다. 8픽셀 셀에 4비트 로그 카운터라 해상도는 낮지만 방의 구조가 복원됩니다. 오른쪽은 같은 칩에 자기보정이 구한 피벗을 설정한 결과로, 같은 모양이 나옵니다.");
-  s.addImage({ path: fig("chip_roll_world.png"), x: 0.6, y: 1.35, w: 8.5, h: 3.17 });
-  s.addImage({ path: fig("chip_map_growth.png"), x: 1.2, y: 4.6, w: 10.4, h: 2.36 });
-  card(s, 9.3, 1.4, 3.4, 1.55, "무엇을 본 것인가", "실제 DELTA roll 녹화 32프레임 → 칩 RTL 시뮬레이션이 쓴 월드 메모리 내용(8 px 셀, 4비트).", { size: 11 });
-  card(s, 9.3, 3.05, 3.4, 1.5, "읽는 법", "왼쪽은 같은 이벤트를 회전 보정 없이 쌓은 것. 가운데·오른쪽은 칩 출력으로, 보정 피벗 설정만 다르다.", { size: 11 });
+  const s = content("칩 S가 만든 월드 맵: 보정 전 소용돌이가 방의 구조로 바뀐다",
+    "위쪽은 교수님 roll과 pan 녹화 전체를 칩 모델에 통과시킨 결과입니다. 왼쪽은 이벤트를 그대로 쌓은 것이고 오른쪽이 칩 출력입니다. roll은 응집도가 1.06에서 2.34로, pan은 1.16에서 2.76으로 올랐습니다. 아래쪽은 칩 RTL 시뮬레이션이 roll 32프레임을 받아 실제 월드 메모리에 쓴 값입니다. 8픽셀 셀에 4비트 로그 카운터라 해상도는 낮지만 같은 장면이 복원되고, 같은 칩에 자기보정 피벗을 설정해도 같은 지도가 나옵니다. 가장 아래 줄은 프레임이 쌓이며 지도가 자라는 과정입니다.");
+  s.addImage({ path: fig("hs_A1_roll.png"), x: 0.6, y: 1.3, w: 6.0, h: 2.94 });
+  s.addImage({ path: fig("hs_A2_pan.png"), x: 6.8, y: 1.3, w: 5.9, h: 1.45 });
+  T(s, "교수님 roll·pan 녹화 전체: 이벤트를 그대로 쌓은 것(왼쪽) 대 칩 S 출력(오른쪽), 동일 스케일. 응집도 roll 1.06 → 2.34, pan 1.16 → 2.76.", { x: 6.8, y: 2.8, w: 5.9, h: 0.55, fontSize: 10, color: MID });
+  s.addImage({ path: fig("chip_roll_world.png"), x: 0.6, y: 4.4, w: 5.6, h: 2.09 });
+  T(s, "RTL 시뮬 roll 32프레임: 보정 없음 / 칩 출력 / 보정 피벗 설정", { x: 0.6, y: 6.52, w: 5.6, h: 0.3, fontSize: 10, color: MID });
+  s.addImage({ path: fig("hs_E9_roll.png"), x: 6.8, y: 3.45, w: 2.5, h: 2.24 });
+  T(s, "칩 월드 메모리 내용 (4비트 로그 카운터)", { x: 6.8, y: 5.72, w: 2.5, h: 0.4, fontSize: 10, color: MID });
+  s.addImage({ path: fig("chip_map_growth.png"), x: 9.5, y: 3.5, w: 3.2, h: 0.73 });
+  T(s, "프레임이 쌓이며 지도가 자란다 (2→32프레임)", { x: 9.5, y: 4.25, w: 3.2, h: 0.3, fontSize: 10, color: MID });
+  T(s, "읽는 법: 위쪽 두 그림은 녹화 전체를 칩 모델에 통과시킨 월드 맵이고, 왼쪽 아래 RTL 시뮬 그림은 칩 RTL이 실제로 월드 메모리에 쓴 값(8 px 셀)이다. RTL = 기준모델이 비트 단위로 같아서 같은 장면을 보여 준다.", { x: 9.5, y: 4.7, w: 3.2, h: 2.2, fontSize: 11, color: INK });
 }
 
 // ---------- 8c. 파노라마와 3D
@@ -242,12 +247,14 @@ const chartBase = (title, colors) => ({
     ["자기보정 (상수 0개, float 모델)", { text: "0.67°", options: { bold: true } }, "13.9 px (키프레임 8장 시 8.0 px)"],
     ["정수 기준모델: 구한 피벗 / 손으로 맞춘 피벗", "0.405° / 0.467°", "12.0 px"],
   ], 0.6, 1.5, 7.9, [4.3, 1.6, 2.0], { size: 12, rowH: 0.42 });
-  card(s, 8.8, 1.5, 3.9, 2.3, "자기보정 방식", "처음 몇 창을 3자유도로 돌려 (θ, tx, ty)를 모으고 t = (R(θ)−I)·u 를 최소제곱으로 맞춰 피벗 u를 구함. 설명도 r² 0.9 이상이면 1자유도로 고정.", { size: 12 });
+  T(s, "자기보정: 3자유도로 (θ, tx, ty)를 모아 t = (R(θ)−I)·u 최소제곱으로 피벗 u를 구함, r² 0.9 이상이면 1자유도 고정", { x: 0.6, y: 3.72, w: 7.9, h: 0.3, fontSize: 10, color: MID });
+  s.addImage({ path: fig("hs_D6_roll.png"), x: 8.8, y: 1.45, w: 3.9, h: 1.76 });
+  T(s, "다른 녹화의 상수를 쓰면(왼쪽) 번지고, 자기 녹화 상수(오른쪽)면 방이 보인다. roll, 응집도 1.28 대 2.34", { x: 8.8, y: 3.23, w: 3.9, h: 0.6, fontSize: 10, color: MID });
   s.addChart(pres.charts.BAR, [
     { name: "자기보정", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [0.29, 0.22, 1.68] },
     { name: "재맞춤", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [0.25, 0.10, 0.06] },
     { name: "프리즈 (다른 녹화 상수)", labels: ["R 1,552 px (회전 20°)", "R 6,000 px (8°)", "R 20,025 px (5°)"], values: [8.3, 18.1, 115.9] },
-  ], Object.assign({ x: 0.6, y: 3.95, w: 8.0, h: 3.0, barDir: "col" }, chartBase("정답 있는 합성 장면: 각도 오차 (°)", [TEAL, "7A7A7A", "1D1D1F"]), { showLegend: true, legendPos: "b", legendFontFace: FONT, legendFontSize: 11, dataLabelFormatCode: "0.00", dataLabelFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: 130 }));
+  ], Object.assign({ x: 0.6, y: 4.1, w: 8.0, h: 2.85, barDir: "col" }, chartBase("정답 있는 합성 장면: 각도 오차 (°)", [TEAL, "7A7A7A", "1D1D1F"]), { showLegend: true, legendPos: "b", legendFontFace: FONT, legendFontSize: 11, dataLabelFormatCode: "0.00", dataLabelFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: 130 }));
   s.addShape(pres.ShapeType.roundRect, { x: 8.9, y: 3.95, w: 3.8, h: 1.45, fill: { color: DARK }, line: { color: DARK }, rectRadius: 0.12 });
   T(s, "115.9° → 1.68°", { x: 9.1, y: 4.05, w: 3.4, h: 0.7, fontSize: 28, bold: true, color: BLUE_D, valign: "middle" });
   T(s, "pan 크기 피벗(R 20,025 px): 프리즈 대비 자기보정", { x: 9.1, y: 4.8, w: 3.4, h: 0.55, fontSize: 12, color: WHITE });
