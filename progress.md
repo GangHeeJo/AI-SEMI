@@ -4203,3 +4203,5 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 | 6.0 ns | -0.036 -> +0.042 ns, 위반 0 | -0.006 ns, 2경로 | 1 | 5.44 mW |
 - 5.6 ns에서 setup/hold 모두 위반 0, DRC 0, 연결 이상 없음(5.2/6.0 ns의 남은 hold는 ECO 대상 셀 CLKMX2X2가 아닌 FIFO 카운터의 OAI211X1 게이트).
 - **게이트 시뮬(RTL vs signoff SDF, 5.6 ns)은 불일치**: RTL은 쓰기 1,419건, 게이트는 `wmem_overrun`이 처음부터 계속 X라 쓰기 0건. 타이밍 위반 0, SDF 주석 99.2%. 리셋 40사이클로 늘려도 동일 -> 리셋 길이 문제가 아니라 게이트 레벨 초기화(X) 문제로 보이나 원인 미규명(영 지연 게이트 시뮬로 SDF와 분리해 볼 필요). 따라서 mul1024의 5.6 ns는 STA 기준으로만 닫힘, 게이트 시뮬 검증은 미완.
+
+- **2026-10-30 제출 확정(사용자 결정: 칩 S로 제출, 칩 S 수치 사용에 동의)**: 최종 덱 `submission/REDRED_2차_발표자료_칩S.pptx`(20쪽, 글꼴 포함: COM `SaveAs(..., 24, -1)`로 EmbedTrueTypeFonts 켬)와 `.pdf`, 1쪽 설명서 `submission/REDRED_제출설명_1쪽_칩S.docx`(생성 `figgen/make_doc_chipS.py`; Word로 정확히 1쪽 확인, 서버 경로 존재 여부를 모두 확인). 9쪽 표 머리글에 '(ECC 대비, 오프셋 제거 평균)' 명시. 칩 S의 `code/rtl`은 신호오프된 `job25/rtl`의 주요 파일과 동일(est_core/est_top/chip_s_full/xf_b8/world_writer/aer_decoder cmp 일치).
