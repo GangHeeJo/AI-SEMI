@@ -4168,3 +4168,17 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 - 최악 setup 경로는 좌표 변환이 아니라 쓰기 경로(FIFO 카운터 -> arbiter8 -> 카운터, 약 5.3 ns)이고, hold 위반 3개도 FIFO 포인터/카운터 자기 루프. Innovus의 hold 수정이 카운터 D 입력에 0.55 ns 지연 셀을 넣어 setup이 깨짐(§228의 메모리 자기 루프와 같은 유형). v1은 같은 5.2 ns에서 닫혔으나 설계가 커지며 배치가 달라짐. 좌표 변환 경로 슬랙은 -0.011 ns.
 - 비교: v1 코어(메모리 제외, 256각도 RMCM) 약 40,259 um2 -> mul1024 코어 합성 약 89,700 um2. 증가분 = 레인 8개 직접 행렬곱(합성 레인당 5,209 um2 x 8) + 자세 FIFO 폭 확장. 메모리는 1024x1024x2비트(2.1 Mbit)를 외부 SRAM으로 붙이는 전제(FF 64x64 약 96k um2와 같은 조건이 아님).
 - 진행: 5.6 ns, 6.0 ns로 닫히는 주기를 찾는 중(서버 `~/gf_mul56`, `~/gf_mul60`). 닫히면 게이트 시뮬 후 덱 반영.
+
+
+## 233. 현수 칩 S 비교 + 자기보정(피벗 상수 알고리즘화) 독립 검증 + 칩 반영 착수 (2026-10-30)
+
+**현수 2차 칩(`~/hyunsu_round2`, 마지막 커밋 b9e6888, 2026-10-27) 요약(그의 문서에서 읽은 값, 직접 재실행한 것 아님)**: 교수 `.dvs`(Samsung S5KRC1S group AER) 직접 해독, 디코더 -> 증분 변환 8레인(xf_b8) -> 직렬화 -> world writer -> world 메모리(8 px 셀 x 4비트 Morris 로그 카운터, 8 kbit 하드매크로 뱅크 16개 약 131 kbit) + 자세 추정기(시야 1비트 평면 3장 cur/prev/key, 3 px 셀, 230.4 kbit, 8 kbit 뱅크 30개). 풀칩 P&R(2923x1942 um, 매크로 46개): 출하 클록 8.0 ns, signoff setup +2.406 ns / hold +0.007 ns, DRC 10(전원선 via 스택만), 오픈 0, antenna 없음, LEC 통과(비교점 14,618), 전력 13.02 mW(벡터 없음, 매크로 내부 0), 면적 4.521 mm2(매크로 4.194 + 표준셀 0.327). 게이트 시뮬(Quantus signoff SDF) pan_B/roll_B MIN·MAX(8 ns) bit-exact, MAX 5.5/6 ns는 정지/불일치(원인 미규명). 정확도(정수 기준모델): roll ECC 대비 0.467 deg, pan 14.0 px. 한계: 기하 상수(roll 피벗 (480,352), pan 연동 KA/KX/KY/BY16)가 녹화에 맞춰짐(다른 녹화 상수 사용 시 roll 61 deg 붕괴), UZH 3-DOF 정수 모델 정확도 문제, 시차 강한 성긴 장면에서 실패(§168).
+
+**자기보정 독립 검증(현수 job26 EstU 무수정, 합성 정답 장면)** -- 기준 `syn/reports/hyunsu_selfcal/criteria.md`(210fda6), `criteria_far.md`(cdedb32), 스크립트 `scripts/hyunsu_selfcal_synth.py`, `scripts/hyunsu_selfcal_far.py`, 결과 `syn/reports/hyunsu_selfcal/result_main.txt`, `result_far.txt`:
+- 주 시험(피벗 u = 0~150 px, 120도 회전, 시드 3개): 피벗 복원 오차 0.7~6.9 px(P1 통과), 자기보정 각도 오차 1.8~2.1 deg가 참 피벗 재맞춤 1.8~2.0 deg와 동급(P2 통과), 15건 중 12건 rot1 선택(P4 통과, 나머지 3건은 피벗이 중심이라 이동량이 없어 3-DOF 유지), **P3 실패**: 피벗이 50~120 px 어긋난 프리즈(칩 roll 피벗)의 손해가 거의 없음(0.7~2.6 deg).
+- 먼 피벗 변형: V1 R=1,552 px -> R_est 1,516~1,611, S 0.29 deg / 프리즈 8.26 deg; V2 R=6,000 -> R_est 5,689/7,710/6,078, S 0.22 / 프리즈 18.1; V3 R=20,025(pan 크기, 5 deg) -> R_est 14,137/22,397/31,072(-29%/+12%/+55%), S 1.68 deg(재맞춤 0.06) / **프리즈 115.9 deg**. Q1 통과, Q2 실패(V3), Q3 통과.
+- 결론: 기하 상수를 데이터에서 구하는 알고리즘은 float 복제 모델에서 합성 정답으로 붕괴를 막음(프리즈 8~116 deg -> 0.2~1.7 deg). pan 크기의 먼 피벗은 R 정밀도가 제한적(오차 1.7 deg). 장면 의존성(§168)과 칩 RTL 반영은 별개로 남음. 한계: 단일 깊이, 한 방향 회전, 시차 없음, float 모델.
+
+**mul1024 코어 후처리(서버 `~/gf_mulfix52/56/60`)**: §232 결과(5.6 ns setup -0.010/hold -0.000, 6.0 ns setup -0.036/hold -0.006, 5.2 ns setup -0.088/hold -0.011)에 hold 셀 교체 ECO(CLKMX2X4) -> signoff -> setup 후처리(목표 여유 60 ps) -> signoff -> 게이트 시뮬(`tb/tb_mul1024_gate.sv`)을 건 상태. 6.0 ns의 hold 위반 1개는 `OAI211X1` 게이트라 기존 ECO 셀 목록에 없음. 결과 대기.
+
+**칩 S 자기보정 반영 착수**: 현수 코드 사본(스크래치 `chipS/code`), roll `.dvs` 해독(`events.npy` 75,340,608개, 프레임 2,062) 완료, 정답 궤적(`roll_ecc.npy`)은 현수 `register_roll.py`로 재생성 예정. est_core의 `cfg_px/py`(추정기 피벗), `cfg_wP*/wO*`(월드 프레임), `cfg_KA/KX/KY/BY16`(pan 연동)이 정적 입력이라, 부트스트랩 구간에 3-DOF로 돌려 (th, tx, ty)를 누적해 피벗을 구하는 블록을 앞에 두고 roll형 피벗을 cfg로 쓰는 방식을 설계 중. 풀칩 한 바퀴 시간(현수 기록): Genus 43분 + Innovus 41분(첫 실행), 이후 DRC 정리/signoff/게이트 시뮬에 6시간 이상.

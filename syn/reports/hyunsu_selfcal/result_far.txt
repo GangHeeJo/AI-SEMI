@@ -1,0 +1,4 @@
+V1 u_true=(np.float64(1500.0), np.float64(-400.0)) R=1552 각도 20.0° span=542px | 오차 중앙값 S=0.29 R=0.25 F=8.26 | rot1 R_est=1525 방향오차=0.4° r2=1.00; rot1 R_est=1611 방향오차=0.3° r2=1.00; rot1 R_est=1516 방향오차=0.3° r2=1.00
+V2 u_true=(np.float64(6000.0), np.float64(0.0)) R=6000 각도 8.0° span=838px | 오차 중앙값 S=0.22 R=0.10 F=18.10 | rot1 R_est=5689 방향오차=0.2° r2=1.00; rot1 R_est=7710 방향오차=0.4° r2=0.99; rot1 R_est=6078 방향오차=0.2° r2=1.00
+V3 u_true=(np.float64(20000.0), np.float64(-1000.0)) R=20025 각도 5.0° span=1748px | 오차 중앙값 S=1.68 R=0.06 F=115.87 | rot1 R_est=14137 방향오차=1.3° r2=0.97; rot1 R_est=22397 방향오차=0.9° r2=0.98; rot1 R_est=31072 방향오차=1.5° r2=0.93
+Q1 PASS {'V1': True, 'V2': True, 'V3': True} | Q2 FAIL {'V1': True, 'V2': True, 'V3': False} | Q3 PASS(3/3)
