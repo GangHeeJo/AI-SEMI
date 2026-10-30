@@ -1,0 +1,100 @@
+*----------------------------------------------------------------------------------------
+*	Innovus 23.14-s088_1 (64bit) 02/28/2025 12:25 (Linux 3.10.0-693.el7.x86_64)
+*	
+*
+* 	Date & Time:	2026-Oct-30 14:10:38 (2026-Oct-30 05:10:38 GMT)
+*
+*----------------------------------------------------------------------------------------
+*
+*	Design: aer_tx16_coord_transform_mul1024
+*
+*	Liberty Libraries used: 
+*	        view_setup: /home/aiasic26911/gf_mulfix60/w/pnr/final.enc.dat/libs/mmmc/slow_vdd1v0_basicCells.lib
+*
+*	Power Domain used: 
+*              Rail:        VDD      Voltage:        0.9 
+*
+*	Parasitic Files used: 
+*	        pnr/aer_tx16_coord_transform_mul1024_quantus.spef
+*
+*       Power View : view_setup
+*
+*       User-Defined Activity : N.A.
+*
+*       Activity File: N.A.
+*
+*       Hierarchical Global Activity: N.A.
+*
+*       Global Activity: N.A.
+*
+*       Sequential Element Activity: 0.100000
+*
+*       Primary Input Activity: 0.200000
+*
+*       Default icg ratio: N.A.
+*
+*       Global Comb ClockGate Ratio: N.A.
+*
+*	Power Units = 1mW
+*
+*	Time Units = 1e-09 secs 
+*
+*       report_power -outfile pnr/signoff_power.rpt -view view_setup
+*
+-----------------------------------------------------------------------------------------
+
+
+Total Power 
+-----------------------------------------------------------------------------------------
+Total Internal Power:        3.20004374 	   58.7771%
+Total Switching Power:       2.24132685 	   41.1678%
+Total Leakage Power:         0.00299837 	    0.0551%
+Total Power:                 5.44436896 
+-----------------------------------------------------------------------------------------
+
+
+Group                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+Sequential                         1.719       0.131   0.0005652       1.851       33.99 
+Macro                                  0           0           0           0           0 
+IO                                     0           0           0           0           0 
+Combinational                      1.252       1.546    0.002391         2.8       51.44 
+Clock (Combinational)             0.2295      0.5638    4.21e-05      0.7933       14.57 
+Clock (Sequential)                     0           0           0           0           0 
+-----------------------------------------------------------------------------------------
+Total                                3.2       2.241    0.002998       5.444         100 
+-----------------------------------------------------------------------------------------
+
+
+Rail                  Voltage   Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+VDD                       0.9        3.2       2.241    0.002998       5.444         100 
+
+
+Clock                           Internal   Switching     Leakage       Total  Percentage 
+                                Power      Power         Power         Power  (%)        
+-----------------------------------------------------------------------------------------
+clk                               0.2295      0.5638    4.21e-05      0.7933       14.57 
+-----------------------------------------------------------------------------------------
+Total (excluding duplicates)      0.2295      0.5638    4.21e-05      0.7933       14.57 
+-----------------------------------------------------------------------------------------
+Clock: clk
+Clock Period: 0.006000 usec 
+Clock Toggle Rate:   333.3333 Mhz 
+Clock Static Probability:  0.5000
+
+
+
+-----------------------------------------------------------------------------------------
+*	Power Distribution Summary: 
+*                Highest Average Power:       CTS_ccl_a_buf_00169 (CLKBUFX4):         0.002663 
+*                Highest Leakage Power: FE_OFC12202_pose_mask1_19 (CLKBUFX20):        6.189e-07 
+*          Total Cap:      1.95955e-10 F
+*          Total instances in design: 52202
+*          Total instances in design with no power:     0
+*          Total instances in design with no activity:     0
+*          Total Fillers and Decap:     0
+-----------------------------------------------------------------------------------------
+
