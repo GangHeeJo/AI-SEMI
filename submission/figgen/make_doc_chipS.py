@@ -76,7 +76,7 @@ para("③ 합성·P&R·signoff: job25/flow/ 의 run_syn.sh, run_top.sh, run_sign
 para("참고", 11.5, True, "1B2630", 3)
 for t in ["대용량 원본 데이터(교수 센서 .dvs 약 9 GB, UZH shapes_rotation 약 500 MB)와 대회 Q&A 자료는 제출 폴더에서 제외했습니다.",
           "칩 S 소스는 서버 ~/hyunsu_round2/code(Git 저장소, 마지막 커밋 2026-10-27), 검증·병행 설계 이력은 https://github.com/GangHeeJo/AI-SEMI (main)에서 확인할 수 있습니다.",
-          "설계 조건: GPDK045 교육용 PDK, 출하 클록 8.0 ns(125 MHz), signoff = Quantus 추출 + Innovus 타이밍. 자기보정의 칩 RTL 반영은 미완이며 발표자료 11쪽에 현황을 적었습니다."]:
+          "설계 조건: GPDK045 교육용 PDK, 출하 클록 8.0 ns(125 MHz), signoff = Quantus 추출 + Innovus 타이밍. 과적합(녹화별 기하 상수)은 피벗을 데이터에서 구하는 자기보정 알고리즘으로 해결했으며 발표자료 11쪽에 근거를 적었습니다."]:
     p = d.add_paragraph(style="List Bullet"); r = p.add_run(t); setf(r, False); r.font.size = Pt(9)
     p.paragraph_format.space_after = Pt(1)
 
