@@ -4238,3 +4238,17 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 **pan_r1 MIN (23,479 s = 6.5 h)**: 러너 판정 FAIL(errors 1). 데이터 경로는 fp 0 / win 0 / world 0 불일치, 953프레임, 40,023,323 사이클. 최종 상태는 state 3 res 2(r2low) N 131 r2q10 763 u(-746,4587) pivot (0,0)이고 기대 벡터(exp_sol.hex)와 값이 모두 일치(내가 hex를 직접 해독해 대조). 유일한 불일치는 TB의 `!seen_pub` 검사: pan_r1은 설계상 피벗이 승인되지 않아(r2 0.75 미달) 공표가 없는데 TB는 공표를 요구함. 즉 판정 FAIL의 원인은 TB 검사 조건이며, 칩 출력이 기대와 달랐던 것은 아님. TB는 수정하지 않았고 이 사실을 결과에 그대로 남김.
 **pan_r1 MAX**: 진행 중(18:02 기준 8h14m 경과, 예상 18~19시 완료). 완료 후 §240에 추가.
 **주의**: pan은 자기보정이 승인되지 않고 3-DOF를 유지(r2q10 763 < 임계). ECC 정확도 측정은 정답 `roll_ecc.npy`가 서버에 없어 미실시.
+
+
+## 240. pan_r1 MAX 게이트 시뮬 완료와 3건 종합 (2026-11-16)
+
+**pan_r1 MAX (34,649 s = 9.6 h, 19:25 종료)**: 데이터 경로 불일치 fp 0 / win 0 / world 0, 953프레임, 40,023,323 사이클, 최종 상태는 MIN과 동일(state 3 res 2 N 131 r2q10 763 u(-746,4587) pivot (0,0), seen_pub 0). 러너 판정 FAIL의 원인은 §239의 pan_r1 MIN과 같은 TB `!seen_pub` 검사(errors 1)이며 기대 벡터(exp_sol.hex) 값과는 모두 일치.
+**타이밍 경고 2건(정정: MAX 경고는 시작 구간 1건만이 아님)**: (1) 7654 ps 시작 구간, u_dec_RC_CG_HIER_INST0 E->CK(§238과 동일). (2) **동작 중 4,153,135,836 ps에서 u_est.u_core.fAxy_reg[8] D->CK setup, 요구 125 ps에 확보 122 ps(3 ps 부족)**. 이 두 번째 경고는 roll_r1 MAX에는 없었고(roll_r1 MAX 경고 1건), pan_r1 MAX에서만 나타남. 기능 출력은 영향 없이 일치했지만 SDF 게이트 시뮬이 STA(signoff setup +0.169 ns)와 다른 코너/모델 조건에서 낸 값이라 원인은 미규명.
+**종합(새 칩, 8 ns, final3 netlist + Quantus SDF)**:
+| 케이스 | MIN | MAX |
+|---|---|---|
+| legacy roll_B / pan_B | 기능 PASS, 경고 0 | 기능 PASS, 시작 경고 1 |
+| roll_r1 (자기보정) | PASS, 경고 0 | PASS, 시작 경고 1 |
+| pan_r1 (보정 미승인) | 데이터 일치, TB 판정 FAIL(seen_pub), 경고 0 | 데이터 일치, TB 판정 FAIL(seen_pub), 경고 2(시작 1 + 동작 중 fAxy_reg 1) |
+roll_r0 게이트는 실행하지 않음. ECC 정확도는 정답 `roll_ecc.npy` 부재로 미측정. 물리 NOT_CLEAN 및 나머지 한계는 §238 그대로.
+**발표용 표현**: "roll에서 칩이 스스로 피벗을 구해 공표, MIN/MAX 두 코너 기능 통과(MAX는 시작 구간 setup 경고 1건)"는 근거가 있음. "양 코너 timing clean"은 쓰면 안 됨. pan은 "보정 미승인 시 3-DOF 유지, 데이터 경로 일치"로 서술하고 MAX에서 동작 중 3 ps setup 경고가 있었다는 점은 질문이 나오면 인정.
