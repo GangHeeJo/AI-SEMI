@@ -1,0 +1,103 @@
+{
+  "source_commit": "9254eb989561181228aeefe571678c9db6547d71",
+  "clock_ns": 8.0,
+  "synthesis_area_um2": 4457451.573,
+  "macro_area_um2": 4194133.734,
+  "pnr_area_um2": 4564050.496,
+  "setup_wns_ns": 0.169,
+  "hold_wns_ns": 0.015,
+  "setup_hold_violating_paths": 0,
+  "pg_maxviastack_drc": 11,
+  "transition_real_nets": 456,
+  "transition_real_terms": 920,
+  "glitch_violations": 13,
+  "out_of_core_instances": 9,
+  "vectorless_power_mw": 12.8264658,
+  "physical_status": "NOT_CLEAN: PG_DRC, transition, glitch, placement boundary and startup GLS timing warnings",
+  "macro_model": "behavioral; macro internal power excluded",
+  "gate": {
+    "roll_B_MINIMUM": {
+      "functional_pass": true,
+      "timing_violations": 0,
+      "runner_exit": 0,
+      "wall_seconds": 1571,
+      "warnings": {
+        "DLCPTH": 180,
+        "MXWARN": 2,
+        "SDFNDP": 500,
+        "SDFNSB": 500
+      },
+      "result": [
+        "RESULT windows 8/8 fp 33/32 (extra fp after the segment = next window, not checked) frames_done 32  mismatches: fp 0 win 0 world_words 0  mem rd 227803 wr 227803  cycles 2861065"
+      ]
+    },
+    "roll_B_MAXIMUM": {
+      "functional_pass": true,
+      "timing_violations": 1,
+      "runner_exit": 1,
+      "wall_seconds": 2387,
+      "warnings": {
+        "DLCPTH": 180,
+        "MXWARN": 1,
+        "SDFNDP": 7,
+        "SDFNSB": 500
+      },
+      "result": [
+        "RESULT windows 8/8 fp 33/32 (extra fp after the segment = next window, not checked) frames_done 32  mismatches: fp 0 win 0 world_words 0  mem rd 227803 wr 227803  cycles 2861065"
+      ]
+    },
+    "pan_B_MINIMUM": {
+      "functional_pass": true,
+      "timing_violations": 0,
+      "runner_exit": 0,
+      "wall_seconds": 284,
+      "warnings": {
+        "DLCPTH": 180,
+        "MXWARN": 2,
+        "SDFNDP": 500,
+        "SDFNSB": 500
+      },
+      "result": [
+        "RESULT windows 8/8 fp 65/64 (extra fp after the segment = next window, not checked) frames_done 64  mismatches: fp 0 win 0 world_words 0  mem rd 59980 wr 59980  cycles 546324"
+      ]
+    },
+    "pan_B_MAXIMUM": {
+      "functional_pass": true,
+      "timing_violations": 1,
+      "runner_exit": 1,
+      "wall_seconds": 400,
+      "warnings": {
+        "DLCPTH": 180,
+        "MXWARN": 1,
+        "SDFNDP": 7,
+        "SDFNSB": 500
+      },
+      "result": [
+        "RESULT windows 8/8 fp 65/64 (extra fp after the segment = next window, not checked) frames_done 64  mismatches: fp 0 win 0 world_words 0  mem rd 59980 wr 59980  cycles 546324"
+      ]
+    },
+    "roll_r1_MINIMUM": {
+      "functional_pass": true,
+      "timing_violations": 0,
+      "runner_exit": 0,
+      "wall_seconds": 19622,
+      "warnings": {
+        "DLCPTH": 180,
+        "MXWARN": 2,
+        "SDFNDP": 500,
+        "SDFNSB": 500
+      },
+      "result": [
+        "SELFCAL_FINAL state 2 res 1 N 89 r2 989 u (9,35) pivot (489,395) seen_pub 1 errors 0",
+        "RESULT windows 177/177 fp 746/745 (extra fp after the segment = next window, not checked) frames_done 745  mismatches: fp 0 win 0 world_words 0  mem rd 901151 wr 901151  cycles 39552733"
+      ]
+    }
+  },
+  "optional_not_run": [
+    "roll_r1 MAX",
+    "pan_r1 MIN/MAX",
+    "roll_r0 MIN/MAX"
+  ],
+  "algorithm_accuracy": "ECC accuracy not evaluated; no estimator redesign in stage2/3",
+  "final_rtl_regression": "25/25 PASS"
+}

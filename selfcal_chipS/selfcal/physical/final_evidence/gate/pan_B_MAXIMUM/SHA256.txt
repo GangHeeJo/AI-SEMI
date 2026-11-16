@@ -1,0 +1,8 @@
+6aab825eac497f08c2f1bce1cef9a43ba6b50c4bea899c39f776c466eaad6715  tb_run.sv
+3efbaebffef53ff8f1dc2bf589c504260c45cc2f53b8421fa1b62acb8dfdf336  /home/aiasic26911/selfcal_20261115/phys/full_8.0/pnr/chip_s_full_pnr3.v
+d395e34ea2c28dcc9faeeb50360fc261d50d23b12ce141ab71ec26e1c2902b72  /home/aiasic26911/selfcal_20261115/phys/full_8.0/pnr/chip_s_full3_signoff.sdf
+bfbfa6970166bfcd15f158fee22f1258a6d040426c876e61738ff2c28452d2e3  /home/aiasic26911/selfcal_20261115/phys/rtl/mem_bank_8k.sv
+5f89e4cdef167a6f5e82d55f6c1fb38cb6ba216f57dcac5d8b6c608216648242  /home/aiasic26911/selfcal_20261115/phys/../legacy_regress/vec/pan_B/cfg.hex
+ed3dd0f1dd7a15358df30d41b63ef43dadb80b52554b8f370d82f27183ea4eb5  /home/aiasic26911/selfcal_20261115/phys/../legacy_regress/vec/pan_B/exp_fp.hex
+b88f785238d97a1b13aad9970b07547282cfd927426f9acff2f267c028d3bb37  /home/aiasic26911/selfcal_20261115/phys/../legacy_regress/vec/pan_B/exp_win.hex
+0579e4767808c73f853c87184c01747c9f5b9dd38a5d73efd5519ea7ce49ec1f  /home/aiasic26911/selfcal_20261115/phys/../legacy_regress/vec/pan_B/mem_final_w.hex

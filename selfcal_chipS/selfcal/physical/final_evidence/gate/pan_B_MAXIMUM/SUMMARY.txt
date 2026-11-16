@@ -1,0 +1,3 @@
+Warning!  Timing violation
+RESULT windows 8/8 fp 65/64 (extra fp after the segment = next window, not checked) frames_done 64  mismatches: fp 0 win 0 world_words 0  mem rd 59980 wr 59980  cycles 546324
+PASS

@@ -1,0 +1,3 @@
+SELFCAL_FINAL state 2 res 1 N 89 r2 989 u (9,35) pivot (489,395) seen_pub 1 errors 0
+RESULT windows 177/177 fp 746/745 (extra fp after the segment = next window, not checked) frames_done 745  mismatches: fp 0 win 0 world_words 0  mem rd 901151 wr 901151  cycles 39552733
+PASS

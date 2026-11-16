@@ -1,0 +1,417 @@
+[
+  {
+    "path": "RESULTS.json",
+    "bytes": 3300,
+    "sha256": "2d994a5cf5c87b853ff8eb70dd5c9b5805e2c8700fecd8a1f5e502577f2f4b6d"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/CLOCK.txt",
+    "bytes": 26,
+    "sha256": "c8bb49f38026f0c040e8f2a4e080acd28746ff87fd80f79dbf88de7a6caecf2b"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/EXIT",
+    "bytes": 2,
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/FINISHED",
+    "bytes": 25,
+    "sha256": "6b19a194ca3c4ff011af38c32f198261b3bbbde042d604b4df6ead3b4e2f417f"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/SHA256.txt",
+    "bytes": 1066,
+    "sha256": "beb81df4b7b14bc57be71b73e1e70d7e2716bd97dee69d5c86ef8868f745ef7e"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/STARTED",
+    "bytes": 25,
+    "sha256": "e7938cd2534a5bbaa5ae3d8a33cf9ded08a3e912546b14664531a3b4a7235ef6"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/SUMMARY.txt",
+    "bytes": 207,
+    "sha256": "8290133f8e13007f14488b17c79d0f48f99c4144d533cfc0b6bb59d786c6f550"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/WALL_SECONDS",
+    "bytes": 4,
+    "sha256": "e4df891c484d7abb985dadf539fa1883a646dab6337af5cae4159c587b7050cc"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/sdf.log",
+    "bytes": 141906,
+    "sha256": "2ff70df6a3f29b2fb6c22d9cf3fb2455a9e33eb70819b97f4626eaa3ccaf025d"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/tb_run.sv",
+    "bytes": 299616,
+    "sha256": "6aab825eac497f08c2f1bce1cef9a43ba6b50c4bea899c39f776c466eaad6715"
+  },
+  {
+    "path": "gate/pan_B_MAXIMUM/xrun.log",
+    "bytes": 301924,
+    "sha256": "6f7b6a33c57c028357dc0e4dd6565b6287d4057c0907db659c620ec0f9d55717"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/CLOCK.txt",
+    "bytes": 26,
+    "sha256": "c8bb49f38026f0c040e8f2a4e080acd28746ff87fd80f79dbf88de7a6caecf2b"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/EXIT",
+    "bytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/FINISHED",
+    "bytes": 25,
+    "sha256": "89f40ad7075759a611e8f9f98f3c07edd99b5cc9cc897acc8974e861e94b56ab"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/SHA256.txt",
+    "bytes": 1066,
+    "sha256": "beb81df4b7b14bc57be71b73e1e70d7e2716bd97dee69d5c86ef8868f745ef7e"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/STARTED",
+    "bytes": 25,
+    "sha256": "e7938cd2534a5bbaa5ae3d8a33cf9ded08a3e912546b14664531a3b4a7235ef6"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/SUMMARY.txt",
+    "bytes": 180,
+    "sha256": "4bfa3204ca120dc2d7b29e849be162c7a868305d4ec27d678d1ebf2475dec977"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/WALL_SECONDS",
+    "bytes": 4,
+    "sha256": "dbf95f7435bcafd288ad6b6183f67a47dbdb3d0e8bf3af7d5be76debd3ffb9e6"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/sdf.log",
+    "bytes": 286056,
+    "sha256": "55236d8280aa7de98159d51566e66a72f52815ba5b1e83b391f4d2684f40317d"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/tb_run.sv",
+    "bytes": 299616,
+    "sha256": "6aab825eac497f08c2f1bce1cef9a43ba6b50c4bea899c39f776c466eaad6715"
+  },
+  {
+    "path": "gate/pan_B_MINIMUM/xrun.log",
+    "bytes": 445788,
+    "sha256": "bacd17b312943731a0340833b4898651c9161ee07b974b4a51f640cc390fb4ff"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/CLOCK.txt",
+    "bytes": 26,
+    "sha256": "c8bb49f38026f0c040e8f2a4e080acd28746ff87fd80f79dbf88de7a6caecf2b"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/EXIT",
+    "bytes": 2,
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/FINISHED",
+    "bytes": 25,
+    "sha256": "8756b40540dc440efaee761dd64600f4c45947c4ebe0e754a729885ba22641bd"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/SHA256.txt",
+    "bytes": 1070,
+    "sha256": "7b1cb29cc722c54b13fc0f1555486c1e3b3ee9f2e8167ed0361e51b2b5b4e9bb"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/STARTED",
+    "bytes": 25,
+    "sha256": "e7938cd2534a5bbaa5ae3d8a33cf9ded08a3e912546b14664531a3b4a7235ef6"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/SUMMARY.txt",
+    "bytes": 210,
+    "sha256": "4afce2ab8eb40365eb740a56e5f2d012f4ed985791927470e944c6d4b1e40017"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/WALL_SECONDS",
+    "bytes": 5,
+    "sha256": "88ed9f64c2abf5c7ecf1e8959673f71322716e15ee7f310a5bd40ed8b058cf6a"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/sdf.log",
+    "bytes": 141906,
+    "sha256": "2ff70df6a3f29b2fb6c22d9cf3fb2455a9e33eb70819b97f4626eaa3ccaf025d"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/tb_run.sv",
+    "bytes": 299616,
+    "sha256": "6aab825eac497f08c2f1bce1cef9a43ba6b50c4bea899c39f776c466eaad6715"
+  },
+  {
+    "path": "gate/roll_B_MAXIMUM/xrun.log",
+    "bytes": 302038,
+    "sha256": "3a40f2aca9b7df1188da1f58187503c5ebb1945c05126478c4aed48d0c167eb2"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/CLOCK.txt",
+    "bytes": 26,
+    "sha256": "c8bb49f38026f0c040e8f2a4e080acd28746ff87fd80f79dbf88de7a6caecf2b"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/EXIT",
+    "bytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/FINISHED",
+    "bytes": 25,
+    "sha256": "c098e71a38845a07b6bbeae0633909c8d4f82e6ed2b777977affdfe8755a04c6"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/SHA256.txt",
+    "bytes": 1070,
+    "sha256": "7b1cb29cc722c54b13fc0f1555486c1e3b3ee9f2e8167ed0361e51b2b5b4e9bb"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/STARTED",
+    "bytes": 25,
+    "sha256": "e7938cd2534a5bbaa5ae3d8a33cf9ded08a3e912546b14664531a3b4a7235ef6"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/SUMMARY.txt",
+    "bytes": 183,
+    "sha256": "2cf1eab9a9f3e4e26ecd0e58c912df08606a2189bc67ca0a388527f811756479"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/WALL_SECONDS",
+    "bytes": 5,
+    "sha256": "637275ef2891daaca98b24dab4598f154bb2de669812cdeb4057f576286af29e"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/sdf.log",
+    "bytes": 286056,
+    "sha256": "55236d8280aa7de98159d51566e66a72f52815ba5b1e83b391f4d2684f40317d"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/tb_run.sv",
+    "bytes": 299616,
+    "sha256": "6aab825eac497f08c2f1bce1cef9a43ba6b50c4bea899c39f776c466eaad6715"
+  },
+  {
+    "path": "gate/roll_B_MINIMUM/xrun.log",
+    "bytes": 445902,
+    "sha256": "f5c4e7989031a0a930f766773fc1c3708c09e97dd896992f76a0c4a454c73344"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/CLOCK.txt",
+    "bytes": 26,
+    "sha256": "c8bb49f38026f0c040e8f2a4e080acd28746ff87fd80f79dbf88de7a6caecf2b"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/EXIT",
+    "bytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/FINISHED",
+    "bytes": 25,
+    "sha256": "f547cf0f2397a493b7d7cb86d9d428babf3fa18ee4e876e8d5a6713fec6b0e0c"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/SHA256.txt",
+    "bytes": 1082,
+    "sha256": "603cffae6b32a8fe6ad25032e25f4925576be1b7c6c2bd5f969c58203416d8d5"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/STARTED",
+    "bytes": 25,
+    "sha256": "8f35f905ccdbfbb3d6c8ac9423889df73c15e919ac5cc23d1d0932fddbe16532"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/SUMMARY.txt",
+    "bytes": 276,
+    "sha256": "1a6a3233dbc5eda1ab75ae6889fe0aefe7169add38807164126dfeca316c0add"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/WALL_SECONDS",
+    "bytes": 6,
+    "sha256": "00c9b5ed60d7eb5881fecc93d0024b7f5fc06cb684ddd4a9117c13b2a9819c7c"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/sdf.log",
+    "bytes": 286056,
+    "sha256": "55236d8280aa7de98159d51566e66a72f52815ba5b1e83b391f4d2684f40317d"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/tb_run.sv",
+    "bytes": 300472,
+    "sha256": "d979d2cb75cc97cb9130e2f6721f3e633c8ff46c03e5f54b12db1c7bfbfb900c"
+  },
+  {
+    "path": "gate/roll_r1_MINIMUM/xrun.log",
+    "bytes": 448251,
+    "sha256": "60fa546c1ef4ac4c6808de74a838273f1ca99a2a21d5a84df8940da43162c864"
+  },
+  {
+    "path": "lec/lec2.log",
+    "bytes": 6151,
+    "sha256": "f5d39c715fecac3bec88a78811c5b00ad25230e0cf4d80299bab4c98abdeb551"
+  },
+  {
+    "path": "lec/lec2_synthesis.log",
+    "bytes": 6141,
+    "sha256": "0987862f31596b437c495ce4652ac1d786ec45099e2c15553e03db1e9eae2fed"
+  },
+  {
+    "path": "lec/rtl_to_fv_map.log",
+    "bytes": 192709,
+    "sha256": "54877b7932fee60dad13650f2dfb9140765aaf20aaa023e2cf8d70220f4476a8"
+  },
+  {
+    "path": "logs/lec_final3.log",
+    "bytes": 274,
+    "sha256": "ce7b4eced174bb6a6656ec6cc6e26703adbe5d8ab17c682a8bd09994a44da79e"
+  },
+  {
+    "path": "logs/lec_synthesis.log",
+    "bytes": 775,
+    "sha256": "93b25e80f39b9a61d75b28bdf178fd03f6aa72fbcc958432da223fb4be3f2e10"
+  },
+  {
+    "path": "logs/pnr.log",
+    "bytes": 484,
+    "sha256": "44a599147f59cedb57ddab55538a132bfd4f9bbc9a0a8041cb60dc6947b90477"
+  },
+  {
+    "path": "logs/rtl_regression_final.log",
+    "bytes": 2761,
+    "sha256": "5a84858f8764e901958bae9b145d322fdc1f5a2b77b01585f9f540434dac8225"
+  },
+  {
+    "path": "logs/signoff3.log",
+    "bytes": 282,
+    "sha256": "55222071f420a08d35cc66a55f4262883fc98d81adb9c176a1fa0ba84f974e30"
+  },
+  {
+    "path": "logs/stage2.log",
+    "bytes": 88,
+    "sha256": "86fba0a8fe7eee4de72a47a409fc24ad06a267fb1ae34d94af1e06b1402a66b1"
+  },
+  {
+    "path": "logs/stage2b.log",
+    "bytes": 39,
+    "sha256": "161c693e95b52bb62e2fdbe1f4a4162a06893bf8a5de9e199d71003862be5053"
+  },
+  {
+    "path": "logs/synthesis.log",
+    "bytes": 405,
+    "sha256": "ad4a3101cbb173d8c59dea4cbf688784a4e43e662e2f5bb2216cdde65f3dc13f"
+  },
+  {
+    "path": "physical/antenna_final3.rpt",
+    "bytes": 340,
+    "sha256": "74627d24285967a751e1af37eb8901114231e140845c60efc6b402e3b59ec144"
+  },
+  {
+    "path": "physical/area_final3.rpt",
+    "bytes": 170436,
+    "sha256": "37a012547b5d40cfaf99939dde924af9999d75592ba7e94bba5275924243da21"
+  },
+  {
+    "path": "physical/checkplace3.rpt",
+    "bytes": 393,
+    "sha256": "56dc5a35fb2ba9b7570224a9a4552717fce880460d4c76b41babe14c60ea5719"
+  },
+  {
+    "path": "physical/conn_final3.rpt",
+    "bytes": 15486,
+    "sha256": "5c8e7479c8f8118ce469855dc514b6f6bd25f988f8d88a5c27ad59947f42ec0b"
+  },
+  {
+    "path": "physical/drc_final3.rpt",
+    "bytes": 1699,
+    "sha256": "c286c8b9b7a0870e8f7c76f285d2001849b541a12f984c361dd7b2debee2cf68"
+  },
+  {
+    "path": "physical/pin_placement.txt",
+    "bytes": 34587,
+    "sha256": "c279635c6048ff5527b47e3e44fe3fb545ab6ed1199dc4e46dcda4bd0bfbdb67"
+  },
+  {
+    "path": "physical/signoff_hold3.rpt",
+    "bytes": 9262,
+    "sha256": "85fc2d25cd13b2a08dd830a511eca3424eb7d496826b9a201cdba7ae90f2328b"
+  },
+  {
+    "path": "physical/signoff_hold3_summary.txt",
+    "bytes": 1191,
+    "sha256": "ed03fbef9986cb7819364734bada8997ceed234986558aa1d71ce4cb527cb367"
+  },
+  {
+    "path": "physical/signoff_power3_80.rpt",
+    "bytes": 4609,
+    "sha256": "a3dd806ae786f28172c183f8b06f7a362601d1284e2dce2f73ef37d7a10cb315"
+  },
+  {
+    "path": "physical/signoff_setup3.rpt",
+    "bytes": 17537,
+    "sha256": "bdffa4ea68f54cc63c5822feb780bd3f982c3a2753f20da2725a2f09c23d0f83"
+  },
+  {
+    "path": "physical/signoff_setup3_summary.txt",
+    "bytes": 1925,
+    "sha256": "9c26197d487fc977090cd81cc737d5f659c8187ead4e5ba779f66e06dd864774"
+  },
+  {
+    "path": "provenance/FINAL3_SHA256.txt",
+    "bytes": 280,
+    "sha256": "0f0b4cc7dc1a63c5c3489175b1eed7bf2d1293bb20d9109f234d48925d2de5b7"
+  },
+  {
+    "path": "provenance/RTL_SHA256.txt",
+    "bytes": 1178,
+    "sha256": "eee76840fec6ab3587156501f5823deb55b68a37c0d79aa3cbabc69b879e2fcb"
+  },
+  {
+    "path": "provenance/SOURCE_COMMIT.txt",
+    "bytes": 41,
+    "sha256": "a93008ee260862e2827d3f1106c617e1098292bd76c050736d971a2823305c04"
+  },
+  {
+    "path": "provenance/STAGE1_SPEC.md",
+    "bytes": 5310,
+    "sha256": "f18ebfbbdb011762733845d4541289881d6a3c3e7033060ed30b426b005a3915"
+  },
+  {
+    "path": "provenance/SYN_SHA256.txt",
+    "bytes": 188,
+    "sha256": "da8fe17f8db5b2bb1069b122a0b1b0ab9f669e0b55a5f491c0102f5add1e5738"
+  },
+  {
+    "path": "synthesis/area.rpt",
+    "bytes": 1680,
+    "sha256": "0db9b00e3cf892c4e483a7a13da0f99eb5518fb8481fe6c161425f1cac9368c9"
+  },
+  {
+    "path": "synthesis/chip_s_full.sdc",
+    "bytes": 300490,
+    "sha256": "8122208875fd20bb566ff73906342fe9ec9d36506d85127be92f867187dc6af8"
+  },
+  {
+    "path": "synthesis/gates.rpt",
+    "bytes": 9565,
+    "sha256": "09d206d727a3357551f620f0c1e8a78cc323343ff50355491d020dbb20dabe32"
+  },
+  {
+    "path": "synthesis/power.rpt",
+    "bytes": 1205,
+    "sha256": "d8f28e771dc1c0edbea430c67446f1e08c547fa0124a724f8ffdfc01900459b8"
+  },
+  {
+    "path": "synthesis/timing.rpt",
+    "bytes": 9949,
+    "sha256": "5c165105b54bea560797eb9b5e35a77ae349c5b2c12840eff871c8d52b15ee34"
+  }
+]
