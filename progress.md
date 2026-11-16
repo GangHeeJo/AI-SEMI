@@ -4229,3 +4229,12 @@ blink 활동도 전력(`syn/run_genus_blink_power.tcl`, tb_blink 유휴 6000 VCD
 **한계(보고서 그대로)**: 물리 NOT_CLEAN(위 DRC·transition·glitch·코어 밖 9개), 전력은 매크로 내부전력 없는 벡터리스 값이라 에너지 개선 근거 아님, 보정 피벗의 기하 정확도(ECC)는 측정하지 않음, roll_r1 MAX·pan_r1·roll_r0 게이트는 미실행, 재보정/후속 보정 등 추가 설계 없음. 새 칩의 setup 여유(+0.169, 최악 경로는 입력 dbg_en->메모리 뱅크 addr)는 기존 job25(+2.406)보다 작음.
 **이 문서 §237과의 관계**: §237의 "자기보정 RTL 미착수·MAX TIMEOUT 규명 우선" 계획은 이 별도 세션 결과로 대체됨(외부에서 계산한 피벗을 cfg로 넣는 방식이 아니라 칩이 스스로 피벗을 구해 공표하는 새 넷리스트에서 검증). 단 §237의 기존 칩(job25)+보정 피벗 MAX TIMEOUT 원인은 여전히 미규명. 제출물(칩 S 원본 기준 덱·영상)은 변경 없음.
 **저장소 반영**: `selfcal_chipS/`에 selfcal-phys 브랜치의 selfcal/(스크립트·물리 흐름·증거 요약), rtl/(chip_s_full, est_core, est_selfcal, est_top), tb/ 3개를 복사(120 파일, 2.5 MB; PDK·바이너리 없음). 서버 클론의 origin이 현수 폴더(`hyunsu_round2/code`)라서 그 클론에서는 push하지 않음.
+
+
+## 239. 새 칩(selfcal final3) 추가 게이트 시뮬: roll_r1 MAX, pan_r1 MIN (2026-11-16)
+
+**실행**: `~/redred_gate_ext/`(새 폴더, 기존 산출물 미변경). `gate_ext.sh`는 `run_gate_case.sh`와 같은 TB·netlist(chip_s_full_pnr3.v)·SDF(chip_s_full3_signoff.sdf)·xrun 명령이고 허용 케이스와 출력 폴더만 다름. 시작 09:47, 3건 동시.
+**roll_r1 MAX (29,554 s = 8.2 h)**: 177/177 윈도우, 745프레임, 39,552,733 사이클, 불일치 fp 0 / win 0 / world 0, SELFCAL_FINAL state 2 res 1 N 89 r2q10 989 u(9,35) pivot (489,395) seen_pub 1 errors 0, PASS. 정지 없음(기존 칩 job25+보정 피벗 벡터에서 MAX가 멈추던 현상은 이 칩에서 재현되지 않음). MAX 시작 구간 setup 경고 1건은 legacy MAX와 동일(7654 ps, u_dec_RC_CG_HIER_INST0 E->CK, 108 ps 요구/92 ps 확보). 즉 roll_r1은 MIN, MAX 모두 기능 통과, MAX는 timing-clean 아님.
+**pan_r1 MIN (23,479 s = 6.5 h)**: 러너 판정 FAIL(errors 1). 데이터 경로는 fp 0 / win 0 / world 0 불일치, 953프레임, 40,023,323 사이클. 최종 상태는 state 3 res 2(r2low) N 131 r2q10 763 u(-746,4587) pivot (0,0)이고 기대 벡터(exp_sol.hex)와 값이 모두 일치(내가 hex를 직접 해독해 대조). 유일한 불일치는 TB의 `!seen_pub` 검사: pan_r1은 설계상 피벗이 승인되지 않아(r2 0.75 미달) 공표가 없는데 TB는 공표를 요구함. 즉 판정 FAIL의 원인은 TB 검사 조건이며, 칩 출력이 기대와 달랐던 것은 아님. TB는 수정하지 않았고 이 사실을 결과에 그대로 남김.
+**pan_r1 MAX**: 진행 중(18:02 기준 8h14m 경과, 예상 18~19시 완료). 완료 후 §240에 추가.
+**주의**: pan은 자기보정이 승인되지 않고 3-DOF를 유지(r2q10 763 < 임계). ECC 정확도 측정은 정답 `roll_ecc.npy`가 서버에 없어 미실시.
