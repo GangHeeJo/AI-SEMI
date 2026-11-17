@@ -1,0 +1,4 @@
+events 42448178 frames 1001
+ran 4s windows 215 mode rot1 calib {'min_ev': 967, 'u': [6.475144873304827, -48.39994193929465], 'r2': 0.9935719979940291, 'R': 48.83115686585132, 'windows': 88, 't_std': 10.795018092978884, 'mode': 'rot1'}
+FLOAT slope vs u_float(-5.4,54.5): -1.220 corr -0.976  (windows 88/88; th slope -1.388)
+FLOAT slope vs u_ecc(-10.3,57.2): -1.140 corr -0.968  (windows 88/88; th slope -1.388)
