@@ -2,3 +2,7 @@ REAL roll d_t=32 result=accept pub_win=156 Q=(489,395) R=36.1 N=89 dist_to_ECC=2
 REAL pan d_t=32 result=r2low pub_win=142 Q=(-11,2937) R=2623.4 N=124 dist_to_ECC=2565.2
 REAL roll d_t=16 result=accept pub_win=157 Q=(481,391) R=31.0 N=90 dist_to_ECC=28.5
 REAL pan d_t=16 result=r2low pub_win=155 Q=(34,2544) R=2229.1 N=137 dist_to_ECC=2171.0
+SYNTH single d_t=32 accept 12/12 x mean -1.0 med|.| 1.0 max|.| 4; y mean -0.7 med|.| 2.0 max|.| 3
+SYNTH single d_t=16 accept 12/12 x mean -0.5 med|.| 1.0 max|.| 3; y mean -1.1 med|.| 1.5 max|.| 3
+SYNTH depth d_t=32 accept 12/12 x mean -9.8 med|.| 9.5 max|.| 16; y mean +7.6 med|.| 7.0 max|.| 22
+SYNTH depth d_t=16 accept 12/12 x mean -6.1 med|.| 9.5 max|.| 18; y mean +3.0 med|.| 4.5 max|.| 19

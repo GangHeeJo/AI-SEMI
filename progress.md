@@ -4324,3 +4324,13 @@ roll_r0 게이트는 실행하지 않음. ECC 정확도는 정답 `roll_ecc.npy`
 **배경**: pan_r1 게이트 시뮬은 데이터 경로 불일치 0, 최종 상태가 기대값(exp_sol.hex)과 같았으나 TB의 `!seen_pub` 조건 때문에 FAIL로 찍혔음(pan은 r2<0.9라 설계상 공표하지 않음). roll_r0는 미실행이었음.
 **수정(TB 확인 조건만, 칩·SDF·벡터 불변)**: `gate_selfcal.sv` 3766행 `|| !seen_pub` -> `|| (seen_pub !== (cfg[58][1:0] == 2'd2))`. 기대 최종 상태가 ROT1(2)일 때만 공표를 요구하고, 그 외(pan: 상태 3)에서는 공표가 없어야 통과로 바꿈(공표했는데 기대 상태가 아니면 오히려 실패). 원본 TB는 수정하지 않고 사본 `~/redred_gate_ext/tb_fix/gate_selfcal_fix.sv`(저장소 `selfcal_chipS/results_server/gate_fix/`)를 사용.
 **실행(2026-11-17 12:22 KST 시작, 서버 `~/redred_gate_ext/fix_<case>`)**: roll_r0 MIN, pan_r1 MIN, pan_r1 MAX(8 ns, chip_s_full_pnr3.v + chip_s_full3_signoff.sdf, 해시는 각 SHA256.txt). 이전 동일 케이스는 MIN 약 6.5시간, MAX 약 9.6시간. 결과는 완료 후 기록.
+
+
+## 249. d_t=16 검증: 사전 기준 1 미달로 채택하지 않음 (2026-11-17)
+
+**사전 등록**: `PREREG_pivot_bias.md` "d_t=16 검증"(커밋 041f1eb). 스크립트 `selfcal_chipS/selfcal/sc_dt_eval.py`, 로그 `selfcal_chipS/results_server/trans/log_dt_eval.txt`. 정수 부트스트랩(key_w=4, retry=1), d_t 32 대 16.
+**실영상 roll**: d_t=32 피벗 (489,395) R 36.1 거리 29.4 px(재현), d_t=16 피벗 (481,391) R 31.0 거리 **28.5 px**. 기준 1(24 px 이하) **미달**.
+**실영상 pan**: 둘 다 r2low(공표 안 함, 현재 동작 유지) -> 기준 2 통과.
+**단일 깊이 합성(12건)**: d_t=32 x 중앙 절대 1.0 / y 2.0, d_t=16 x 1.0 / y 1.5 (모두 12/12 accept, 최대 4 px 이하) -> 기준 3 통과.
+**다중 깊이 합성(보고만)**: d_t=32 x -9.8 y +7.6 (중앙 절대 9.5/7.0), d_t=16 x -6.1 y +3.0 (9.5/4.5). d_t=16이 y 방향 편향을 줄이나 x 중앙 절대값은 그대로.
+**판정**: 기준 1 미달이므로 d_t=16 채택 안 함, 현행 d_t=32 유지. 병진 탐색 간격은 §244 기울기(0.59->0.72)를 일부 개선하지만 실영상 피벗 위치 오차(약 28 px)를 거의 바꾸지 못함. 이로써 설정값만으로 시험 가능한 후보(d_t, key_w)는 모두 소진했고, 칩 피벗 어긋남의 원인은 여전히 미규명.
