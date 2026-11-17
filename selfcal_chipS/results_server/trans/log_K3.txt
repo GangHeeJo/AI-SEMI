@@ -1,0 +1,6 @@
+win 50 f 201 0s
+win 100 f 529 1s
+win 150 f 929 2s
+win 200 f 1329 3s
+win 250 f 1729 5s
+RESULT K3 d_t=32 score_windows=224 matched=223 slope=0.661 corr=0.528 th_slope=0.465

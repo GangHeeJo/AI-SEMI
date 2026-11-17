@@ -1,0 +1,4 @@
+REAL roll d_t=32 result=accept pub_win=156 Q=(489,395) R=36.1 N=89 dist_to_ECC=29.4
+REAL pan d_t=32 result=r2low pub_win=142 Q=(-11,2937) R=2623.4 N=124 dist_to_ECC=2565.2
+REAL roll d_t=16 result=accept pub_win=157 Q=(481,391) R=31.0 N=90 dist_to_ECC=28.5
+REAL pan d_t=16 result=r2low pub_win=155 Q=(34,2544) R=2229.1 N=137 dist_to_ECC=2171.0

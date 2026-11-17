@@ -1,0 +1,8 @@
+d979d2cb75cc97cb9130e2f6721f3e633c8ff46c03e5f54b12db1c7bfbfb900c  tb_run.sv
+3efbaebffef53ff8f1dc2bf589c504260c45cc2f53b8421fa1b62acb8dfdf336  /home/aiasic26911/selfcal_20261115/phys/full_8.0/pnr/chip_s_full_pnr3.v
+d395e34ea2c28dcc9faeeb50360fc261d50d23b12ce141ab71ec26e1c2902b72  /home/aiasic26911/selfcal_20261115/phys/full_8.0/pnr/chip_s_full3_signoff.sdf
+bfbfa6970166bfcd15f158fee22f1258a6d040426c876e61738ff2c28452d2e3  /home/aiasic26911/selfcal_20261115/phys/rtl/mem_bank_8k.sv
+17881e2869c63915ba48c75ec8ecdf6292a4c43823d97f7c74ed5f6770ebba42  /home/aiasic26911/selfcal_20261115/phys/../code/selfcal/out/vec/roll_r1/cfg.hex
+4500bcbf608fde036af95e761d6116b0197f4c0bf70c46a2faad70ef2895feef  /home/aiasic26911/selfcal_20261115/phys/../code/selfcal/out/vec/roll_r1/exp_fp.hex
+518b7d329e928acb22ccc0e0e7d1be1043a8c938782053be3cc861affad413e0  /home/aiasic26911/selfcal_20261115/phys/../code/selfcal/out/vec/roll_r1/exp_win.hex
+e21598b89d944490ac8074bf0be112290036887bec572057ea6e7d3ed0f1eaa9  /home/aiasic26911/selfcal_20261115/phys/../code/selfcal/out/vec/roll_r1/mem_final_w.hex

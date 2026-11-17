@@ -1,0 +1,6 @@
+Warning!  Timing violation
+Warning!  Timing violation
+SELFCAL_FINAL state 3 res 2 N 131 r2 763 u (-746,4587) pivot (0,0) seen_pub 0 errors 1
+RESULT windows 160/160 fp 954/953 (extra fp after the segment = next window, not checked) frames_done 953  mismatches: fp 0 win 0 world_words 0  mem rd 2626110 wr 2626110  cycles 40023323
+xmsim: *F,FATSEV (./tb_run.sv,3772): (time 320186581 NS).
+FAIL

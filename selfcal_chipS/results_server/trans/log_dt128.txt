@@ -1,0 +1,10 @@
+win 50 f 201 0s
+win 100 f 437 1s
+win 150 f 637 1s
+win 200 f 837 2s
+win 250 f 1053 3s
+win 300 f 1417 4s
+win 350 f 1617 5s
+win 400 f 1817 6s
+win 450 f 2017 6s
+RESULT d_t=128 score_windows=394 matched=393 slope=0.228 corr=0.604 th_slope=0.986

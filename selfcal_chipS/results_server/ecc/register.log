@@ -1,0 +1,16 @@
+windows 514, registered 440, median ECC corr 0.978
+total roll 323.1 deg; skipped windows (low events) 74
+angular vel deg/s: median |w| 215, p95 482, max 511
+      3 ms  theta      0.0  dth    nan  t=(   nan,   nan)px  cc nan  n 3342
+    126 ms  theta      0.0  dth    nan  t=(   nan,   nan)px  cc nan  n 3072
+    250 ms  theta      2.3  dth   0.28  t=(   1.9,  -2.3)px  cc 0.97  n 104052
+    373 ms  theta     28.3  dth   0.84  t=(   5.9,  -6.9)px  cc 0.98  n 175519
+    496 ms  theta     77.9  dth   1.49  t=(  10.8, -12.0)px  cc 0.98  n 267292
+    620 ms  theta    136.6  dth   1.47  t=(  10.9, -11.7)px  cc 0.98  n 287344
+    744 ms  theta    191.6  dth   1.10  t=(   8.1,  -8.9)px  cc 0.98  n 236432
+    867 ms  theta    201.0  dth   0.03  t=(   0.1,  -0.1)px  cc 0.76  n 17825
+    991 ms  theta    202.7  dth   0.08  t=(   0.6,  -0.7)px  cc 0.95  n 44777
+   1114 ms  theta    217.9  dth   0.66  t=(   4.8,  -5.4)px  cc 0.98  n 190797
+   1237 ms  theta    257.9  dth   1.04  t=(   7.7,  -8.5)px  cc 0.98  n 208689
+   1360 ms  theta    281.1  dth   0.47  t=(   3.4,  -3.8)px  cc 0.98  n 129082
+   1483 ms  theta    304.1  dth   0.61  t=(   4.4,  -5.5)px  cc 0.98  n 163986

@@ -1,0 +1,10 @@
+roll key_w=4 windows=462 state=2 result=accept pub_win=156 pivot=(489, 395) mode=roll (3s)
+   Q_est=489,395 u=(8.8,35.3) R=36.3 r2=0.966 N=89 dist_to_ECC=29.0px
+Traceback (most recent call last):
+  File "sc_nokey_eval.py", line 24, in <module>
+    GT = G.EstGT(ds, 12); fe = G.DS[ds]['f_eval']; gq = np.array([GT.at(k)[0] for k in range(st.nf)]); m = np.arange(st.nf) >= fe
+  File "/home/aiasic26911/redred_gate_ext/results/job6_golden.py", line 292, in __init__
+    a = np.load(ROOT / ('data/roll_ecc.npy' if ds == 'roll' else 'data/pan_ecc_0915.npy'))
+  File "/tools/Siemens/aoj_cal_2023.4_17.10/pkgs/icv_python/asp/lib/python3.8/site-packages/numpy/lib/npyio.py", line 416, in load
+    fid = stack.enter_context(open(os_fspath(file), "rb"))
+FileNotFoundError: [Errno 2] No such file or directory: '/home/aiasic26911/selfcal_20261115/code/data/roll_ecc.npy'

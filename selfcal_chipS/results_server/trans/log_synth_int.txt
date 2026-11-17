@@ -1,0 +1,26 @@
+G1 s0 key_w=4 mir=True accept Q=(428,357) true=(430,360) err=(-2.0,-3.0) R=51.1 N=59
+G1 s0 key_w=0 mir=True accept Q=(417,349) true=(430,360) err=(-13.0,-11.0) R=63.0 N=58
+G1 s1 key_w=4 mir=True accept Q=(429,357) true=(430,360) err=(-1.0,-3.0) R=50.1 N=60
+G1 s1 key_w=0 mir=True accept Q=(412,344) true=(430,360) err=(-18.0,-16.0) R=68.9 N=57
+G1 s2 key_w=4 mir=True accept Q=(430,357) true=(430,360) err=(+0.0,-3.0) R=49.1 N=60
+G1 s2 key_w=0 mir=True accept Q=(417,355) true=(430,360) err=(-13.0,-5.0) R=62.2 N=59
+G2 s0 key_w=4 mir=True accept Q=(476,422) true=(480,420) err=(-4.0,+2.0) R=62.1 N=59
+G2 s0 key_w=0 mir=True accept Q=(454,401) true=(480,420) err=(-26.0,-19.0) R=48.0 N=60
+G2 s1 key_w=4 mir=True accept Q=(478,422) true=(480,420) err=(-2.0,+2.0) R=62.0 N=59
+G2 s1 key_w=0 mir=True accept Q=(450,398) true=(480,420) err=(-30.0,-22.0) R=47.8 N=59
+G2 s2 key_w=4 mir=True accept Q=(478,420) true=(480,420) err=(-2.0,+0.0) R=60.0 N=59
+G2 s2 key_w=0 mir=True accept Q=(468,437) true=(480,420) err=(-12.0,+17.0) R=77.8 N=57
+G3 s0 key_w=4 mir=True accept Q=(524,325) true=(525,325) err=(-1.0,+0.0) R=57.0 N=59
+G3 s0 key_w=0 mir=True accept Q=(504,326) true=(525,325) err=(-21.0,+1.0) R=42.2 N=102
+G3 s1 key_w=4 mir=True accept Q=(524,323) true=(525,325) err=(-1.0,-2.0) R=58.3 N=59
+G3 s1 key_w=0 mir=True accept Q=(491,317) true=(525,325) err=(-34.0,-8.0) R=44.6 N=60
+G3 s2 key_w=4 mir=True accept Q=(526,323) true=(525,325) err=(+1.0,-2.0) R=59.8 N=59
+G3 s2 key_w=0 mir=True accept Q=(525,334) true=(525,325) err=(+0.0,+9.0) R=52.8 N=101
+G4 s0 key_w=4 mir=True accept Q=(359,451) true=(360,450) err=(-1.0,+1.0) R=150.6 N=52
+G4 s0 key_w=0 mir=True accept Q=(357,452) true=(360,450) err=(-3.0,+2.0) R=152.8 N=52
+G4 s1 key_w=4 mir=True accept Q=(361,451) true=(360,450) err=(+1.0,+1.0) R=149.0 N=52
+G4 s1 key_w=0 mir=True accept Q=(346,441) true=(360,450) err=(-14.0,-9.0) R=155.7 N=53
+G4 s2 key_w=4 mir=True accept Q=(360,449) true=(360,450) err=(+0.0,-1.0) R=148.6 N=52
+G4 s2 key_w=0 mir=True accept Q=(361,483) true=(360,450) err=(+1.0,+33.0) R=170.4 N=51
+SUMMARY key_w=4 n=12 x: mean -1.0 median|.| 1.0 same-sign 8/12; y: mean -0.7 median|.| 2.0
+SUMMARY key_w=0 n=12 x: mean -15.2 median|.| 13.5 same-sign 10/12; y: mean -2.3 median|.| 10.0

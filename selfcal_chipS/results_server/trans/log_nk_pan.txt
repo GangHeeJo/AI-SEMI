@@ -1,0 +1,4 @@
+pan key_w=4 windows=430 state=3 result=r2low pub_win=149 pivot=(480, 360) mode=3d (7s)
+   Q_est=-266,4947 u=(-746.3,4586.5) R=4646.9 r2=0.746 N=131 dist_to_ECC=4588.8px
+pan key_w=0 windows=432 state=3 result=r2low pub_win=138 pivot=(480, 360) mode=3d (7s)
+   Q_est=-98,3132 u=(-578.0,2771.6) R=2831.2 r2=0.791 N=120 dist_to_ECC=2773.1px

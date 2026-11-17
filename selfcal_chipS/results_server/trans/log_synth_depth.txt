@@ -1,0 +1,13 @@
+G1 s0 accept Q=(424,357) true=(430,360) err=(-6.0,-3.0) R=55.1 true R=50.0 ratio=1.10
+G1 s1 accept Q=(419,357) true=(430,360) err=(-11.0,-3.0) R=60.1 true R=50.0 ratio=1.20
+G1 s2 accept Q=(422,354) true=(430,360) err=(-8.0,-6.0) R=57.3 true R=50.0 ratio=1.15
+G2 s0 accept Q=(472,426) true=(480,420) err=(-8.0,+6.0) R=66.4 true R=60.0 ratio=1.11
+G2 s1 accept Q=(470,428) true=(480,420) err=(-10.0,+8.0) R=68.6 true R=60.0 ratio=1.14
+G2 s2 accept Q=(478,432) true=(480,420) err=(-2.0,+12.0) R=72.0 true R=60.0 ratio=1.20
+G3 s0 accept Q=(514,319) true=(525,325) err=(-11.0,-6.0) R=53.9 true R=57.0 ratio=0.95
+G3 s1 accept Q=(516,330) true=(525,325) err=(-9.0,+5.0) R=47.6 true R=57.0 ratio=0.84
+G3 s2 accept Q=(518,339) true=(525,325) err=(-7.0,+14.0) R=44.3 true R=57.0 ratio=0.78
+G4 s0 accept Q=(344,472) true=(360,450) err=(-16.0,+22.0) R=175.4 true R=150.0 ratio=1.17
+G4 s1 accept Q=(347,470) true=(360,450) err=(-13.0,+20.0) R=171.8 true R=150.0 ratio=1.15
+G4 s2 accept Q=(344,472) true=(360,450) err=(-16.0,+22.0) R=175.4 true R=150.0 ratio=1.17
+SUMMARY n=12 x mean -9.8 median|.| 9.5; y mean +7.6 median|.| 7.0; R ratio median 1.14, ratio<0.8: 1/12
