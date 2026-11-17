@@ -11,9 +11,9 @@ class FakeStream:
     def __init__(s, x, y, f): s.nf = int(f.max()) + 1; s.idx = np.argsort(f, kind='stable'); s.x = x[s.idx]; s.y = y[s.idx]; s.b = np.searchsorted(f[s.idx], np.arange(s.nf + 1))
     def frame(s, k): a, b = s.b[k], s.b[k + 1]; return s.x[a:b].astype(np.int64), s.y[a:b].astype(np.int64)
 
-def decide(x, y, f, key_w):
+def decide(x, y, f, key_w, dt=32):
     P = (W // 2, H // 2); sc = M.SelfCal(G.SW, P, P, P, retry=True)
-    est = M.EstSC('3d', G.SW, G.SH, P, [11, 32, 32], 2500, S=3, key_thr=[int(30 * U / 360), 2400, 2400], key_w=key_w, rot_t=True, sc=sc, wP=P, wO=P)
+    est = M.EstSC('3d', G.SW, G.SH, P, [11, dt, dt], 2500, S=3, key_thr=[int(30 * U / 360), 2400, 2400], key_w=key_w, rot_t=True, sc=sc, wP=P, wO=P)
     M.run(est, FakeStream(x, y, f)); return est, sc
 
 def main():
