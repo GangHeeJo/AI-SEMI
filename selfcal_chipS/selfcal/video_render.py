@@ -17,9 +17,15 @@ fs = ImageFont.truetype("C:/Windows/Fonts/malgun.ttf", 19)
 lut = (cm.magma(np.arange(256))[:, :3] * 255).astype(np.uint8)
 lut[0] = (14, 15, 24)
 
+_fin = world[-1].astype(np.float32); _m = _fin > 0
+LO, HI = np.percentile(_fin[_m], 20), np.percentile(_fin[_m], 99.7)
+gray_lut = (cm.gray(np.arange(256))[:, :3] * 255).astype(np.uint8)
+
 def world_img(w):
-    idx = np.minimum(w.astype(np.int32) * 17, 255)
-    return cv2.resize(lut[idx], None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST)
+    wf = w.astype(np.float32); msk = wf > 0
+    x = np.clip((cv2.GaussianBlur(wf, (0, 0), 0.8) - LO) / (HI - LO), 0, 1) ** 1.8
+    rgb = gray_lut[(x * 255).astype(np.uint8)]; rgb[~msk] = (14, 15, 24)
+    return cv2.resize(rgb, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
 
 def sens_img(s):
     nz = s[s > 0]; sc = 255.0 / max(float(np.percentile(nz, 97)) if nz.size else 1.0, 2.0)
@@ -41,6 +47,7 @@ for i in range(n + 2 * FPS):
     d.text((xb, 78), "② 칩이 쌓은 월드 지도 (밝을수록 많이 쌓임)", font=fm, fill=(255, 190, 140))
     d.text((xa, 120 + a.shape[0] + 12), "카메라가 돌면서 같은 물체가 계속 다른 자리에 찍힘", font=fs, fill=(170, 175, 190))
     d.text((xa, 120 + a.shape[0] + 40), "→ 각도를 추정해 되돌린 뒤 오른쪽 지도에 쌓음", font=fs, fill=(170, 175, 190))
+    d.text((700, 678), "※ 지도는 보기 좋게 약간 부드럽게 표시", font=fs, fill=(150, 155, 170))
     t_ms = ks[j] * 0.773
     d.text((40, 672), f"{t_ms:6.0f} ms   ·   프레임 {ks[j]}   ·   누적 회전 약 {abs(th[j]):.0f}°", font=fm, fill=(240, 240, 245))
     pw = 1200 * (j + 1) / n
