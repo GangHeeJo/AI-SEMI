@@ -4344,3 +4344,42 @@ roll_r0 게이트는 실행하지 않음. ECC 정확도는 정답 `roll_ecc.npy`
 **주의**: float와 정수는 병진 정의가 달라(정수 모델은 rot_t, 평면 좌표계로 회전한 병진) tx/ty 창별 직접 비교는 의미 없음(기울기 -0.34/-1.17 무의미).
 **구조 차이 확인**: 정수 모델에서 rot_t=False/True 모두 결과 동일((489,395) R 36.1; key_w=0이면 (495,402) R 44.6), 따라서 rot_t는 이 결과의 원인이 아님.
 **해석(주의)**: 병진 축소와 피벗 어긋남은 실데이터의 특성이 아니라 정수(칩) 추정기 파이프라인 쪽에 있다는 쪽으로 증거가 모임(float는 같은 실데이터에서 R 49, 상관 0.997, 피벗이 ECC 중심에 근접). 다만 float는 키프레임·정수 양자화·창 길이 처리 등 다른 구조라 정확한 원인 항목은 아직 미규명. 남은 구조 차이 후보: 정수 1비트 평면의 샘플 수·좌표 양자화(S=3 격자), 후보 간격이 각도에 종속(d=11), 키프레임 평면, 확률적 카운터 대신 1비트 지도.
+
+
+## 251. 게이트 시뮬 보강 실행 결과 (실행 2026-11-17, 확인 2026-11-24)
+
+**조건(§248과 동일)**: TB 확인 조건만 수정한 사본 `gate_selfcal_fix.sv`, 넷리스트 `chip_s_full_pnr3.v`, SDF `chip_s_full3_signoff.sdf`(8 ns, 클록 `always #4.0`), xrun 23.09. 해시는 각 `SHA256.txt`(앞 8자리: tb_run.sv 73248f12, 넷리스트 3efbaebf, SDF d395e34e, mem_bank_8k bfbfa697, pan_r1 벡터 cfg c99c9c33 / exp_fp 15443888 / exp_win 774e4c64 / mem_final_w dd7637d7). 증거 파일은 `selfcal_chipS/results_server/gate_fix/fix_<case>/`.
+
+| 케이스 | 결과 | 소요 | 타이밍 경고 |
+|---|---|---|---|
+| pan_r1 MINIMUM | **PASS** | 24,496 s (6.8 h) | 0건 |
+| pan_r1 MAXIMUM | **PASS** | 38,067 s (10.6 h) | 2건 (아래) |
+| roll_r0 MINIMUM | **미실행** (EXIT 1) | 즉시 종료 | - |
+
+**pan_r1 (MIN/MAX 공통 RESULT)**: windows 160/160, fp 954/953(구간 뒤 다음 창의 fp 1개, 검사 대상 아님), frames_done 953, 불일치 fp 0 / win 0 / world_words 0, 메모리 읽기 2,626,110 = 쓰기 2,626,110, 40,023,323 사이클. 칩 상태는 `SELFCAL_FINAL state 3 res 2 N 131 r2 763 u (-746,4587) pivot (0,0) seen_pub 0 errors 0`: pan은 r2가 0.9 미만(763/1024)이라 설계상 공표하지 않고 3자유도를 유지하며, 수정한 TB 조건(공표 유무가 기대 상태와 같을 때만 통과)에서 PASS. §248의 "pan은 데이터 경로 불일치 0이었으나 TB 조건 때문에 FAIL로 찍힘"이 TB 수정으로 PASS가 됨(칩·SDF·벡터 불변).
+**pan_r1 MAX 타이밍 경고 2건(출력 불일치는 없음)**: (1) 시작 7,654 ps, `u_est.u_dec_RC_CG_HIER_INST0.RC_CGIC_INST`(클록 게이트) setup, E가 CK보다 92 ps 앞서 도착(요구 108 ps). (2) 4,153,135,836 ps, `u_est.u_core.fAxy_reg[8]` setup, D가 CK보다 122 ps 앞서 도착(요구 125 ps). 둘 다 게이트 모델이 값을 x로 만들지 않았고 결과는 PASS. 단 MAX 코너에서 setup 여유 부족이 실제로 나타난 것이라 "MAX 코너 위반 0"이라고 말하면 안 됨. SDF 음수 지연 보정(SDFNDP) 로그는 MIN 500건, MAX 7건(원인 분석은 하지 않음).
+**roll_r0 MIN 미실행 원인**: 하네스(`gate_fix.sh`)가 시작 직후 `sha256sum`으로 `vec/roll_r0/mem_final_w.hex`를 읽는데 이 파일이 없어(`roll_r0` 벡터 폴더에는 exp_fp/exp_win 등은 있으나 mem_final_w.hex, wgrid.hex, world.json이 없음, roll_r1에는 있음) `set -e`로 중단. 시뮬 결과가 아니라 **벡터 준비 미완**이며 FAIL이 아님. roll_r0의 기대 최종 월드 메모리를 만드는 단계를 먼저 실행해야 재실행할 수 있음(미수행).
+**현재 게이트 시뮬 커버리지(새 칩, 8 ns)**: pan_r1 MIN/MAX PASS 확인, roll_r0 MIN 미실행, 그 외 케이스는 이전 기록(§248 이전) 참조. 새 칩 물리 상태는 NOT_CLEAN(DRC 11, max-transition 456넷, glitch 13, 코어 밖 9) 그대로.
+
+
+## 252. 칩 S 클록 게이팅과 메모리 뱅크 구조 확인 (넷리스트·RTL, 2026-11-24)
+
+대상 `~/hyunsu_round2/job25`(제출 칩). 읽기 전용 확인.
+- **RTL**: 월드 메모리는 `world_mem`(NB=16) 뱅크 × `mem_bank_8k`(128×64비트 = 8 kbit **플립플롭 레지스터 파일**, SRAM 아님). 뱅크 enable은 `req && bank == b`이고 `if (en)`일 때만 읽기/쓰기. 손으로 만든 래치+AND나 ICG 셀은 RTL에 없고, Genus `lp_insert_clock_gating`(`flow/genus*.tcl`, 환경변수 `CG=1`)이 자동 삽입.
+- **매크로 46개의 내용**: 월드 메모리 16개 + 추정기 평면 30개(평면 3장 × 76.8 kbit = 230.4 kbit)이며 모두 `mem_bank_8k`. 따라서 Q&A 초안의 "SRAM 매크로 46개" 표현은 "FF 기반 하드매크로 46개(월드 16 + 추정기 30)"로 고쳐야 함(미수정).
+- **넷리스트 `chip_s_full_pnr3.v`**: 통합 클록 게이트 셀(`TLATNTSC*`) 1,242개(합성 `gates.rpt`의 `clock_gating_integrated_cell`도 1,242). 래퍼(`RC_CG_MOD`) 인스턴스 기준 모듈별: world_writer 1,099 / est_core 113 / 최상위 17 / est_cordic 4 / est_udiv 1(합계 1,234, 나머지 8개는 래퍼 밖 직접 인스턴스로 보이나 위치 미분류). **좌표 변환(xf_b8) 레인에는 게이트가 없음**(레인 단위 게이팅 없음).
+- **활성 뱅크 비율 불일치**: RTL 주석은 "선형 밴드 배치, 프레임당 활성 뱅크 roll 66%(행 우선) / pan 40%(열 우선)", 덱 13쪽은 roll 약 76% / pan 약 97%(행 우선 배치 기준). 근거 배치가 다른지 현수 확인 필요.
+- **수치 구분**: 행 단위 게이팅 메모리 클록 전력 −65.5%(§217)는 병행 설계(`world_mem_ff_rg`) 실측이며 칩 S의 측정값이 아님. 칩 S의 게이팅 절감량은 측정한 적 없음(전력 13.02 mW는 활동도 없는 값).
+
+
+## 253. 월드 지도가 쌓이는 과정 영상 (정수 기준모델 재생, 2026-11-24)
+
+**방법**: 칩과 비트 일치가 확인된 정수 기준모델(`job24_est.EstS` 추정기 + `job24_world.py` 월드 규칙: 8 px 셀, 4비트 Morris 카운터, LFSR16, 스트림 순서)로 roll 전체(프레임 1~2060)를 재생하며 4프레임마다 월드 메모리와 센서 이벤트를 저장(515장). 스크립트 `selfcal_chipS/selfcal/video_make_snaps.py`(서버 `~/redred_gate_ext/video/`, 작업 폴더 `~/redred_gate_ext/ecc/work/results`), 렌더 `video_render.py`.
+**설정·수치**: roll 피벗 (480,352), 초기 자세는 ECC 기준, 월드 격자 182×180 셀(X0=-728, Y0=-720), 최종 비영 셀 18,073, 최대 카운터 15, 누적 회전 약 325°. 영상 `submission/월드지도_쌓이는과정_roll.mp4`(19.2 s, 30 fps, 14.4 MB): 오른쪽 월드 지도는 4비트 카운터 값(0~15)을 보정 없이 회색 농도로 표시(블러·대비 보정 없음, 사용자 요청), 왼쪽은 최근 4프레임 이벤트(프레임별 밝기 자동 조절).
+**주의**: 칩 RTL이나 게이트 시뮬을 직접 찍은 영상이 아니라 기준모델 재생이며, 제출 칩 설정(손으로 맞춘 피벗) 기준. 자기보정 새 칩의 결과가 아님. 스냅샷 원본 `snaps_roll.npz`(12 MB)는 저장소에 올리지 않음. 커밋 71c6aea, edd4117, 5cfce65.
+**미생성**: pan 영상은 서버에 `pan_ecc_0915.npy`가 없어 초기 자세 기준을 만들 수 없어 만들지 못함.
+
+
+## 254. 대회 결과 (2026-11-24 DISU 공지)
+
+REDRED(서울대, Digital)는 **산학협력상(Cadence)** 수상(상금 20만원). Digital 대상 전전긍긍(고려대), 2등 나이스트라이(경희대). 시상식 2026-11-28(토) 10:00~13:00, 대한전자공학회 추계학술대회장(곤지암리조트 EW빌리지 지하1층 L5룸), 참석·식사 회신 기한 11-25 14:00(`as3848@snu.ac.kr`, 팀장 대표). 공지 https://www.disu.ac.kr/LOCnLOS/AIX/notice?md=v&bbsidx=8955 (수상자 명단은 본문 이미지).

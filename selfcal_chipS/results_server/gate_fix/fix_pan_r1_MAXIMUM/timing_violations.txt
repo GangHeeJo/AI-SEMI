@@ -1,0 +1,14 @@
+
+Warning!  Timing violation
+           $setuphold<setup>( posedge CK:7654 PS, negedge E:7562 PS,  0.108 : 108 PS,  -0.061 : -61 PS );
+            File: /home/aiasic26911/gsclib045_all_v4.7/gsclib045/verilog/slow_vdd1v0_basicCells.v, line = 12736
+           Scope: tb_chip_full_sc.dut.u_est.u_dec_RC_CG_HIER_INST0.RC_CGIC_INST
+            Time: 7654 PS
+
+
+Warning!  Timing violation
+           $setuphold<setup>( posedge CK:4153135836 PS, posedge D:4153135714 PS,  0.125 : 125 PS,  -0.080 : -80 PS );
+            File: /home/aiasic26911/gsclib045_all_v4.7/gsclib045/verilog/slow_vdd1v0_basicCells.v, line = 2880
+           Scope: tb_chip_full_sc.dut.u_est.u_core.\fAxy_reg[8] 
+            Time: 4153135836 PS
+
